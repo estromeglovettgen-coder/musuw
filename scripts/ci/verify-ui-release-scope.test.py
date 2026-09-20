@@ -119,7 +119,12 @@ class UiReleaseScopeTest(unittest.TestCase):
             "e2e/billing-entitlement.spec.ts",
             "docs/STAGING_OPERATIONS.md",
         ):
-            self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+            source = SOURCE_ROOT / path
+            if path == "third_party/weknora/v0.7.2-provenance.json":
+                # This ledger evolves with backend work too. Exercise the approved
+                # blob 161811e, not whatever this release currently records.
+                source = SCRIPT.parent / "fixtures/ui-release-reviewed-provenance.json"
+            self.write(path, source.read_text(encoding="utf-8"))
         candidate = self.commit("reviewed UI and delivery content")
         self.assert_scope_passes(self.run_scope(self.base, candidate))
 
@@ -143,7 +148,11 @@ class UiReleaseScopeTest(unittest.TestCase):
 
     def test_reviewed_paths_reject_unreviewed_content_and_deletion(self) -> None:
         baseline = self.base
-        for path in ("auth/src/AuthShowcase.tsx", ".github/workflows/deploy-production.yml", "weknora/frontend/src/hooks/useKnowledgeBase.ts"):
+        for path in (
+            "auth/src/AuthShowcase.tsx", ".github/workflows/deploy-production.yml",
+            "weknora/frontend/src/hooks/useKnowledgeBase.ts",
+            "third_party/weknora/v0.7.2-provenance.json",
+        ):
             with self.subTest(path=path):
                 self.write(path, "unreviewed executable content\n")
                 candidate = self.commit("unreviewed content at a reviewed path")

@@ -30,8 +30,10 @@ func TestIterationLimitSynthesizesWithUpstreamThinkingPolicy(t *testing.T) {
 			}
 			model.responses = append(model.responses, mockResponse{chunks: []types.StreamResponse{
 				{ResponseType: types.ResponseTypeAnswer, Content: "根据检索资料整理的完整答案。"},
-				{ResponseType: types.ResponseTypeAnswer, Done: true, FinishReason: "stop",
-					Usage: &types.TokenUsage{PromptTokens: 100, CompletionTokens: 20, TotalTokens: 120}},
+				{
+					ResponseType: types.ResponseTypeAnswer, Done: true, FinishReason: "stop",
+					Usage: &types.TokenUsage{PromptTokens: 100, CompletionTokens: 20, TotalTokens: 120},
+				},
 			}})
 			thinking := true
 			engine := newTestEngine(t, model, withMaxIterations(rounds), func(cfg *types.AgentConfig) {
@@ -89,12 +91,15 @@ func TestFinalSynthesisRespectsUpstreamContextBudget(t *testing.T) {
 			}}}
 			model := &mockChat{responses: []mockResponse{response, response}}
 			engine := newTestEngine(t, model)
-			require.NoError(t, engine.streamFinalAnswerToEventBus(context.Background(), "query", &types.AgentState{}, "session"))
+			require.NoError(t, engine.streamFinalAnswerToEventBus(
+				context.Background(), "query", &types.AgentState{}, "session"))
 			require.Equal(t, 4096, model.opts[0].MaxCompletionTokens, "unconfigured window keeps the existing budget")
 			// Reserve the upstream 4096-token safety margin around the actual
 			// synthesis prompt; the remaining output allowance is the fixture.
-			engine.config.MaxContextTokens = engine.tokenEstimator.EstimateMessages(model.calls[0]) + 4096 + tc.remaining
-			require.NoError(t, engine.streamFinalAnswerToEventBus(context.Background(), "query", &types.AgentState{}, "session"))
+			promptTokens := engine.tokenEstimator.EstimateMessages(model.calls[0])
+			engine.config.MaxContextTokens = promptTokens + 4096 + tc.remaining
+			require.NoError(t, engine.streamFinalAnswerToEventBus(
+				context.Background(), "query", &types.AgentState{}, "session"))
 			require.Equal(t, tc.want, model.opts[1].MaxTokens)
 			require.Equal(t, tc.want, model.opts[1].MaxCompletionTokens)
 		})
