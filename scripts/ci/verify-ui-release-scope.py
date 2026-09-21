@@ -33,6 +33,8 @@ PROTECTED = ("backend", "billing", "payment", "checkout", "entitlement", "subscr
 # Pin content, not just sensitive filenames: later edits need a fresh review.
 # The two documentation entries also include this clarification of the policy.
 REVIEWED_UI_CONTENT = {
+    # Documentation links only; retain exact-content review for channel settings.
+    "weknora/frontend/src/views/integrations/IntegrationSettingsSection.vue": {"08c0c4a5da3342e0a4305ecb6ff8b7be9621b638"},
     # Embed presentation files also contain session, token, origin, and message
     # handling. Pin the exact reviewed blobs instead of broadly allowing paths.
     "weknora/frontend/public/musuw-widget.js": {"ea25bcf9e9e6b7241a15b346424b8f3f4b3ad0c3"},

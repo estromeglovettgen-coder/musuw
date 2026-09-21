@@ -101,6 +101,17 @@ class UiReleaseScopeTest(unittest.TestCase):
         candidate = self.commit("allowed UI changes")
         self.assert_scope_passes(self.run_scope(self.base, candidate))
 
+    def test_reviewed_docs_entrypoint_is_pinned_and_later_edits_rejected(self) -> None:
+        # The release CLI is the stable seam: reviewed help links may ship,
+        # but this settings page also owns channel state and cannot be open-ended.
+        path = "weknora/frontend/src/views/integrations/IntegrationSettingsSection.vue"
+        self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+        reviewed = self.commit("reviewed public documentation links")
+        self.assert_scope_passes(self.run_scope(self.base, reviewed))
+        self.write(path, "unreviewed channel behavior\n")
+        changed = self.commit("future changes require review")
+        self.assert_scope_rejects(self.run_scope(reviewed, changed))
+
     def test_package_json_allows_only_batch_script_change(self) -> None:
         package = {"name": "fixture", "scripts": {"test": "true", "app:e2e:batch": "playwright test"}}
         self.write("package.json", json.dumps(package, indent=2) + "\n")
