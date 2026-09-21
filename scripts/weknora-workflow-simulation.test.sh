@@ -22,12 +22,17 @@ grep -Fq 'python3 "$RUNNER_TEMP/verify-ui-release-scope.py" "$UI_BASE_SHA" "$act
 python3 "$script_dir/ci/verify-ui-release-scope.test.py"
 grep -Fq 'python3 "$RUNNER_TEMP/verify-reviewed-model-release.py" "$actual" "$UI_BASE_SHA" "$REQUESTED_STAGING_RUN_ID"' "$workflow_path" || fail 'reviewed model acceptance lacks its exact release guard'
 python3 "$script_dir/ci/verify-reviewed-model-release.test.py"
+grep -Fq '          - reviewed-integration-release' "$workflow_path" || fail 'reviewed integration acceptance is missing'
+grep -Fq 'python3 "$RUNNER_TEMP/verify-reviewed-integration-release.py" "$actual" "$UI_BASE_SHA" "$REQUESTED_STAGING_RUN_ID"' "$workflow_path" || fail 'reviewed integration acceptance lacks its exact release guard'
+grep -Fq 'targeted IM/embed acceptance passed; full Sandbox E2E NOT claimed' "$workflow_path" || fail 'reviewed integration acceptance overclaims its evidence'
+python3 "$script_dir/ci/verify-reviewed-integration-release.test.py"
 if grep -Eq '^[[:space:]]*- full$' "$workflow_path"; then
     fail 'unsupported full release mode remains in the workflow'
 fi
 grep -Fq "github.event_name == 'workflow_dispatch'" "$workflow_path" || fail 'production promotion is not manual-only'
 grep -Fq "inputs.release_mode == 'promote'" "$workflow_path" || fail 'production promotion lacks an explicit promote gate'
 grep -Fq "inputs.staging_e2e_result == 'full-sandbox-e2e-green'" "$workflow_path" || fail 'production promotion is not gated by full Sandbox E2E attestation'
+grep -Fq "inputs.staging_e2e_result == 'reviewed-integration-release'" "$workflow_path" || fail 'production promotion omits the reviewed integration gate'
 grep -Fq 'required_reviewers' "$workflow_path" || fail 'production promotion does not verify a protected reviewer gate'
 grep -Fq 'EVENT_SHA: ${{ github.sha }}' "$workflow_path" || fail 'manual staging does not bind the requested SHA to the dispatched branch head'
 grep -Fq 'test "$requested" = "$EVENT_SHA"' "$workflow_path" || fail 'manual staging accepts a SHA other than the dispatched branch head'

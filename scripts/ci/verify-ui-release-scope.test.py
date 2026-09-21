@@ -118,6 +118,9 @@ class UiReleaseScopeTest(unittest.TestCase):
             "auth/e2e/background-stability.spec.ts",
             "e2e/billing-entitlement.spec.ts",
             "docs/STAGING_OPERATIONS.md",
+            "docs/INTEGRATION_RELEASE_REVIEW_20260921.md",
+            "scripts/ci/verify-reviewed-integration-release.py",
+            "scripts/ci/verify-reviewed-integration-release.test.py",
         ):
             source = SOURCE_ROOT / path
             if path == "third_party/weknora/v0.7.2-provenance.json":
@@ -170,6 +173,7 @@ class UiReleaseScopeTest(unittest.TestCase):
             "auth/src/AuthShowcase.tsx", ".github/workflows/deploy-production.yml",
             "weknora/frontend/src/hooks/useKnowledgeBase.ts",
             "third_party/weknora/v0.7.2-provenance.json",
+            "scripts/ci/verify-reviewed-integration-release.py",
         ):
             with self.subTest(path=path):
                 self.write(path, "unreviewed executable content\n")

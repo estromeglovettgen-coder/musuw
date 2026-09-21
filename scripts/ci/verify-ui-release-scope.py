@@ -28,7 +28,7 @@ REVIEWED_UI_CONTENT = {
     'e2e/mobile-fixture-api.mjs': {"2c550eb1ecc0cdaff57116b0c57d5098a757c05a"},
     "e2e/mobile-layout.md": {"d8ccce7a55b6383234c60589835e2170cf0a8fff"},
     "weknora/frontend/src/hooks/useKnowledgeBase.ts": {"f61ae64f29f66e34c30734af13ad144914c7d887"},
-    ".github/workflows/deploy-production.yml": {"9a76d9923b9c28de0e4175a4b88370109dc8d525", "a5971dec25b35056d796eec3c79cffd11382fc16"},
+    ".github/workflows/deploy-production.yml": {"9a76d9923b9c28de0e4175a4b88370109dc8d525", "a5971dec25b35056d796eec3c79cffd11382fc16", "11bdd2059ab4c398892f8d3aef199efabb4e9cec"},
     # The new blob only provisions the already-reviewed, bounded customer-service
     # channel secrets inside the protected storefront deploy environment. Keep
     # this exact-content pin so later workflow edits still require review.
@@ -46,8 +46,13 @@ REVIEWED_UI_CONTENT = {
     "openspec/changes/deploy-isolated-staging/specs/sandbox-billing-release-gate/spec.md": {"5f89c66ff9261991a42692d8f8f16988c6fc5174", "4eb0d34d0f96341f4e55ae8913c987e0a8e02294"},
     "playwright.billing.config.ts": {"0af6c9ab3d45b26da9a2ad5b0517b0a7d4b64fe0"},
     "playwright.knowledge-upload.config.ts": {"fad968652432f48a144489a70c23b3967030c1a5", "0bb47d368da4d1c558eab3ce0db1cc1e210fc9db", "bde962ce72910dae6b2f618a5b6ba53c6104fc9c", "d44879f4afbe340c02c859ce4f3f82458db94e31"},
-    "scripts/ci/validate-workflows.rb": {"5154e0d6c229af1e2180bc1026d47954ecb626af", "72062480c9e6a49c3a2dd50d5935b98436e7021a"},
-    "scripts/weknora-workflow-simulation.test.sh": {"bf077e542b96ad418d13a3a8091498c05c2e72fb", "fb779bfd40c16055266bc42ceacc47bbe4df3481"},
+    "scripts/ci/validate-workflows.rb": {"5154e0d6c229af1e2180bc1026d47954ecb626af", "72062480c9e6a49c3a2dd50d5935b98436e7021a", "437c9eb6204a039c9971222f3ac8b2ee375604c7"},
+    "scripts/weknora-workflow-simulation.test.sh": {"bf077e542b96ad418d13a3a8091498c05c2e72fb", "fb779bfd40c16055266bc42ceacc47bbe4df3481", "de9073a864cdaca267f713f6bfc350a7a68c4ae5"},
+    # The exact integration release gate is policy-only. Pin every new file so
+    # a later UI-scoped release may carry this reviewed policy but cannot edit it.
+    "docs/INTEGRATION_RELEASE_REVIEW_20260921.md": {"7ae4207e8b43a6f26ff86e42b75299ec89bf3328"},
+    "scripts/ci/verify-reviewed-integration-release.py": {"65a8f05a68460419b96b0efabde22fe587402307"},
+    "scripts/ci/verify-reviewed-integration-release.test.py": {"4aae3b03abbf2bfe0a4e0955c5a6f6bd198d502b"},
     "third_party/weknora/v0.7.2-provenance.json": {"59de0f2d7797ce39b91b0d5db709ac316a2a1876", "601fb80639787f1a3ba6ab43d533608d757fada8", "8735c066f0119c55670bfa512216924ff21c8675", "a433c0d10542e136e68051a318c66d23e055bfad", "e1361c776a4e15ffb2572fe957177202055f3dcf", "161811eafbf08d8f2e76fdfc8b23b0a076b46d8b"},
     "weknora/frontend/e2e/billing-harness.html": {"51526a1a4a971fb3e9393658944c04cf5819cee9"},
     "weknora/frontend/e2e/billing-harness.ts": {"d04631889c795e31a0b3b02a222de4e2bf464d07"},
