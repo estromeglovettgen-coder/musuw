@@ -1214,7 +1214,7 @@ internal/router/files.go	-	M	100644	73df3fef55647d458dc806cc594f1c1c201cb56c	ada
 internal/router/lite_product_edition_test.go	A	-	100644	6c04dd9109c0de4d50f24abeee6451865ee60fea	preserve-musuw-exact		audited local-only content is byte-identical
 internal/router/lite_product_gate.go	A	-	100644	3cdb3d78e5d62a94fb7a914a096b82238d6c6695	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/router/lite_product_gate_request_test.go	A	-	100644	fb03401e1f0627c88e3da66586677a829660ac98	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-internal/router/lite_product_gate_test.go	A	-	100644	be931397c2334f0d67b6505c068fc9d34ca60c35	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/router/lite_product_gate_test.go	A	-	100644	9d4d40377d18771da8c34cc436e5d3b727b79c90	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/router/paddle_public_config_route_test.go	A	-	100644	37bd1221be65160723b79c92199ca6d1069e3985	preserve-musuw-exact		audited local-only content is byte-identical
 internal/router/paddle_webhook_task.go	A	-	100644	9e10f4ccce671dce77e6d831f993559ac2c9b7f3	preserve-musuw-exact		audited local-only content is byte-identical
 internal/router/paddle_webhook_task_test.go	A	-	100644	c63f4f7cc79fb52bd1a493f7fba1ec22a989eeee	preserve-musuw-exact		audited local-only content is byte-identical
