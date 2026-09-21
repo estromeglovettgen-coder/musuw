@@ -371,7 +371,13 @@ func TestUpdateIMChannelMergesCredentialKeysWithoutClearingStoredSecrets(t *test
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
 	}
-	for _, forbidden := range []string{"keep-bot-token", "keep-outgoing-token", "new-secret", `"credentials":`, `"bot_identity":`} {
+	for _, forbidden := range []string{
+		"keep-bot-token",
+		"keep-outgoing-token",
+		"new-secret",
+		`"credentials":`,
+		`"bot_identity":`,
+	} {
 		if strings.Contains(w.Body.String(), forbidden) {
 			t.Fatalf("update response leaked %q: %s", forbidden, w.Body.String())
 		}
@@ -433,7 +439,11 @@ func TestUpdateIMChannelRejectsNonObjectCredentialsWithoutWriting(t *testing.T) 
 				t.Fatalf("reload channel: %v", err)
 			}
 			if fresh.Name != "before" || string(fresh.Credentials) != string(original) {
-				t.Fatalf("invalid request changed stored channel: name=%q credentials=%s", fresh.Name, fresh.Credentials)
+				t.Fatalf(
+					"invalid request changed stored channel: name=%q credentials=%s",
+					fresh.Name,
+					fresh.Credentials,
+				)
 			}
 		})
 	}
