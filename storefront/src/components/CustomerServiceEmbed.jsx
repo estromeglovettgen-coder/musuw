@@ -1,0 +1,48 @@
+import { useEffect } from "react";
+import {
+  CUSTOMER_SERVICE_CONFIG_PATH,
+  loadCustomerServiceWidget,
+  normalizeCustomerServiceConfig,
+  widgetLocale,
+} from "../customerServiceEmbed.js";
+
+export function CustomerServiceEmbed({ locale }) {
+  useEffect(() => {
+    let cancelled = false;
+    let widget = null;
+
+    async function mountWidget() {
+      const response = await fetch(CUSTOMER_SERVICE_CONFIG_PATH, {
+        credentials: "same-origin",
+        headers: { accept: "application/json" },
+      });
+      if (!response.ok) return;
+      const config = normalizeCustomerServiceConfig(await response.json());
+      if (!config) return;
+
+      const musuw = await loadCustomerServiceWidget(config.scriptUrl);
+      if (cancelled) return;
+      widget = musuw.init({
+        baseUrl: config.baseUrl,
+        channel: config.channelId,
+        position: "bottom-right",
+        title: locale === "zh-CN" ? "Musuw 智能客服" : "Musuw AI assistant",
+        tokenEndpoint: config.tokenEndpoint,
+      });
+      widget?.setLocale(widgetLocale(locale));
+      widget?.setContext({ locale, page: window.location.href, surface: "storefront" });
+    }
+
+    mountWidget().catch(() => {
+      // A missing or temporarily unavailable support channel must never block
+      // the public homepage. The next page load retries the runtime config.
+    });
+
+    return () => {
+      cancelled = true;
+      widget?.destroy();
+    };
+  }, [locale]);
+
+  return null;
+}

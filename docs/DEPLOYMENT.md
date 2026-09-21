@@ -119,10 +119,14 @@ the upload never copies or prints their values.
 
 The Worker-scoped `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are
 secrets of the `storefront-production` GitHub Environment. The storefront job
-receives no server, database, model, auth or billing credentials.
-`storefront/wrangler.jsonc` is the deployment
-configuration and the Worker serves only the public static site. Product
-actions hand off to `https://app.musuw.com/auth/start`.
+receives no database, model-provider, account-authentication or billing
+credentials. `storefront/wrangler.jsonc` is the deployment configuration. The
+Worker serves the public site and, when configured, the bounded homepage
+customer-service config and short-token exchange endpoints. Its only
+application-scoped credential is `MUSUW_CUSTOMER_SERVICE_PUBLISH_TOKEN`, an
+embed-channel publish token that cannot grant account, tenant-management,
+billing, or provider access. Product actions hand off to
+`https://app.musuw.com/auth/start`.
 
 After deployment, check both domains, the HTML language signal and the auth
 handoff. A Cloudflare command succeeding without these probes is not enough.

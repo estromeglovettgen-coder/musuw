@@ -14,6 +14,17 @@ available to the signed-in tenant. A paid plan can be mirrored only from a
 signature-verified Paddle Webhook; URL parameters and checkout returns never
 grant entitlements.
 
+The homepage can also mount the existing Musuw webpage-embed widget as a
+bottom-right customer-service launcher. It is disabled unless the `musuw-site`
+Worker has both `MUSUW_CUSTOMER_SERVICE_CHANNEL_ID` and the secret
+`MUSUW_CUSTOMER_SERVICE_PUBLISH_TOKEN` runtime bindings. The browser receives
+the channel ID and a same-origin short-token endpoint; the Worker keeps the
+publish token private and exchanges it against the configured application
+origin (default `https://app.musuw.com`). The channel's `allowed_origins` must
+include `https://app.musuw.com`, `https://musuw.com`, and
+`https://www.musuw.com`: the first is the iframe/API origin and the other two
+are the supported homepage origins.
+
 ## Local verification
 
 ```bash

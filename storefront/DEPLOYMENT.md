@@ -1,9 +1,20 @@
 # Storefront deployment boundary
 
-The Cloudflare Worker named `musuw-site` owns the static marketing site at
+The Cloudflare Worker named `musuw-site` owns the marketing site at
 `musuw.com` and `www.musuw.com`, including locale-aware document metadata, and
 the independent static partner-board demonstration at `partners.musuw.com`. It
 must not receive payment credentials or expose an `/api/checkout` route.
+
+The only application-scoped runtime credential allowed in this Worker is the
+publish token for the homepage customer-service embed. Bind it as
+`MUSUW_CUSTOMER_SERVICE_PUBLISH_TOKEN` together with the non-secret
+`MUSUW_CUSTOMER_SERVICE_CHANNEL_ID`; do not put either value in source or the
+static bundle. The Worker exposes only a bounded config response and exchanges
+the publish token server-side for the existing 30-minute embed session token.
+The optional `MUSUW_CUSTOMER_SERVICE_APP_ORIGIN` defaults to
+`https://app.musuw.com` and accepts HTTPS origins only. Configure the channel
+with `https://app.musuw.com`, `https://musuw.com`, and
+`https://www.musuw.com` in `allowed_origins`.
 
 Product actions cross to `https://app.musuw.com/auth/start`. Pricing actions carry
 only a bounded local plan and billing period. The product origin owns Google
@@ -26,8 +37,9 @@ methods, and unknown partner routes return 404. The existing deployment smoke
 step checks the hostname, both languages, all assets, and the API boundary.
 
 The application release owns the authenticated product origin separately from
-this static homepage. Keep homepage deployment free of authentication,
-provider, and payment credentials.
+this homepage. Keep homepage deployment free of authentication, model-provider,
+and payment credentials; the scoped customer-service publish token cannot grant
+account, tenant-management, billing, or model-provider access.
 
 See [`../docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) for the canonical end-to-end
 delivery path and production evidence fields.
