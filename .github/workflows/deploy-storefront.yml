@@ -282,12 +282,32 @@ jobs:
             printf '%s release=%s content-language=%s\n' "$origin" "$RELEASE_SHA" "$(grep -i '^content-language:' "$headers" | tr -d '\r' | tr '\n' ' ')" | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
 
             customer_config="$RUNNER_TEMP/musuw-customer-service-${origin#https://}.json"
-            curl --fail --silent --show-error --retry 8 --retry-delay 3 --connect-timeout 10 --max-time 30 \
-              -o "$customer_config" "$origin/_musuw/customer-service/config"
+            customer_config_ready=false
+            for attempt in $(seq 1 12); do
+              customer_config_status="$(curl --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 \
+                --connect-timeout 10 --max-time 30 -o "$customer_config" -w '%{http_code}' \
+                "$origin/_musuw/customer-service/config" || true)"
+              if [ "$customer_config_status" = 200 ]; then
+                if [ "$CUSTOMER_SERVICE_CONFIGURED" = true ]; then
+                  if jq -e --arg channel "$CUSTOMER_SERVICE_CHANNEL_ID" \
+                    '.enabled == true and .channelId == $channel and (.publishToken | not) and (.publish_token | not)' \
+                    "$customer_config" >/dev/null; then
+                    customer_config_ready=true
+                    break
+                  fi
+                elif jq -e '.enabled == false' "$customer_config" >/dev/null; then
+                  customer_config_ready=true
+                  break
+                fi
+              fi
+              if [ "$attempt" -lt 12 ]; then sleep 5; fi
+            done
+            if [ "$customer_config_ready" != true ]; then
+              printf 'customer-service config did not converge for %s (last status=%s)\n' \
+                "$origin" "${customer_config_status:-unavailable}" >&2
+              exit 1
+            fi
             if [ "$CUSTOMER_SERVICE_CONFIGURED" = true ]; then
-              jq -e --arg channel "$CUSTOMER_SERVICE_CHANNEL_ID" \
-                '.enabled == true and .channelId == $channel and (.publishToken | not) and (.publish_token | not)' \
-                "$customer_config" >/dev/null
               customer_token="$RUNNER_TEMP/musuw-customer-service-token-${origin#https://}.json"
               curl --fail --silent --show-error --retry 8 --retry-delay 3 --connect-timeout 10 --max-time 30 \
                 -H "Origin: $origin" -o "$customer_token" "$origin/_musuw/customer-service/token"
@@ -296,7 +316,6 @@ jobs:
               printf '%s customer-service=configured short-token=ok\n' "$origin" \
                 | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
             else
-              jq -e '.enabled == false' "$customer_config" >/dev/null
               printf '%s customer-service=disabled\n' "$origin" \
                 | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
             fi
