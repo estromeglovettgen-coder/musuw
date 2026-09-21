@@ -488,12 +488,14 @@ const agentImageUploadEnabledEffective = computed(() =>
   drawerAgent.value?.config?.image_upload_enabled === true,
 )
 
-const WEKNORA_BRAND_COLOR = '#07C05F'
+const MUSUW_BRAND_COLOR = '#2563EB'
 
 function getDefaultEmbedPrimaryColor(): string {
-  if (typeof window === 'undefined') return WEKNORA_BRAND_COLOR
-  const css = getComputedStyle(document.documentElement).getPropertyValue('--td-brand-color').trim()
-  return css || WEKNORA_BRAND_COLOR
+  if (typeof window === 'undefined') return MUSUW_BRAND_COLOR
+  const styles = getComputedStyle(document.documentElement)
+  const css = styles.getPropertyValue('--musuw-accent').trim()
+    || styles.getPropertyValue('--td-brand-color').trim()
+  return css || MUSUW_BRAND_COLOR
 }
 
 const defaultPrimaryColor = getDefaultEmbedPrimaryColor()
@@ -1093,12 +1095,116 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
   flex-direction: column;
 }
 
+.channels-section {
+  min-width: 0;
+}
+
+.channels-header {
+  gap: var(--musuw-space-1, 8px);
+  margin-bottom: var(--musuw-space-2, 16px);
+
+  .channels-title {
+    color: var(--musuw-ink-strong, var(--td-text-color-primary));
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .channels-count {
+    min-width: 24px;
+    padding: 2px 8px;
+    border: 1px solid var(--musuw-line, var(--td-component-stroke));
+    border-radius: var(--musuw-radius-pill, 999px);
+    background: var(--musuw-surface-hover, var(--td-bg-color-secondarycontainer));
+    color: var(--musuw-muted, var(--td-text-color-secondary));
+    text-align: center;
+  }
+}
+
+.channel-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--musuw-space-2, 16px);
+}
+
+.channel-card {
+  min-height: 82px;
+  padding: var(--musuw-space-2, 16px);
+  border-color: var(--musuw-line, var(--td-component-stroke));
+  border-radius: var(--musuw-radius-card, 12px);
+  background: var(--musuw-surface, var(--td-bg-color-container));
+  box-shadow: var(--musuw-shadow-subtle, 0 1px 2px rgba(38, 38, 38, 0.045));
+
+  &--clickable:hover,
+  &--clickable:focus-visible {
+    border-color: var(--musuw-line-strong, var(--td-component-border));
+    background: var(--musuw-surface, var(--td-bg-color-container));
+    box-shadow: var(--musuw-shadow-raised, 0 12px 32px rgba(38, 38, 38, 0.06));
+  }
+
+  &--clickable:focus-visible {
+    outline-color: var(--musuw-accent, var(--td-brand-color));
+  }
+
+  &--add {
+    border-color: var(--musuw-line-strong, var(--td-component-border));
+    background: var(--musuw-surface-hover, var(--td-bg-color-secondarycontainer));
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--musuw-accent, var(--td-brand-color));
+      background: var(--musuw-accent-soft, var(--td-brand-color-light));
+      color: var(--musuw-accent, var(--td-brand-color));
+    }
+
+    .channel-card__badge {
+      background: var(--musuw-surface, var(--td-bg-color-container));
+      color: var(--musuw-accent, var(--td-brand-color));
+    }
+  }
+
+  &__badge {
+    width: 40px;
+    height: 40px;
+    border: 1px solid color-mix(in srgb, var(--musuw-accent, var(--td-brand-color)) 12%, transparent);
+    border-radius: var(--musuw-radius-control, 8px);
+    background: var(--musuw-accent-soft, var(--td-brand-color-light));
+    color: var(--musuw-accent, var(--td-brand-color));
+  }
+
+  &__title {
+    color: var(--musuw-ink-strong, var(--td-text-color-primary));
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__agent-name {
+    color: var(--musuw-muted, var(--td-text-color-placeholder));
+  }
+
+  &__action-btn {
+    border-radius: var(--musuw-radius-control, 8px);
+  }
+
+  &__more:hover,
+  &__more:focus-visible {
+    background: var(--musuw-surface-hover, var(--td-bg-color-secondarycontainer));
+    color: var(--musuw-ink-strong, var(--td-text-color-primary));
+  }
+}
+
 .im-steps {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--td-component-stroke);
-  padding-bottom: 12px;
+  gap: 4px;
+  margin-bottom: var(--musuw-space-3, 24px);
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--musuw-line, var(--td-component-stroke));
+  border-radius: var(--musuw-radius-card, 12px);
+  background: var(--musuw-surface-hover, var(--td-bg-color-secondarycontainer));
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .im-step {
@@ -1107,17 +1213,22 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
   gap: 6px;
   flex: 1;
   min-width: 0;
+  min-height: 36px;
   font-size: 12px;
-  color: var(--td-text-color-placeholder);
-  padding: 0;
+  font-weight: 500;
+  color: var(--musuw-muted, var(--td-text-color-placeholder));
+  padding: 6px 8px;
   border: none;
+  border-radius: var(--musuw-radius-control, 8px);
   background: transparent;
   font-family: inherit;
   text-align: left;
   cursor: pointer;
+  transition: color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
 
   &:hover {
-    color: var(--td-text-color-secondary);
+    color: var(--musuw-ink, var(--td-text-color-secondary));
+    background: color-mix(in srgb, var(--musuw-surface, #fff) 64%, transparent);
   }
 }
 
@@ -1129,12 +1240,14 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
 }
 
 .im-step.active {
-  color: var(--td-brand-color);
-  font-weight: 500;
+  color: var(--musuw-ink-strong, var(--td-text-color-primary));
+  font-weight: 600;
+  background: var(--musuw-surface, var(--td-bg-color-container));
+  box-shadow: var(--musuw-shadow-subtle, 0 1px 2px rgba(38, 38, 38, 0.045));
 }
 
 .im-step.done {
-  color: var(--td-text-color-secondary);
+  color: var(--musuw-muted-strong, var(--td-text-color-secondary));
   font-weight: 500;
 }
 
@@ -1148,21 +1261,21 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
   justify-content: center;
   font-size: 11px;
   font-weight: 600;
-  border: 1px solid var(--td-component-stroke);
-  color: var(--td-text-color-placeholder);
-  background: transparent;
+  border: 1px solid var(--musuw-line-strong, var(--td-component-stroke));
+  color: var(--musuw-muted, var(--td-text-color-placeholder));
+  background: var(--musuw-surface, var(--td-bg-color-container));
 }
 
 .im-step.active .im-step-num {
-  background: var(--td-brand-color);
+  background: var(--musuw-accent, var(--td-brand-color));
   color: #fff;
-  border-color: var(--td-brand-color);
+  border-color: var(--musuw-accent, var(--td-brand-color));
 }
 
 .im-step.done .im-step-num {
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-brand-color);
-  border-color: var(--td-component-stroke);
+  background: var(--musuw-accent-soft, var(--td-bg-color-secondarycontainer));
+  color: var(--musuw-accent, var(--td-brand-color));
+  border-color: transparent;
 }
 
 .im-step-check {
@@ -1177,8 +1290,17 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
 
 /* ---------- Drawer form (matches ModelEditorDialog rhythm) ---------- */
 :deep(.embed-drawer__section.setting-drawer__section) {
-  gap: 10px;
-  padding: 10px 0 14px;
+  gap: var(--musuw-space-2, 16px);
+  padding: var(--musuw-space-2, 16px);
+  border: 1px solid var(--musuw-line, var(--td-component-stroke));
+  border-radius: var(--musuw-radius-card, 12px);
+  background: var(--musuw-surface, var(--td-bg-color-container));
+  box-shadow: var(--musuw-shadow-subtle, 0 1px 2px rgba(38, 38, 38, 0.045));
+}
+
+:deep(.embed-drawer__section .setting-drawer__section-title) {
+  margin-bottom: 0;
+  color: var(--musuw-ink-strong, var(--td-text-color-primary));
 }
 
 .form-item {
@@ -1294,14 +1416,14 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  border-radius: 8px;
-  background: var(--td-bg-color-secondarycontainer);
-  border: 1px dashed var(--td-component-stroke);
+  border-radius: var(--musuw-radius-control, 8px);
+  background: var(--musuw-accent-soft, var(--td-bg-color-secondarycontainer));
+  border: 1px solid color-mix(in srgb, var(--musuw-accent, var(--td-brand-color)) 14%, var(--musuw-line, transparent));
 
   &__icon {
     flex-shrink: 0;
     margin-top: 1px;
-    color: var(--td-brand-color);
+    color: var(--musuw-accent, var(--td-brand-color));
     font-size: 16px;
   }
 
@@ -1309,7 +1431,7 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
     margin: 0;
     font-size: 13px;
     line-height: 1.5;
-    color: var(--td-text-color-secondary);
+    color: var(--musuw-muted-strong, var(--td-text-color-secondary));
   }
 }
 
@@ -1443,9 +1565,9 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
 }
 
 .code-panel {
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
-  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--musuw-line, var(--td-component-stroke));
+  border-radius: var(--musuw-radius-card, 12px);
+  background: var(--musuw-surface-hover, var(--td-bg-color-secondarycontainer));
   overflow: hidden;
 
   &__toolbar {
@@ -1454,14 +1576,14 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
     justify-content: space-between;
     gap: 8px;
     padding: 8px 10px;
-    border-bottom: 1px solid var(--td-component-stroke);
-    background: var(--td-bg-color-container);
+    border-bottom: 1px solid var(--musuw-line, var(--td-component-stroke));
+    background: var(--musuw-surface, var(--td-bg-color-container));
   }
 
   &__label {
     font-size: 12px;
     font-weight: 500;
-    color: var(--td-text-color-secondary);
+    color: var(--musuw-muted-strong, var(--td-text-color-secondary));
   }
 
   &__actions {
@@ -1479,26 +1601,26 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-all;
-    color: var(--td-text-color-primary);
+    color: var(--musuw-ink, var(--td-text-color-primary));
     max-height: 180px;
     overflow: auto;
   }
 }
 
 .widget-preview {
-  border: 1px dashed var(--td-component-stroke);
-  border-radius: 8px;
-  padding: 6px;
-  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--musuw-line, var(--td-component-stroke));
+  border-radius: var(--musuw-radius-card, 12px);
+  padding: var(--musuw-space-1, 8px);
+  background: var(--musuw-surface-hover, var(--td-bg-color-secondarycontainer));
   width: 100%;
 }
 
 .preview-surface {
   position: relative;
   height: 88px;
-  border-radius: 6px;
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-stroke);
+  border-radius: var(--musuw-radius-control, 8px);
+  background: var(--musuw-surface, var(--td-bg-color-container));
+  border: 1px solid var(--musuw-line, var(--td-component-stroke));
   overflow: hidden;
 }
 
@@ -1514,7 +1636,7 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
   color: #fff;
   font-size: 16px;
   line-height: 1;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--musuw-shadow-raised, 0 12px 32px rgba(38, 38, 38, 0.12));
   cursor: default;
 
   :deep(.t-icon) {
@@ -1543,5 +1665,51 @@ const toggleEnabled = async (ch: EmbedChannel, enabled: boolean) => {
 .pos-top-left .preview-launcher {
   left: 10px;
   top: 10px;
+}
+
+@media (max-width: 720px) {
+  .channel-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--musuw-space-1, 8px);
+  }
+
+  .channel-card {
+    min-height: 76px;
+    padding: 12px;
+  }
+
+  .im-step {
+    flex: 0 0 auto;
+    min-width: 96px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .im-step,
+  .channel-card {
+    transition: none;
+  }
+}
+</style>
+
+<style lang="less">
+/* The drawer is teleported to <body>, outside `.musuw-workspace-surface`.
+   Reapply the existing Musuw tokens here so this one feature does not fall
+   back to WeKnora's green theme. */
+.embed-channel-drawer {
+  --td-brand-color: var(--musuw-accent, #2563eb);
+  --td-brand-color-hover: var(--musuw-accent-hover, #1d4ed8);
+  --td-brand-color-active: var(--musuw-accent-hover, #1d4ed8);
+  --td-brand-color-light: var(--musuw-accent-soft, rgba(37, 99, 235, 0.07));
+  --td-brand-color-focus: color-mix(in srgb, var(--musuw-accent, #2563eb) 20%, transparent);
+  --td-component-stroke: var(--musuw-line, #e5e7eb);
+  --td-component-border: var(--musuw-line-strong, #d1d5db);
+  --td-bg-color-container: var(--musuw-surface, #fff);
+  --td-bg-color-secondarycontainer: var(--musuw-surface-hover, #f3f4f6);
+  --td-text-color-primary: var(--musuw-ink, #1f2937);
+  --td-text-color-secondary: var(--musuw-muted-strong, #4b5563);
+  --td-text-color-placeholder: var(--musuw-muted, #6b7280);
+  color: var(--musuw-ink, #1f2937);
+  font-family: var(--app-font-family, ui-sans-serif, system-ui, sans-serif);
 }
 </style>

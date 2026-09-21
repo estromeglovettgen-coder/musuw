@@ -108,13 +108,14 @@ const formatFileSize = (bytes: number): string => {
 .user_msg {
   width: max-content;
   max-width: min(76%, 680px);
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--td-bg-color-secondarycontainer);
+  padding: 9px 13px;
+  border: 1px solid var(--musuw-line, #e5e7eb);
+  border-radius: 12px 4px 12px 12px;
+  background: var(--musuw-surface-hover, #f3f4f6);
   margin-left: auto;
-  color: var(--td-text-color-primary);
-  font-size: 16px;
-  line-height: 1.6;
+  color: var(--musuw-ink, #1f2937);
+  font-size: 14px;
+  line-height: 1.55;
   text-align: left;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -134,8 +135,8 @@ const formatFileSize = (bytes: number): string => {
   width: 120px;
   height: 120px;
   object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid var(--td-border-level-2-color, #e7e7e7);
+  border-radius: var(--musuw-radius-control, 8px);
+  border: 1px solid var(--musuw-line, #e5e7eb);
   cursor: pointer;
 }
 
@@ -149,9 +150,9 @@ const formatFileSize = (bytes: number): string => {
 
 .user_attachment_card {
   padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--td-border-level-1-color, #e7e7e7);
-  background: var(--td-bg-color-container, #fff);
+  border-radius: var(--musuw-radius-control, 8px);
+  border: 1px solid var(--musuw-line, #e5e7eb);
+  background: var(--musuw-surface, #fff);
   max-width: 260px;
   min-width: 120px;
 }
@@ -166,11 +167,11 @@ const formatFileSize = (bytes: number): string => {
 
 .attachment_card_meta {
   font-size: 11px;
-  color: var(--td-text-color-secondary, #999);
+  color: var(--musuw-muted, #6b7280);
 }
 
 html[theme-mode='dark'] .user_msg {
-  background: var(--td-bg-color-secondarycontainer);
-  color: var(--td-text-color-primary);
+  background: var(--musuw-surface-hover, var(--td-bg-color-secondarycontainer));
+  color: var(--musuw-ink, var(--td-text-color-primary));
 }
 </style>
