@@ -136,7 +136,9 @@ class UiReleaseScopeTest(unittest.TestCase):
                 "ui-release-reviewed-model-guard-test.txt",
         }
         for path in (
-            ".github/workflows/deploy-production.yml", "docs/DEPLOYMENT.md",
+            ".github/workflows/deploy-production.yml",
+            ".github/workflows/deploy-storefront.yml",
+            "docs/DEPLOYMENT.md",
             "docs/MODEL_RELEASE_20260919.md", "scripts/ci/validate-workflows.rb",
             "scripts/ci/verify-reviewed-model-release.py",
             "scripts/ci/verify-reviewed-model-release.test.py",

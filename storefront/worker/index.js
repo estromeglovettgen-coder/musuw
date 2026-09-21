@@ -1,6 +1,7 @@
 import { normalizeCountry } from "../src/pricingLocalization.js";
 import { localizeDocumentResponse, selectLocale } from "./localization.js";
 import { prerenderAssetPath } from "./prerender.js";
+import { customerServiceResponse } from "./customerService.js";
 
 function requestCountry(request) {
   return normalizeCountry(request.cf?.country || request.headers.get("CF-IPCountry"));
@@ -49,6 +50,8 @@ async function partnerBoardResponse(request, env, url) {
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
   if (url.hostname === "partners.musuw.com") return partnerBoardResponse(request, env, url);
+  const customerService = await customerServiceResponse(request, env, url);
+  if (customerService) return customerService;
   let pathname;
   try { pathname = decodeURIComponent(url.pathname); } catch { return notFound(); }
   if (pathname === "/partner-board" || pathname.startsWith("/partner-board/")) return notFound();

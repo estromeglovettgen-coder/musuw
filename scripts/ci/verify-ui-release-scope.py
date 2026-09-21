@@ -29,14 +29,17 @@ REVIEWED_UI_CONTENT = {
     "e2e/mobile-layout.md": {"d8ccce7a55b6383234c60589835e2170cf0a8fff"},
     "weknora/frontend/src/hooks/useKnowledgeBase.ts": {"f61ae64f29f66e34c30734af13ad144914c7d887"},
     ".github/workflows/deploy-production.yml": {"9a76d9923b9c28de0e4175a4b88370109dc8d525", "a5971dec25b35056d796eec3c79cffd11382fc16"},
-    ".github/workflows/deploy-storefront.yml": {"de051d83aab6281d0c89b2943dca87c8118fbbd1", "0bd421b23303c181500a49cdff8e141d4ac7d991", "a3426cbc189f35856ca23134c9cc94f4ed57d5fe"},
+    # The new blob only provisions the already-reviewed, bounded customer-service
+    # channel secrets inside the protected storefront deploy environment. Keep
+    # this exact-content pin so later workflow edits still require review.
+    ".github/workflows/deploy-storefront.yml": {"de051d83aab6281d0c89b2943dca87c8118fbbd1", "0bd421b23303c181500a49cdff8e141d4ac7d991", "a3426cbc189f35856ca23134c9cc94f4ed57d5fe", "6f345b6505682c959580633c5dfafb01e2d58376"},
     "README.md": {"32bfedf673e7951d615dc231ce12867a218be613"},
     "auth/e2e/background-stability.spec.ts": {"5259bb88fe9802ab6bb04ae72b7fb7664ad9e91e"},
     "auth/playwright.config.ts": {"8982318e2d188f555b20769aeb6da0d60a4b43b9"},
     "auth/src/AuthApp.test.ts": {"81938fa219bd30d2c1ad492292f393e4bac2445d"},
     "auth/src/AuthShowcase.tsx": {"96c26a6ca16ba0b5025921be26fe6765deb3592c"},
     "auth/src/LiquidEther.tsx": {"e6032911a35297b85d21dd76046d04e314ce3483"},
-    "docs/DEPLOYMENT.md": {"eab3ccb887935df15ec3ea42f34cc52bdecb2b58", "0d21e1bf823277c1f12fd6ad0f13dc48b4d7195f"},
+    "docs/DEPLOYMENT.md": {"eab3ccb887935df15ec3ea42f34cc52bdecb2b58", "0d21e1bf823277c1f12fd6ad0f13dc48b4d7195f", "bbbc7b6cd9948ab0a76de01c428e9523d2b25ca9"},
     "docs/STAGING_OPERATIONS.md": {"f2d98dfe3b6176b3f7837f0d1fafbf664f6acb19", "39a5adb3c9a9912a73b7e25bbd8f3dbc5839b863"},
     "e2e/billing-entitlement.spec.ts": {"a00142228e37eb0a8c136eabbda3bd01628c9eee"},
     "e2e/knowledge-upload.spec.ts": {"6272624c5bedf75c5cbbc2b0b72a969e960f37c5", "d519786e0a34e234dcfb2357fa5b673181388a9e"},

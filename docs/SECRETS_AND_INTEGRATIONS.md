@@ -31,6 +31,10 @@ Staging 的独立 Compose、Sandbox 和发布门见
 - 浏览器只能接收 publishable/client/catalog 值；server secret、management/admin、
   webhook signing、SSH/deploy 和 OAuth secret 只能从 Keychain、GitHub Environment
   或服务器 `0600` 文件进入受控进程。
+- 官网智能客服只允许 `musuw-site` Worker 持有单一网页嵌入渠道的 publish token。
+  浏览器只收到渠道 ID 与同源短令牌端点；Worker 调用现有 `/exchange` 换取 30 分钟
+  session token。该 publish token 不得进入仓库、静态 bundle、HTML 或日志，也不能
+  复用于账号、租户、账单或模型供应商权限。
 - TikHub 社交链接入库只读取后端进程的 `TIKHUB_API_KEY`。Musuw production 与
   staging overlay 都要求 root-owned `0600` 文件 `tikhub_api_key`：预检只验证文件
   元数据，Compose 只读挂载并保留本地源文件的 root-owned `0600` mode；声明的

@@ -186,6 +186,57 @@ jobs:
           ' "$RUNNER_TEMP/musuw-storefront-previous-deployments.json")"
           [[ "$previous_version_id" =~ ^[0-9a-fA-F-]{36}$ ]]
           printf 'previous_version_id=%s\n' "$previous_version_id" >> "$GITHUB_OUTPUT"
+      - name: Prepare and verify the bounded homepage customer-service channel
+        id: customer_service
+        working-directory: storefront
+        env:
+          CUSTOMER_SERVICE_CHANNEL_ID: ${{ secrets.MUSUW_CUSTOMER_SERVICE_CHANNEL_ID }}
+          CUSTOMER_SERVICE_PUBLISH_TOKEN: ${{ secrets.MUSUW_CUSTOMER_SERVICE_PUBLISH_TOKEN }}
+        run: |
+          set -euo pipefail
+          configured=false
+          if [ -z "$CUSTOMER_SERVICE_CHANNEL_ID" ] && [ -z "$CUSTOMER_SERVICE_PUBLISH_TOKEN" ]; then
+            echo 'Homepage customer service is not configured; the launcher will stay disabled.'
+            CUSTOMER_SERVICE_CHANNEL_ID=__disabled__
+            CUSTOMER_SERVICE_PUBLISH_TOKEN=__disabled__
+          else
+            test -n "$CUSTOMER_SERVICE_CHANNEL_ID"
+            test -n "$CUSTOMER_SERVICE_PUBLISH_TOKEN"
+            [[ "$CUSTOMER_SERVICE_CHANNEL_ID" =~ ^[0-9a-fA-F-]{36}$ ]]
+            [[ "$CUSTOMER_SERVICE_PUBLISH_TOKEN" =~ ^em_[A-Za-z0-9_-]{43}$ ]]
+            case "$CUSTOMER_SERVICE_CHANNEL_ID$CUSTOMER_SERVICE_PUBLISH_TOKEN" in
+              *$'\n'*|*$'\r'*) printf '%s\n' 'customer-service bindings must be single-line values' >&2; exit 1 ;;
+            esac
+            # Prove the production application has the public Lite runtime and
+            # this exact channel/origin before any Cloudflare version changes.
+            readiness="$RUNNER_TEMP/musuw-customer-service-readiness.json"
+            curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 3 \
+              --connect-timeout 10 --max-time 30 --request POST \
+              -H 'Accept: application/json' \
+              -H "Authorization: Embed $CUSTOMER_SERVICE_PUBLISH_TOKEN" \
+              -H 'Origin: https://musuw.com' \
+              -o "$readiness" \
+              "https://app.musuw.com/api/v1/embed/$CUSTOMER_SERVICE_CHANNEL_ID/exchange"
+            jq -e '
+              .success == true and
+              (.data.session_token | type == "string" and startswith("ems_")) and
+              (.data.expires_in | type == "number" and . > 0)
+            ' "$readiness" >/dev/null
+            configured=true
+          fi
+          secrets_file="$RUNNER_TEMP/musuw-storefront-secrets.json"
+          umask 077
+          jq -n \
+            --arg channel "$CUSTOMER_SERVICE_CHANNEL_ID" \
+            --arg publishToken "$CUSTOMER_SERVICE_PUBLISH_TOKEN" \
+            '{MUSUW_CUSTOMER_SERVICE_CHANNEL_ID:$channel,MUSUW_CUSTOMER_SERVICE_PUBLISH_TOKEN:$publishToken}' \
+            > "$secrets_file"
+          chmod 0600 "$secrets_file"
+          test "$(stat -c '%a' "$secrets_file")" = 600
+          {
+            printf 'configured=%s\n' "$configured"
+            printf 'secrets_file=%s\n' "$secrets_file"
+          } >> "$GITHUB_OUTPUT"
       - name: Deploy the storefront only
         id: deploy_worker
         working-directory: storefront
@@ -193,9 +244,11 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           RELEASE_SHA: ${{ needs.build.outputs.release_sha }}
+          CUSTOMER_SERVICE_SECRETS_FILE: ${{ steps.customer_service.outputs.secrets_file }}
         run: |
           set -euo pipefail
           if ! npx wrangler deploy --strict --config wrangler.jsonc \
+            --secrets-file "$CUSTOMER_SERVICE_SECRETS_FILE" \
             --message "musuw storefront $RELEASE_SHA" \
             --tag "github-$RELEASE_SHA" 2>&1 | tee "$RUNNER_TEMP/musuw-storefront-deploy.log"; then
             {
@@ -213,6 +266,8 @@ jobs:
         id: smoke
         env:
           RELEASE_SHA: ${{ needs.build.outputs.release_sha }}
+          CUSTOMER_SERVICE_CHANNEL_ID: ${{ secrets.MUSUW_CUSTOMER_SERVICE_CHANNEL_ID }}
+          CUSTOMER_SERVICE_CONFIGURED: ${{ steps.customer_service.outputs.configured }}
         run: |
           set -euo pipefail
           : > "$RUNNER_TEMP/musuw-storefront-smoke.txt"
@@ -225,6 +280,26 @@ jobs:
             grep -Eiq '<html[^>]+lang="(en|zh-CN)"' "$body"
             grep -Eiq 'window\.__MUSUW_LOCALE__[[:space:]]*=[[:space:]]*"(en|zh-CN)"' "$body"
             printf '%s release=%s content-language=%s\n' "$origin" "$RELEASE_SHA" "$(grep -i '^content-language:' "$headers" | tr -d '\r' | tr '\n' ' ')" | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
+
+            customer_config="$RUNNER_TEMP/musuw-customer-service-${origin#https://}.json"
+            curl --fail --silent --show-error --retry 8 --retry-delay 3 --connect-timeout 10 --max-time 30 \
+              -o "$customer_config" "$origin/_musuw/customer-service/config"
+            if [ "$CUSTOMER_SERVICE_CONFIGURED" = true ]; then
+              jq -e --arg channel "$CUSTOMER_SERVICE_CHANNEL_ID" \
+                '.enabled == true and .channelId == $channel and (.publishToken | not) and (.publish_token | not)' \
+                "$customer_config" >/dev/null
+              customer_token="$RUNNER_TEMP/musuw-customer-service-token-${origin#https://}.json"
+              curl --fail --silent --show-error --retry 8 --retry-delay 3 --connect-timeout 10 --max-time 30 \
+                -H "Origin: $origin" -o "$customer_token" "$origin/_musuw/customer-service/token"
+              jq -e '.token | type == "string" and startswith("ems_")' "$customer_token" >/dev/null
+              jq -e '.expiresIn | type == "number" and . > 0' "$customer_token" >/dev/null
+              printf '%s customer-service=configured short-token=ok\n' "$origin" \
+                | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
+            else
+              jq -e '.enabled == false' "$customer_config" >/dev/null
+              printf '%s customer-service=disabled\n' "$origin" \
+                | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
+            fi
           done
           for locale in zh en; do
             headers="$RUNNER_TEMP/musuw-partners-$locale.headers"

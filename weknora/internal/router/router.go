@@ -146,10 +146,10 @@ func NewRouter(params RouterParams) *gin.Engine {
 		))
 	}
 
-	// Embed infrastructure is a Standard-only product surface. Lite does not
-	// register its public page/API entry points at all, so publish tokens cannot
-	// be used to bypass the consumer product boundary.
-	if !isLiteEdition && params.EmbedChannelService != nil {
+	// The public embed page must enforce each channel's frame allowlist in every
+	// edition that exposes channel management. The API remains independently
+	// protected by EmbedAuth below.
+	if params.EmbedChannelService != nil {
 		r.Use(embedFrameAncestorsMiddleware(params.EmbedChannelService))
 	}
 
@@ -158,21 +158,25 @@ func NewRouter(params RouterParams) *gin.Engine {
 		serveFrontendStatic(r)
 	}
 
-	// IM callbacks, public Embed routes and short-lived resource grants belong
-	// to hidden integration surfaces. Keep their source for Standard, but do not
-	// register them in Musuw Lite.
+	// Public Embed routes are the runtime counterpart of the channel management
+	// API exposed by both editions. Reuse the complete native route group so the
+	// widget contract cannot drift; EmbedAuth still requires a valid publish or
+	// short-lived session token and enforces the channel origin allowlist.
+	RegisterEmbedPublicRoutes(
+		r,
+		params.EmbedChannelHandler,
+		params.EmbedChannelService,
+		params.TenantService,
+		params.RedisClient,
+		params.FileService,
+		params.StorageBackendResolver,
+		params.ResourceCatalog,
+	)
+
+	// IM callbacks and short-lived resource grants remain Standard-only hidden
+	// integration surfaces.
 	if !isLiteEdition {
 		RegisterIMRoutes(r, params.IMHandler)
-		RegisterEmbedPublicRoutes(
-			r,
-			params.EmbedChannelHandler,
-			params.EmbedChannelService,
-			params.TenantService,
-			params.RedisClient,
-			params.FileService,
-			params.StorageBackendResolver,
-			params.ResourceCatalog,
-		)
 		serveResourceGrants(r, params.ResourceCatalog, params.TenantService, params.FileService, params.StorageBackendResolver)
 	}
 

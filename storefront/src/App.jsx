@@ -20,6 +20,7 @@ import {
   structuredDataText,
 } from "./seoMetadata.js";
 import { applyTheme, getInitialTheme } from "./theme.js";
+import { CustomerServiceEmbed } from "./components/CustomerServiceEmbed.jsx";
 
 function setMeta(attribute, key, content) {
   let element = document.querySelector(`meta[${attribute}="${key}"]`);
@@ -192,6 +193,7 @@ export default function App() {
         onThemeToggle={handleThemeToggle}
         pricingCurrency={pricingCurrency}
       />
+      <CustomerServiceEmbed locale={locale} />
     </div>
   );
 }
