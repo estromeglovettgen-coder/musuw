@@ -32,7 +32,7 @@ REVIEWED_UI_CONTENT = {
     # The new blob only provisions the already-reviewed, bounded customer-service
     # channel secrets inside the protected storefront deploy environment. Keep
     # this exact-content pin so later workflow edits still require review.
-    ".github/workflows/deploy-storefront.yml": {"de051d83aab6281d0c89b2943dca87c8118fbbd1", "0bd421b23303c181500a49cdff8e141d4ac7d991", "a3426cbc189f35856ca23134c9cc94f4ed57d5fe", "6f345b6505682c959580633c5dfafb01e2d58376"},
+    ".github/workflows/deploy-storefront.yml": {"de051d83aab6281d0c89b2943dca87c8118fbbd1", "0bd421b23303c181500a49cdff8e141d4ac7d991", "a3426cbc189f35856ca23134c9cc94f4ed57d5fe", "6f345b6505682c959580633c5dfafb01e2d58376", "bf49f05ad8875a1b46baa863294e9b767acb9daf"},
     "README.md": {"32bfedf673e7951d615dc231ce12867a218be613"},
     "auth/e2e/background-stability.spec.ts": {"5259bb88fe9802ab6bb04ae72b7fb7664ad9e91e"},
     "auth/playwright.config.ts": {"8982318e2d188f555b20769aeb6da0d60a4b43b9"},
