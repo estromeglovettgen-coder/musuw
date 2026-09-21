@@ -20,6 +20,7 @@ function json(body, init = {}) {
 function runtimeConfig(env) {
   const channelId = String(env.MUSUW_CUSTOMER_SERVICE_CHANNEL_ID ?? "").trim();
   const publishToken = String(env.MUSUW_CUSTOMER_SERVICE_PUBLISH_TOKEN ?? "").trim();
+  const releaseSha = String(env.MUSUW_STOREFRONT_RELEASE_SHA ?? "dev").trim();
   const rawAppOrigin = String(
     env.MUSUW_CUSTOMER_SERVICE_APP_ORIGIN ?? "https://app.musuw.com",
   ).trim();
@@ -33,7 +34,7 @@ function runtimeConfig(env) {
   try {
     const appOrigin = new URL(rawAppOrigin);
     if (appOrigin.protocol !== "https:") return null;
-    return { appOrigin: appOrigin.origin, channelId, publishToken };
+    return { appOrigin: appOrigin.origin, channelId, publishToken, releaseSha };
   } catch {
     return null;
   }
@@ -98,7 +99,7 @@ export async function customerServiceResponse(request, env, url = new URL(reques
           enabled: true,
           baseUrl: config.appOrigin,
           channelId: config.channelId,
-          scriptUrl: `${config.appOrigin}/musuw-widget.js`,
+          scriptUrl: `${config.appOrigin}/musuw-widget.js?v=${encodeURIComponent(config.releaseSha)}`,
           tokenEndpoint: `${url.origin}${CUSTOMER_SERVICE_TOKEN_PATH}`,
         }
       : { enabled: false };
