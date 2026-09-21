@@ -257,7 +257,7 @@ The target-specific split is intentionally narrow:
 
 | Settings location | Allowed production inputs |
 | --- | --- |
-| `storefront-production` | Cloudflare account ID and Worker-scoped API token only. |
+| `storefront-production` | Cloudflare account ID, Worker-scoped API token, and the one bounded homepage embed channel ID/publish token pair. |
 | Repository variables | Three browser-visible `VITE_*` values shared by native build and deploy. |
 | `staging` | Staging SSH key/host settings, staging public/auth runtime files, and job-only GHCR read token; never production credentials. |
 | `server-production` | Required account-owner reviewer plus restricted SSH key/host settings and the public server input file consumed only by deploy; least-privilege package-read token. |

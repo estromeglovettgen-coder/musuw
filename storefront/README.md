@@ -23,7 +23,10 @@ publish token private and exchanges it against the configured application
 origin (default `https://app.musuw.com`). The channel's `allowed_origins` must
 include `https://app.musuw.com`, `https://musuw.com`, and
 `https://www.musuw.com`: the first is the iframe/API origin and the other two
-are the supported homepage origins.
+are the supported homepage origins. Production deployment verifies the exact
+channel against the application before atomically publishing the Worker code
+and both bindings; an incomplete pair is rejected and an absent pair disables
+the launcher.
 
 ## Local verification
 

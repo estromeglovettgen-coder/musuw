@@ -1219,7 +1219,7 @@ internal/router/paddle_public_config_route_test.go	A	-	100644	37bd1221be65160723
 internal/router/paddle_webhook_task.go	A	-	100644	9e10f4ccce671dce77e6d831f993559ac2c9b7f3	preserve-musuw-exact		audited local-only content is byte-identical
 internal/router/paddle_webhook_task_test.go	A	-	100644	c63f4f7cc79fb52bd1a493f7fba1ec22a989eeee	preserve-musuw-exact		audited local-only content is byte-identical
 internal/router/rbac.go	-	M	100644	20a3bf4a7c5cef9847e0d7b9ee1e5445609f6388	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
-internal/router/router.go	M	M	100644	03d60c3af3fb123a00faf8b444d3eb3e590c2bc4	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/router/router.go	M	M	100644	722ce19a98a2583d773a9e86602ff4cb0fd217f3	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/router/router_api_key_capabilities_test.go	M	M	100644	5dbca4f06f583fb5aa55f9a60190ece5fe828f8f	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/router/router_api_key_management_test.go	-	M	100644	b5f2b91529a33f82b5dbe35dfdb31eece4623811	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/router/router_files_test.go	-	M	100644	d00e2667886a40d5511d5f28c792482e9816c317	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation

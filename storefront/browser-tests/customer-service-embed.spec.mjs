@@ -17,7 +17,13 @@ test("configured homepage mounts the existing Musuw widget at bottom-right", asy
     contentType: "text/javascript",
     body: `
       window.__customerServiceCalls = [];
+      const handlers = new Map();
       window.Musuw = {
+        on(event, handler) {
+          if (!handlers.has(event)) handlers.set(event, new Set());
+          handlers.get(event).add(handler);
+        },
+        off(event, handler) { handlers.get(event)?.delete(handler); },
         init(options) {
           window.__customerServiceCalls.push({ type: 'init', options });
           const button = document.createElement('button');
@@ -27,11 +33,18 @@ test("configured homepage mounts the existing Musuw widget at bottom-right", asy
           button.style.bottom = '24px';
           button.textContent = 'chat';
           document.body.appendChild(button);
-          return {
+          let ready = false;
+          const widget = {
+            isReady() { return ready; },
             setContext(context) { window.__customerServiceCalls.push({ type: 'context', context }); },
             setLocale(locale) { window.__customerServiceCalls.push({ type: 'locale', locale }); },
             destroy() { button.remove(); },
           };
+          queueMicrotask(() => {
+            ready = true;
+            for (const handler of handlers.get('ready') ?? []) handler();
+          });
+          return widget;
         },
       };
     `,
@@ -40,6 +53,9 @@ test("configured homepage mounts the existing Musuw widget at bottom-right", asy
   await page.goto("/", { waitUntil: "domcontentloaded" });
   const launcher = page.locator('[data-customer-service-launcher="true"]');
   await expect(launcher).toBeVisible();
+  await expect.poll(() => page.evaluate(() =>
+    window.__customerServiceCalls.some(({ type }) => type === "locale"),
+  )).toBe(true);
   const calls = await page.evaluate(() => window.__customerServiceCalls);
   expect(calls).toContainEqual({
     type: "locale",

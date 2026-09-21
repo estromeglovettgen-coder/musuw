@@ -1,15 +1,16 @@
 import { useEffect } from "react";
 import {
+  bindCustomerServiceWidgetReadyState,
   CUSTOMER_SERVICE_CONFIG_PATH,
   loadCustomerServiceWidget,
   normalizeCustomerServiceConfig,
-  widgetLocale,
 } from "../customerServiceEmbed.js";
 
 export function CustomerServiceEmbed({ locale }) {
   useEffect(() => {
     let cancelled = false;
     let widget = null;
+    let unbindReadyState = null;
 
     async function mountWidget() {
       const response = await fetch(CUSTOMER_SERVICE_CONFIG_PATH, {
@@ -29,8 +30,10 @@ export function CustomerServiceEmbed({ locale }) {
         title: locale === "zh-CN" ? "Musuw 智能客服" : "Musuw AI assistant",
         tokenEndpoint: config.tokenEndpoint,
       });
-      widget?.setLocale(widgetLocale(locale));
-      widget?.setContext({ locale, page: window.location.href, surface: "storefront" });
+      unbindReadyState = bindCustomerServiceWidgetReadyState(musuw, widget, {
+        locale,
+        page: window.location.href,
+      });
     }
 
     mountWidget().catch(() => {
@@ -40,6 +43,7 @@ export function CustomerServiceEmbed({ locale }) {
 
     return () => {
       cancelled = true;
+      unbindReadyState?.();
       widget?.destroy();
     };
   }, [locale]);

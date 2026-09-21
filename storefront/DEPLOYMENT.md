@@ -16,6 +16,15 @@ The optional `MUSUW_CUSTOMER_SERVICE_APP_ORIGIN` defaults to
 with `https://app.musuw.com`, `https://musuw.com`, and
 `https://www.musuw.com` in `allowed_origins`.
 
+The deploy workflow first exchanges that exact channel/token pair against the
+production application from `https://musuw.com`. A configured release stops
+before Cloudflare changes if the application runtime, channel, or origin is not
+ready. Wrangler receives the code and both secrets in one `--secrets-file`
+deployment, so no mixed channel/token version can receive traffic. When both
+protected GitHub secrets are absent, the same atomic deployment writes invalid
+sentinels that the Worker treats as disabled; removing only one secret fails
+closed.
+
 Product actions cross to `https://app.musuw.com/auth/start`. Pricing actions carry
 only a bounded local plan and billing period. The product origin owns Google
 login, the opaque musuw session, enforced entitlement state, and optional signed

@@ -26,6 +26,22 @@ export function widgetLocale(locale) {
   return locale === "zh-CN" || locale === "zh" ? "zh-CN" : "en-US";
 }
 
+export function bindCustomerServiceWidgetReadyState(musuw, widget, { locale, page }) {
+  if (!widget) return () => {};
+
+  const applyState = () => {
+    widget.setLocale(widgetLocale(locale));
+    widget.setContext({ locale, page, surface: "storefront" });
+  };
+
+  musuw.on("ready", applyState);
+  // The iframe can finish booting between init() and listener registration.
+  // Reconcile that race without sending state before the iframe is ready.
+  if (widget.isReady()) applyState();
+
+  return () => musuw.off("ready", applyState);
+}
+
 export function loadCustomerServiceWidget(scriptUrl) {
   if (window.Musuw?.init) return Promise.resolve(window.Musuw);
   if (widgetScriptPromise) return widgetScriptPromise;

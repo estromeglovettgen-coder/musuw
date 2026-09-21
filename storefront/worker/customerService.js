@@ -7,6 +7,9 @@ const NO_STORE_HEADERS = {
   "x-content-type-options": "nosniff",
 };
 
+const EMBED_CHANNEL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMBED_PUBLISH_TOKEN = /^em_[A-Za-z0-9_-]{43}$/;
+
 function json(body, init = {}) {
   return Response.json(body, {
     ...init,
@@ -21,7 +24,11 @@ function runtimeConfig(env) {
     env.MUSUW_CUSTOMER_SERVICE_APP_ORIGIN ?? "https://app.musuw.com",
   ).trim();
 
-  if (!channelId || !publishToken) return null;
+  // Deployments deliberately write invalid sentinels when the protected
+  // GitHub Environment has no customer-service configuration. Validating the
+  // native channel/token shapes makes that an atomic, reversible disable and
+  // prevents stale Cloudflare secrets from silently keeping the widget live.
+  if (!EMBED_CHANNEL_ID.test(channelId) || !EMBED_PUBLISH_TOKEN.test(publishToken)) return null;
 
   try {
     const appOrigin = new URL(rawAppOrigin);
