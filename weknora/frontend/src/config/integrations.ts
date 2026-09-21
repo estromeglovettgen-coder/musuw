@@ -9,6 +9,12 @@ export type IntegrationTab = 'im' | 'embed' | 'api' | 'chrome' | 'claw'
 
 export const INTEGRATION_TABS: IntegrationTab[] = ['im', 'embed', 'api', 'chrome', 'claw']
 
+const EXPOSED_INTEGRATION_TABS = new Set<IntegrationTab>(['im', 'embed'])
+
+export function isExposedIntegrationTab(tab: IntegrationTab): boolean {
+  return EXPOSED_INTEGRATION_TABS.has(tab)
+}
+
 /** Aligns with Settings.vue SECTION_MIN_ROLE.api and router.go g.Owner() on /api-principal-config. */
 export type IntegrationTabRole = 'viewer' | 'contributor' | 'admin' | 'owner'
 

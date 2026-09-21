@@ -10,7 +10,14 @@ import (
 
 type stubEmbedChannelRepo struct {
 	interfaces.EmbedChannelRepository
-	ch *types.EmbedChannel
+	ch      *types.EmbedChannel
+	created *types.EmbedChannel
+}
+
+func (r *stubEmbedChannelRepo) Create(_ context.Context, ch *types.EmbedChannel) error {
+	cp := *ch
+	r.created = &cp
+	return nil
 }
 
 func (r *stubEmbedChannelRepo) GetByID(_ context.Context, id string) (*types.EmbedChannel, error) {
@@ -58,5 +65,28 @@ func TestEmbedChannelUpdateAgentID(t *testing.T) {
 	}
 	if repo.ch.AgentID != "agent-new" {
 		t.Fatalf("persisted AgentID = %q, want agent-new", repo.ch.AgentID)
+	}
+}
+
+func TestEmbedChannelCreateRejectsAgentFromAnotherTenant(t *testing.T) {
+	repo := &stubEmbedChannelRepo{}
+	svc := &embedChannelService{
+		repo: repo,
+		agentService: &stubAgentForEmbed{
+			agent: &types.CustomAgent{ID: "foreign-agent", TenantID: 99},
+		},
+	}
+
+	_, _, err := svc.Create(
+		context.Background(),
+		42,
+		"foreign-agent",
+		&types.EmbedChannel{Name: "must-not-exist"},
+	)
+	if err == nil {
+		t.Fatal("Create() error = nil, want foreign-tenant agent rejection")
+	}
+	if repo.created != nil {
+		t.Fatalf("Create() persisted a channel for foreign agent: %#v", repo.created)
 	}
 }

@@ -64,3 +64,17 @@ export const SYSTEM_ADMIN_SETTINGS_SECTIONS = new Set([
   'platform-api-keys',
   'system-audit-log',
 ])
+
+const MEMBER_CHANNEL_SETTINGS_SECTIONS = new Set([
+  'integration-im',
+  'integration-embed',
+])
+
+export function canAccessSettingsNavigationSection(
+  section: string,
+  canManageTenantSettings: boolean,
+  isLiteMode: boolean,
+): boolean {
+  if (!isLiteMode) return true
+  return canManageTenantSettings || MEMBER_CHANNEL_SETTINGS_SECTIONS.has(section)
+}

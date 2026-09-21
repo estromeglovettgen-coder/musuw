@@ -37,9 +37,8 @@ func (IMChannel) TableName() string {
 	return "im_channels"
 }
 
-// IMChannelSummary is the HTTP-safe list shape for IM channels. Credentials
-// are never included — use Admin+ Create/Update responses to read back
-// values immediately after a mutation.
+// IMChannelSummary is the HTTP-safe shape for listing or returning an existing
+// IM channel. Credentials and derived bot identities are write-only data.
 type IMChannelSummary struct {
 	ID                    string    `json:"id"`
 	TenantID              uint64    `json:"tenant_id"`
@@ -50,7 +49,6 @@ type IMChannelSummary struct {
 	Mode                  string    `json:"mode"`
 	OutputMode            string    `json:"output_mode"`
 	KnowledgeBaseID       string    `json:"knowledge_base_id"`
-	BotIdentity           string    `json:"bot_identity"`
 	SessionMode           string    `json:"session_mode"`
 	CredentialsConfigured bool      `json:"credentials_configured"`
 	CreatedAt             time.Time `json:"created_at"`
@@ -69,7 +67,6 @@ func SummarizeIMChannel(ch IMChannel) IMChannelSummary {
 		Mode:                  ch.Mode,
 		OutputMode:            ch.OutputMode,
 		KnowledgeBaseID:       ch.KnowledgeBaseID,
-		BotIdentity:           ch.BotIdentity,
 		SessionMode:           ch.SessionMode,
 		CredentialsConfigured: imCredentialsConfigured(ch.Credentials),
 		CreatedAt:             ch.CreatedAt,

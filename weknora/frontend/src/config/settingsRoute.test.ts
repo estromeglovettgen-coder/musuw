@@ -5,6 +5,7 @@ import {
   buildSettingsRouteQuery,
   integrationSectionKey,
   isIntegrationSection,
+  normalizeExposedIntegrationSettingsSection,
   normalizeSettingsSection,
   settingsQueryUnchanged,
 } from './settingsRoute'
@@ -70,4 +71,19 @@ test('canonical settings query skips a redundant replace', () => {
     ),
     false,
   )
+})
+
+test('hidden integration deep links normalize to the IM settings section', () => {
+  assert.equal(normalizeExposedIntegrationSettingsSection('api'), 'integration-im')
+  assert.equal(normalizeExposedIntegrationSettingsSection('integration-chrome'), 'integration-im')
+  assert.equal(normalizeExposedIntegrationSettingsSection('integration-unknown'), 'integration-im')
+  assert.equal(
+    normalizeExposedIntegrationSettingsSection('integrations', 'claw'),
+    'integration-im',
+  )
+  assert.equal(
+    normalizeExposedIntegrationSettingsSection('integration-embed'),
+    'integration-embed',
+  )
+  assert.equal(normalizeExposedIntegrationSettingsSection('models'), 'models')
 })

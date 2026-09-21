@@ -1,4 +1,16 @@
 import { get, post, put, del } from "../../utils/request";
+import type {
+  IMChannelMode,
+  IMChannelOutputMode,
+  IMChannelSessionMode,
+  IMChannelUpdatePayload,
+} from './imChannelPayload';
+
+export {
+  buildIMChannelCredentialsPatch,
+  buildIMChannelUpdatePayload,
+} from './imChannelPayload';
+export type { IMChannelUpdatePayload } from './imChannelPayload';
 
 // 智能体配置
 // 智能推理下的智能体类型预设 ID
@@ -314,9 +326,9 @@ export interface IMChannel {
   platform: 'wecom' | 'feishu' | 'lark' | 'slack' | 'telegram' | 'dingtalk' | 'mattermost' | 'wechat' | 'qqbot' | 'yunzhijia';
   name: string;
   enabled: boolean;
-  mode: 'webhook' | 'websocket' | 'longpoll';
-  output_mode: 'stream' | 'full';
-  session_mode?: 'user' | 'thread';
+  mode: IMChannelMode;
+  output_mode: IMChannelOutputMode;
+  session_mode?: IMChannelSessionMode;
   knowledge_base_id?: string;
   credentials: Record<string, any>;
   created_at?: string;
@@ -324,25 +336,21 @@ export interface IMChannel {
 }
 
 export function listIMChannels(agentId: string) {
-  return get<{ data: IMChannel[] }>(`/api/v1/agents/${agentId}/im-channels`);
+  return get<{ data: IMChannelSummary[] }>(`/api/v1/agents/${agentId}/im-channels`);
 }
 
-// Tenant-wide overview row. Credentials are intentionally omitted — use
-// listIMChannels(agentId) when you need to edit a specific channel.
-export interface IMChannelOverview {
-  id: string;
+export interface IMChannelSummary extends Omit<IMChannel, 'credentials'> {
+  credentials_configured: boolean;
+}
+
+// Tenant-wide overview rows intentionally omit credentials. The per-agent
+// list exposes only whether write-only credentials have been configured.
+export interface IMChannelOverview extends Omit<
+  IMChannelSummary,
+  'tenant_id' | 'knowledge_base_id' | 'credentials_configured'
+> {
   tenant_id: number;
-  agent_id: string;
   agent_name: string; // localized built-in name when the agent is built-in
-  platform: IMChannel['platform'];
-  name: string;
-  enabled: boolean;
-  mode: IMChannel['mode'];
-  output_mode: IMChannel['output_mode'];
-  session_mode?: IMChannel['session_mode'];
-  bot_identity: string;
-  created_at: string;
-  updated_at: string;
 }
 
 export function listAllIMChannels() {
@@ -350,11 +358,11 @@ export function listAllIMChannels() {
 }
 
 export function createIMChannel(agentId: string, data: Partial<IMChannel>) {
-  return post<{ data: IMChannel }>(`/api/v1/agents/${agentId}/im-channels`, data);
+  return post<{ data: IMChannelSummary }>(`/api/v1/agents/${agentId}/im-channels`, data);
 }
 
-export function updateIMChannel(id: string, data: Partial<IMChannel>) {
-  return put<{ data: IMChannel }>(`/api/v1/im-channels/${id}`, data);
+export function updateIMChannel(id: string, data: IMChannelUpdatePayload) {
+  return put<{ data: IMChannelSummary }>(`/api/v1/im-channels/${id}`, data);
 }
 
 export function deleteIMChannel(id: string) {
@@ -362,7 +370,7 @@ export function deleteIMChannel(id: string) {
 }
 
 export function toggleIMChannel(id: string) {
-  return post<{ data: IMChannel }>(`/api/v1/im-channels/${id}/toggle`);
+  return post<{ data: IMChannelSummary }>(`/api/v1/im-channels/${id}/toggle`);
 }
 
 // ===== 推荐问题 =====

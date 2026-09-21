@@ -12,6 +12,7 @@ import { useChatResourcesStore } from '@/stores/chatResources'
 import { useEditorResourcesStore } from '@/stores/editorResources'
 import { useOrganizationStore } from '@/stores/organization'
 import { useSettingsStore } from '@/stores/settings'
+import { resolveCanManageChannels } from '@/stores/channelAccess'
 
 /** 登出时丢弃 Pinia 内的空间级资源缓存，避免 SPA 重登复用上一账号数据。 */
 function clearSessionResourceCaches() {
@@ -180,6 +181,10 @@ export const useAuthStore = defineStore('auth', () => {
   const hasRole = (min: 'viewer' | 'contributor' | 'admin' | 'owner'): boolean => {
     return (ROLE_LEVEL[currentTenantRole.value] ?? 0) >= ROLE_LEVEL[min]
   }
+
+  const canManageChannels = computed(() =>
+    resolveCanManageChannels(currentTenantRole.value, canAccessAllTenants.value),
+  )
 
   const effectiveTenantId = computed(() => {
     // 如果选择了其他空间，使用选择的空间ID，否则使用用户默认空间ID
@@ -550,6 +555,7 @@ export const useAuthStore = defineStore('auth', () => {
     isSystemAdmin,
     currentTenantRole,
     hasRole,
+    canManageChannels,
     effectiveTenantId,
     isLiteMode,
 

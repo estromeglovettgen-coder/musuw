@@ -263,18 +263,18 @@ func RegisterEmbedChannelRoutes(r *gin.RouterGroup, embedHandler *handler.EmbedC
 	}
 	agentEmbed := g.apiKeyGroup(r.Group("/agents/:id/embed-channels"), apiKeyManageChannels(apiKeyFullAccess()))
 	{
-		agentEmbed.POST("", g.Admin(), embedHandler.CreateEmbedChannel)
-		agentEmbed.GET("", g.Viewer(), embedHandler.ListEmbedChannels)
+		agentEmbed.POST("", g.ManageChannels(), embedHandler.CreateEmbedChannel)
+		agentEmbed.GET("", g.ManageChannels(), embedHandler.ListEmbedChannels)
 	}
 	channels := g.apiKeyGroup(r.Group("/embed-channels"), apiKeyManageChannels(apiKeyFullAccess()))
 	{
-		channels.GET("", g.Viewer(), embedHandler.ListAllEmbedChannels)
-		channels.GET("/:channel_id", g.Viewer(), embedHandler.GetEmbedChannel)
-		channels.PUT("/:channel_id", g.Admin(), embedHandler.UpdateEmbedChannel)
-		channels.DELETE("/:channel_id", g.Admin(), embedHandler.DeleteEmbedChannel)
-		channels.POST("/:channel_id/rotate-token", g.Admin(), embedHandler.RotateEmbedToken)
-		channels.POST("/:channel_id/preview-session", g.Viewer(), embedHandler.IssuePreviewSession)
-		channels.GET("/:channel_id/stats", g.Viewer(), embedHandler.GetEmbedChannelStats)
+		channels.GET("", g.ManageChannels(), embedHandler.ListAllEmbedChannels)
+		channels.GET("/:channel_id", g.ManageChannels(), embedHandler.GetEmbedChannel)
+		channels.PUT("/:channel_id", g.ManageChannels(), embedHandler.UpdateEmbedChannel)
+		channels.DELETE("/:channel_id", g.ManageChannels(), embedHandler.DeleteEmbedChannel)
+		channels.POST("/:channel_id/rotate-token", g.ManageChannels(), embedHandler.RotateEmbedToken)
+		channels.POST("/:channel_id/preview-session", g.ManageChannels(), embedHandler.IssuePreviewSession)
+		channels.GET("/:channel_id/stats", g.ManageChannels(), embedHandler.GetEmbedChannelStats)
 	}
 }
 
@@ -290,32 +290,32 @@ func RegisterIMRoutes(r *gin.Engine, imHandler *handler.IMHandler) {
 
 // RegisterIMChannelRoutes registers IM channel CRUD routes (requires authentication).
 //
-// IM channels carry external bot credentials (WeChat/Feishu/Slack/...);
-// listing is Viewer+ but any mutation, toggle, or QR-code login flow
-// (which can hijack a personal WeChat session) is Admin+.
+// IM channels carry external bot credentials (WeChat/Feishu/Slack/...). Every
+// authenticated tenant member may manage them under the product policy, but
+// this authority remains isolated from the general Admin role.
 func RegisterIMChannelRoutes(r *gin.RouterGroup, imHandler *handler.IMHandler, g *rbacGuards) {
 	// Channel CRUD under agents
 	agentChannels := g.apiKeyGroup(r.Group("/agents/:id/im-channels"), apiKeyManageChannels(apiKeyFullAccess()))
 	{
-		agentChannels.POST("", g.Admin(), imHandler.CreateIMChannel)
-		agentChannels.GET("", g.Viewer(), imHandler.ListIMChannels)
+		agentChannels.POST("", g.ManageChannels(), imHandler.CreateIMChannel)
+		agentChannels.GET("", g.ManageChannels(), imHandler.ListIMChannels)
 	}
 
 	// Channel operations by channel ID
 	channels := g.apiKeyGroup(r.Group("/im-channels"), apiKeyManageChannels(apiKeyFullAccess()))
 	{
-		channels.GET("", g.Viewer(), imHandler.ListAllIMChannels)
-		channels.PUT("/:id", g.Admin(), imHandler.UpdateIMChannel)
-		channels.DELETE("/:id", g.Admin(), imHandler.DeleteIMChannel)
-		channels.POST("/:id/toggle", g.Admin(), imHandler.ToggleIMChannel)
+		channels.GET("", g.ManageChannels(), imHandler.ListAllIMChannels)
+		channels.PUT("/:id", g.ManageChannels(), imHandler.UpdateIMChannel)
+		channels.DELETE("/:id", g.ManageChannels(), imHandler.DeleteIMChannel)
+		channels.POST("/:id/toggle", g.ManageChannels(), imHandler.ToggleIMChannel)
 	}
 
-	// WeChat QR code login (requires authentication) — Admin+: a successful
-	// scan binds a personal WeChat account to the tenant.
+	// WeChat QR code login is part of channel management: a successful scan
+	// binds a personal WeChat account to the tenant.
 	wechatGroup := g.apiKeyGroup(r.Group("/wechat"), apiKeyManageChannels(apiKeyFullAccess()))
 	{
-		wechatGroup.POST("/qrcode", g.Admin(), imHandler.WeChatGetQRCode)
-		wechatGroup.POST("/qrcode/status", g.Admin(), imHandler.WeChatPollQRCodeStatus)
+		wechatGroup.POST("/qrcode", g.ManageChannels(), imHandler.WeChatGetQRCode)
+		wechatGroup.POST("/qrcode/status", g.ManageChannels(), imHandler.WeChatPollQRCodeStatus)
 	}
 }
 

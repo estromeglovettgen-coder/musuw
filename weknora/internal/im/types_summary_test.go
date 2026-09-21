@@ -16,6 +16,7 @@ func TestSummarizeIMChannel_OmitsCredentials(t *testing.T) {
 		AgentID:     "agent-1",
 		Platform:    "feishu",
 		Name:        "support",
+		BotIdentity: "feishu:tenant-internal-identity",
 		Credentials: types.JSON(`{"app_secret":"top-secret"}`),
 	}
 
@@ -26,6 +27,8 @@ func TestSummarizeIMChannel_OmitsCredentials(t *testing.T) {
 	assert.True(t, summary.CredentialsConfigured)
 	assert.NotContains(t, string(body), "top-secret")
 	assert.NotContains(t, string(body), `"credentials":`)
+	assert.NotContains(t, string(body), "tenant-internal-identity")
+	assert.NotContains(t, string(body), `"bot_identity":`)
 }
 
 func TestSummarizeIMChannel_EmptyCredentialsNotConfigured(t *testing.T) {

@@ -418,7 +418,49 @@ func liteAgentPathAllowed(method, path string) bool {
 	if len(parts) == 2 && parts[1] == "suggested-questions" {
 		return method == http.MethodGet
 	}
+	if len(parts) == 2 && (parts[1] == "im-channels" || parts[1] == "embed-channels") {
+		return method == http.MethodGet || method == http.MethodPost
+	}
 	return false
+}
+
+// liteChannelManagementPathAllowed enumerates the existing authenticated IM
+// and embed management API. Keeping this list exact lets Lite expose channel
+// management without opening unrelated settings or unknown nested routes.
+func liteChannelManagementPathAllowed(method, path string) bool {
+	if path == "/api/v1/im-channels" || path == "/api/v1/embed-channels" {
+		return method == http.MethodGet
+	}
+
+	if strings.HasPrefix(path, "/api/v1/im-channels/") {
+		parts := strings.Split(strings.TrimPrefix(path, "/api/v1/im-channels/"), "/")
+		if len(parts) == 1 && strings.TrimSpace(parts[0]) != "" {
+			return method == http.MethodPut || method == http.MethodDelete
+		}
+		return len(parts) == 2 && strings.TrimSpace(parts[0]) != "" &&
+			parts[1] == "toggle" && method == http.MethodPost
+	}
+
+	if strings.HasPrefix(path, "/api/v1/embed-channels/") {
+		parts := strings.Split(strings.TrimPrefix(path, "/api/v1/embed-channels/"), "/")
+		if len(parts) == 1 && strings.TrimSpace(parts[0]) != "" {
+			return method == http.MethodGet || method == http.MethodPut || method == http.MethodDelete
+		}
+		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
+			return false
+		}
+		switch parts[1] {
+		case "rotate-token", "preview-session":
+			return method == http.MethodPost
+		case "stats":
+			return method == http.MethodGet
+		default:
+			return false
+		}
+	}
+
+	return method == http.MethodPost &&
+		(path == "/api/v1/wechat/qrcode" || path == "/api/v1/wechat/qrcode/status")
 }
 
 // liteOperationsAdminRouteAllowed exposes only the narrow operations-console
@@ -565,6 +607,9 @@ func liteProductRouteBlocked(method, path string) bool {
 	if liteOperationsAdminRouteAllowed(method, path) {
 		return false
 	}
+	if liteChannelManagementPathAllowed(method, path) {
+		return false
+	}
 
 	// Entire management-only route families.
 	for _, prefix := range []string{
@@ -618,9 +663,9 @@ func liteProductRouteBlocked(method, path string) bool {
 		return rest == "" || strings.Contains(rest, "/")
 	}
 
-	// Native agent cards/editor and the conversation picker are exposed in
-	// Lite. Route-level RBAC still controls list/detail/create/update/delete;
-	// shares and channel management remain hidden below.
+	// Native agent cards/editor, the conversation picker, and agent-scoped
+	// channel management are exposed in Lite. Route-level RBAC still controls
+	// list/detail/create/update/delete; sharing remains hidden below.
 	if strings.HasPrefix(path, "/api/v1/agents") {
 		return !liteAgentPathAllowed(method, path)
 	}

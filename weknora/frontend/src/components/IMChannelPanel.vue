@@ -8,7 +8,7 @@
       </div>
 
       <t-loading :loading="loading" size="small" class="channels-loading-wrap">
-        <div v-if="!loading && channels.length === 0 && !authStore.hasRole('admin')" class="channels-empty">
+        <div v-if="!loading && channels.length === 0 && !authStore.canManageChannels" class="channels-empty">
           <t-empty :description="$t('agentEditor.im.empty')" />
         </div>
 
@@ -31,7 +31,7 @@
                 {{ agentDisplayName(channel) }}
               </span>
             </div>
-            <div v-if="authStore.hasRole('admin')" class="channel-card__actions" @click.stop>
+            <div v-if="authStore.canManageChannels" class="channel-card__actions" @click.stop>
               <t-dropdown trigger="click" placement="bottom-right" attach="body" :options="channelMenuOptions(channel)"
                 @click="handleChannelMenuClick($event, channel)">
                 <t-button variant="text" shape="square" size="small" class="channel-card__action-btn channel-card__more"
@@ -53,7 +53,7 @@
             </div>
           </button>
 
-          <button v-if="authStore.hasRole('admin')" type="button" class="channel-card channel-card--add"
+          <button v-if="authStore.canManageChannels" type="button" class="channel-card channel-card--add"
             @click="openCreate">
             <span class="channel-card__badge" aria-hidden="true">
               <t-icon name="add" />
@@ -71,7 +71,7 @@
 
     <SettingDrawer v-model:visible="showCreateDialog" class="im-channel-drawer" :title="drawerTitle"
       :description="drawerStepDescription" storage-key="setting-drawer:im-channel" width="560px"
-      :confirm-loading="saving" :confirm-text="drawerConfirmText" :hide-footer="!authStore.hasRole('admin')"
+      :confirm-loading="saving" :confirm-text="drawerConfirmText" :hide-footer="!authStore.canManageChannels"
       @confirm="handleDrawerConfirm" @cancel="resetForm">
       <template #headerIcon>
         <img v-if="platformLogo(formData.platform)" :src="platformLogo(formData.platform)"
@@ -133,7 +133,7 @@
             <p v-if="!editingChannel" class="form-desc">{{ $t('agentEditor.im.channelNameDefaultHint') }}</p>
           </div>
 
-          <div v-if="editingChannel && authStore.hasRole('admin')" class="setting-row setting-row--last">
+          <div v-if="editingChannel && authStore.canManageChannels" class="setting-row setting-row--last">
             <div class="setting-info">
               <label>{{ $t('agentEditor.im.enabled') }}</label>
             </div>
@@ -588,7 +588,8 @@ import { copyWithToast } from '@/utils/clipboard';
 import {
   listIMChannels, createIMChannel, updateIMChannel, deleteIMChannel, toggleIMChannel,
   getWeChatQRCode, pollWeChatQRCodeStatus, listAllIMChannels, listAgents,
-  type IMChannelOverview, type CustomAgent,
+  buildIMChannelCredentialsPatch, buildIMChannelUpdatePayload,
+  type IMChannelOverview, type IMChannelSummary, type CustomAgent,
 } from '@/api/agent';
 import { useChatResourcesStore } from '@/stores/chatResources';
 import type { IMChannel } from '@/api/agent';
@@ -633,7 +634,7 @@ const agentOptions = computed(() =>
   agents.value.map((agent) => ({ label: agent.name, value: agent.id })),
 );
 
-const allChannels = ref<Array<IMChannel | IMChannelOverview>>([]);
+const allChannels = ref<IMChannelOverview[]>([]);
 const channels = computed(() => {
   const filter = filterAgentId.value?.trim();
   if (!filter) return allChannels.value;
@@ -642,10 +643,11 @@ const channels = computed(() => {
 const loading = ref(false);
 const saving = ref(false);
 const showCreateDialog = ref(false);
-const editingChannel = ref<IMChannel | null>(null);
+const editingChannel = ref<IMChannelSummary | null>(null);
 const editingEnabled = ref(true);
 const wizardStep = ref(0);
 const channelNameTouched = ref(false);
+const credentialBaseline = ref<Record<string, unknown>>({});
 
 const stepTitles = computed(() => [
   t('agentEditor.im.stepBasic'),
@@ -718,6 +720,7 @@ const wechatQRImgUrl = ref('');   // generated QR image URL
 const wechatQRCode = ref('');     // opaque token for polling status
 const wechatQRStatus = ref<string>('');
 const wechatLoading = ref(false);
+const wechatRebinding = ref(false);
 let wechatPollActive = false;
 let wechatPollTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -734,7 +737,7 @@ const formData = ref({
   credentials: defaultCredentials(),
 });
 
-const channelMenuOptions = (channel: IMChannel | IMChannelOverview) => ([
+const channelMenuOptions = (channel: IMChannelOverview) => ([
   {
     content: channel.enabled ? t('common.off') : t('common.on'),
     value: 'toggle',
@@ -743,18 +746,18 @@ const channelMenuOptions = (channel: IMChannel | IMChannelOverview) => ([
 
 function handleChannelMenuClick(
   data: { value?: string },
-  channel: IMChannel | IMChannelOverview,
+  channel: IMChannelOverview,
 ) {
   if (data.value === 'toggle') {
     void handleToggle(channel);
   }
 }
 
-function agentDisplayName(channel: IMChannel | IMChannelOverview): string {
+function agentDisplayName(channel: IMChannelOverview): string {
   return agentForChannel(channel)?.name || '';
 }
 
-function agentForChannel(channel: IMChannel | IMChannelOverview): CustomAgent | undefined {
+function agentForChannel(channel: IMChannelOverview): CustomAgent | undefined {
   const found = agents.value.find((agent) => agent.id === channel.agent_id);
   if (found) return found;
   const overviewName = (channel as IMChannelOverview).agent_name;
@@ -787,6 +790,12 @@ function platformSupportsThread(platform: string): boolean {
 watch(
   () => formData.value.platform,
   (p) => {
+    if (editingChannel.value) {
+      if (!platformSupportsThread(p)) {
+        formData.value.session_mode = 'user';
+      }
+      return;
+    }
     if (p === 'mattermost') {
       formData.value.mode = 'webhook';
       if (typeof formData.value.credentials.post_to_main !== 'boolean') {
@@ -800,9 +809,14 @@ watch(
 );
 // Whether WeChat credentials are already bound
 const wechatBound = computed(() => {
-  return formData.value.platform === 'wechat' &&
-    formData.value.credentials.bot_token &&
-    formData.value.credentials.ilink_bot_id;
+  if (formData.value.platform !== 'wechat') return false;
+  const newlyBound = Boolean(
+    formData.value.credentials.bot_token && formData.value.credentials.ilink_bot_id,
+  );
+  const alreadyConfigured = Boolean(
+    editingChannel.value?.credentials_configured && !wechatRebinding.value,
+  );
+  return newlyBound || alreadyConfigured;
 });
 
 
@@ -848,6 +862,7 @@ function normalizeYunzhijiaCredentials() {
 
 async function startWeChatBinding() {
   stopWeChatPolling();
+  wechatRebinding.value = true;
   wechatLoading.value = true;
   wechatQRContent.value = '';
   wechatQRImgUrl.value = '';
@@ -866,6 +881,7 @@ async function startWeChatBinding() {
     // Start long-polling for scan status
     startStatusPolling();
   } catch (e: any) {
+    wechatRebinding.value = false;
     MessagePlugin.error(e?.message || 'Failed to generate QR code');
   } finally {
     wechatLoading.value = false;
@@ -890,6 +906,7 @@ async function pollOnce() {
         ilink_bot_id: statusRes.data.credentials.ilink_bot_id,
         ilink_user_id: statusRes.data.credentials.ilink_user_id,
       };
+      wechatRebinding.value = false;
       stopWeChatPolling();
       wechatQRContent.value = '';
       wechatQRImgUrl.value = '';
@@ -936,12 +953,12 @@ async function loadChannels() {
   }
 }
 
-function getCallbackUrl(channel: IMChannel): string {
+function getCallbackUrl(channel: Pick<IMChannelSummary, 'id'>): string {
   const base = window.location.origin;
   return `${base}/api/v1/im/callback/${channel.id}`;
 }
 
-async function copyUrl(channel: IMChannel) {
+async function copyUrl(channel: Pick<IMChannelSummary, 'id'>) {
   await copyWithToast(getCallbackUrl(channel), 'common.copySuccess');
 }
 
@@ -953,22 +970,18 @@ function openCreate() {
   showCreateDialog.value = true;
 }
 
-function openDrawer(channel: IMChannel | IMChannelOverview) {
+function openDrawer(channel: IMChannelOverview) {
   void editChannel(channel);
 }
 
-async function editChannel(channel: IMChannel | IMChannelOverview) {
+async function editChannel(channel: IMChannelOverview) {
   wizardStep.value = 0;
-  let fullChannel: IMChannel | null = null;
-  if (!('credentials' in channel)) {
-    try {
-      const res = await listIMChannels(channel.agent_id);
-      fullChannel = (res.data || []).find((item) => item.id === channel.id) || null;
-    } catch {
-      fullChannel = null;
-    }
-  } else {
-    fullChannel = channel as IMChannel;
+  let fullChannel: IMChannelSummary | null = null;
+  try {
+    const res = await listIMChannels(channel.agent_id);
+    fullChannel = (res.data || []).find((item) => item.id === channel.id) || null;
+  } catch {
+    fullChannel = null;
   }
   if (!fullChannel) {
     MessagePlugin.error(t('common.operationFailed'));
@@ -985,9 +998,10 @@ async function editChannel(channel: IMChannel | IMChannelOverview) {
     output_mode: fullChannel.output_mode,
     session_mode: fullChannel.session_mode || 'user',
     knowledge_base_id: fullChannel.knowledge_base_id || '',
-    credentials: { ...fullChannel.credentials },
+    credentials: defaultCredentials(),
   };
-  normalizeYunzhijiaCredentials();
+  credentialBaseline.value = { ...formData.value.credentials };
+  wechatRebinding.value = false;
   showCreateDialog.value = true;
 }
 
@@ -996,6 +1010,7 @@ function resetForm() {
   editingEnabled.value = true;
   wizardStep.value = 0;
   channelNameTouched.value = false;
+  wechatRebinding.value = false;
   stopWeChatPolling();
   wechatQRContent.value = '';
   wechatQRImgUrl.value = '';
@@ -1011,37 +1026,53 @@ function resetForm() {
     knowledge_base_id: '',
     credentials: defaultCredentials(),
   };
+  credentialBaseline.value = { ...formData.value.credentials };
 }
 
 async function handleSave() {
   saving.value = true;
   try {
-    // For WeChat, validate that credentials are bound
-    if (formData.value.platform === 'wechat' && !formData.value.credentials.bot_token) {
+    const credentialsPatch = editingChannel.value
+      ? buildIMChannelCredentialsPatch(
+        credentialBaseline.value,
+        formData.value.credentials,
+      )
+      : {};
+    const replacingCredentials = !editingChannel.value || Object.keys(credentialsPatch).length > 0;
+
+    // Existing write-only credentials remain valid until the user replaces them.
+    if (replacingCredentials && formData.value.platform === 'wechat' && !formData.value.credentials.bot_token) {
       MessagePlugin.warning(t('agentEditor.im.wechatScanBind'));
       return;
     }
-    if (formData.value.platform === 'yunzhijia') {
-      // normalize fills in the default allowed host suffix, so only the send URL
-      // needs explicit validation here.
+    if (!editingChannel.value && formData.value.platform === 'yunzhijia') {
+      // New channels submit their complete credential set, including defaults.
       normalizeYunzhijiaCredentials();
       if (!String(formData.value.credentials.send_msg_url || '').trim()) {
         MessagePlugin.warning(t('agentEditor.im.yunzhijiaSendMsgUrlRequired'));
         return;
       }
+    } else if (
+      editingChannel.value
+      && formData.value.platform === 'yunzhijia'
+      && Object.prototype.hasOwnProperty.call(credentialsPatch, 'send_msg_url')
+      && !String(credentialsPatch.send_msg_url || '').trim()
+    ) {
+      MessagePlugin.warning(t('agentEditor.im.yunzhijiaSendMsgUrlRequired'));
+      return;
     }
 
     if (editingChannel.value) {
-      await updateIMChannel(editingChannel.value.id, {
+      const payload = buildIMChannelUpdatePayload({
         name: resolvedChannelName(),
         mode: formData.value.mode,
         output_mode: formData.value.output_mode,
         session_mode: formData.value.session_mode,
         knowledge_base_id: formData.value.knowledge_base_id,
-        credentials: formData.value.credentials,
         enabled: editingEnabled.value,
         ...(formData.value.target_agent_id ? { agent_id: formData.value.target_agent_id } : {}),
-      });
+      }, credentialsPatch);
+      await updateIMChannel(editingChannel.value.id, payload);
       MessagePlugin.success(t('common.updateSuccess'));
     } else {
       const targetAgentId = formData.value.target_agent_id;
@@ -1071,7 +1102,7 @@ async function handleSave() {
   }
 }
 
-async function handleToggle(channel: IMChannel | IMChannelOverview) {
+async function handleToggle(channel: IMChannelOverview) {
   try {
     await toggleIMChannel(channel.id);
     await loadChannels();

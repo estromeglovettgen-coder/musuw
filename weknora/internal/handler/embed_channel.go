@@ -730,7 +730,7 @@ func patchEmbedChatPayload(body io.Reader, ch *types.EmbedChannel, agentMode boo
 }
 
 // GetEmbedChannel returns a single embed channel for management, including the
-// publish token so admins can copy deploy snippets at any time.
+// publish token so authorized tenant members can copy deploy snippets.
 func (h *EmbedChannelHandler) GetEmbedChannel(c *gin.Context) {
 	channelID := strings.TrimSpace(c.Param("channel_id"))
 	tenantID := c.GetUint64(types.TenantIDContextKey.String())
