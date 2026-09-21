@@ -16,10 +16,12 @@ import {
 
 const configuredChannelId = "01234567-89ab-4cde-8f01-23456789abcd";
 const configuredPublishToken = `em_${"a".repeat(43)}`;
+const configuredReleaseSha = "8107ee4e0b9bae8d11cf0404001368597b4ffed6";
 const configuredEnvironment = {
   MUSUW_CUSTOMER_SERVICE_APP_ORIGIN: "https://app.musuw.com",
   MUSUW_CUSTOMER_SERVICE_CHANNEL_ID: configuredChannelId,
   MUSUW_CUSTOMER_SERVICE_PUBLISH_TOKEN: configuredPublishToken,
+  MUSUW_STOREFRONT_RELEASE_SHA: configuredReleaseSha,
 };
 
 test("the public config enables the existing widget without exposing its publish token", async () => {
@@ -35,7 +37,7 @@ test("the public config enables the existing widget without exposing its publish
     enabled: true,
     baseUrl: "https://app.musuw.com",
     channelId: configuredChannelId,
-    scriptUrl: "https://app.musuw.com/musuw-widget.js",
+    scriptUrl: `https://app.musuw.com/musuw-widget.js?v=${configuredReleaseSha}`,
     tokenEndpoint: "https://musuw.com/_musuw/customer-service/token",
   });
   assert.doesNotMatch(JSON.stringify(body), /em_a/);

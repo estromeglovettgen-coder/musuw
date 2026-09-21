@@ -249,6 +249,7 @@ jobs:
           set -euo pipefail
           if ! npx wrangler deploy --strict --config wrangler.jsonc \
             --secrets-file "$CUSTOMER_SERVICE_SECRETS_FILE" \
+            --var "MUSUW_STOREFRONT_RELEASE_SHA:$RELEASE_SHA" \
             --message "musuw storefront $RELEASE_SHA" \
             --tag "github-$RELEASE_SHA" 2>&1 | tee "$RUNNER_TEMP/musuw-storefront-deploy.log"; then
             {
@@ -289,8 +290,8 @@ jobs:
                 "$origin/_musuw/customer-service/config" || true)"
               if [ "$customer_config_status" = 200 ]; then
                 if [ "$CUSTOMER_SERVICE_CONFIGURED" = true ]; then
-                  if jq -e --arg channel "$CUSTOMER_SERVICE_CHANNEL_ID" \
-                    '.enabled == true and .channelId == $channel and (.publishToken | not) and (.publish_token | not)' \
+                  if jq -e --arg channel "$CUSTOMER_SERVICE_CHANNEL_ID" --arg release "$RELEASE_SHA" \
+                    '.enabled == true and .channelId == $channel and .scriptUrl == ("https://app.musuw.com/musuw-widget.js?v=" + $release) and (.publishToken | not) and (.publish_token | not)' \
                     "$customer_config" >/dev/null; then
                     customer_config_ready=true
                     break
