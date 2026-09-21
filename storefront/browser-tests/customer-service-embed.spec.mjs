@@ -1,4 +1,11 @@
 import { expect, test } from "@playwright/test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const widgetScriptPath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../weknora/frontend/public/musuw-widget.js",
+);
 
 test("configured homepage mounts the existing Musuw widget at bottom-right", async ({ page }, testInfo) => {
   const storefrontOrigin = new URL(testInfo.project.use.baseURL).origin;
@@ -65,6 +72,7 @@ test("configured homepage mounts the existing Musuw widget at bottom-right", asy
     baseUrl: "https://app.musuw.com",
     channel: "channel-homepage",
     position: "bottom-right",
+    primaryColor: "#111318",
     title: "Musuw 智能客服",
   });
   const position = await launcher.evaluate((element) => {
@@ -72,4 +80,49 @@ test("configured homepage mounts the existing Musuw widget at bottom-right", asy
     return { bottom: style.bottom, position: style.position, right: style.right };
   });
   expect(position).toEqual({ bottom: "24px", position: "fixed", right: "24px" });
+});
+
+test("the real widget uses the Musuw shell on desktop and mobile", async ({ page }, testInfo) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.addScriptTag({ path: widgetScriptPath });
+  await page.evaluate(({ baseURL }) => {
+    window.Musuw.init({
+      baseUrl: new URL(baseURL).origin,
+      channel: "style-check",
+      position: "bottom-right",
+      primaryColor: "#111318",
+      title: "Musuw 智能客服",
+      token: "ems_style_check",
+    });
+  }, { baseURL: testInfo.project.use.baseURL });
+
+  const launcher = page.locator('[data-musuw-widget-launcher="true"]');
+  const panel = page.locator("#musuw-widget-panel");
+  await expect(launcher).toBeVisible();
+  await expect(launcher.locator("svg")).toBeVisible();
+  await expect(launcher).toHaveAttribute("aria-expanded", "false");
+  await launcher.click();
+  await expect(launcher).toHaveAttribute("aria-expanded", "true");
+  await expect(panel).toBeVisible();
+
+  const shell = await page.evaluate(() => {
+    const launcherElement = document.querySelector('[data-musuw-widget-launcher="true"]');
+    const panelElement = document.querySelector("#musuw-widget-panel");
+    const launcherStyle = getComputedStyle(launcherElement);
+    const panelStyle = getComputedStyle(panelElement);
+    return {
+      launcherBackground: launcherStyle.backgroundColor,
+      launcherRadius: launcherStyle.borderRadius,
+      panelRadius: panelStyle.borderRadius,
+      panelLeft: panelStyle.left,
+      panelRight: panelStyle.right,
+    };
+  });
+  expect(shell.launcherBackground).toBe("rgb(17, 19, 24)");
+  expect(shell.launcherRadius).toBe("18px");
+  expect(shell.panelRadius).toMatch(/^(18|20)px$/);
+  if (testInfo.project.name === "mobile") {
+    expect(shell.panelLeft).toBe("12px");
+    expect(shell.panelRight).toBe("12px");
+  }
 });

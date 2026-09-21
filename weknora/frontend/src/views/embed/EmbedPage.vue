@@ -3,9 +3,9 @@
     <div v-if="loadError" class="embed-error">{{ loadError }}</div>
     <template v-else-if="config">
       <header v-if="sessionId" class="embed-header">
-        <span class="embed-header__badge" :style="badgeStyle">
+        <span class="embed-header__badge">
           <span v-if="config.agent_avatar" class="embed-header__avatar">{{ config.agent_avatar }}</span>
-          <t-icon v-else :name="headerIcon" size="18px" />
+          <img v-else class="embed-header__logo" src="/musuw-logo.png" alt="" />
         </span>
         <div class="embed-header__text">
           <h1 class="embed-header__title">{{ headerTitle }}</h1>
@@ -103,23 +103,20 @@ const handleNewChat = () => {
 
 const kbIds = computed(() => config.value?.knowledge_base_ids ?? [])
 
+const resolvedPrimaryColor = computed(() => {
+  const color = config.value?.primary_color?.trim()
+  // Keep an explicitly chosen channel colour intact. New Musuw channels write
+  // the product accent, while older empty values receive the same fallback.
+  return color || '#2563EB'
+})
+
 const pageStyle = computed(() => {
-  const color = config.value?.primary_color
-  if (!color) return {}
+  const color = resolvedPrimaryColor.value
   return {
     '--embed-primary': color,
     '--td-brand-color': color,
     '--td-brand-color-hover': color,
     '--td-brand-color-active': color,
-  } as Record<string, string>
-})
-
-const badgeStyle = computed(() => {
-  const color = config.value?.primary_color
-  if (!color) return {}
-  return {
-    background: `color-mix(in srgb, ${color} 12%, transparent)`,
-    color,
   } as Record<string, string>
 })
 
@@ -161,11 +158,6 @@ const headerSubtitle = computed(() => {
   return cfg.agent_name
 })
 
-const headerIcon = computed(() => {
-  const agentId = config.value?.agent_id || ''
-  return agentId && agentId !== 'builtin-quick-answer' ? 'control-platform' : 'chat'
-})
-
 watch(headerTitle, (title) => {
   if (title) document.title = title
 }, { immediate: true })
@@ -174,9 +166,21 @@ watch(headerTitle, (title) => {
 <style scoped lang="less">
 .embed-page {
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--td-bg-color-container, #fff);
+  background: var(--musuw-canvas, #fff);
+  color: var(--musuw-ink, #1f2937);
+  font-family: var(
+    --app-font-family,
+    "Inter Variable",
+    "Inter",
+    "Noto Sans SC Variable",
+    "Noto Sans SC",
+    ui-sans-serif,
+    system-ui,
+    sans-serif
+  );
   overflow: hidden;
   /* 子组件（含 AgentStreamDisplay）内凡用 --td-brand-color 的 loading / 强调色均跟随渠道主题 */
   --td-brand-color: var(--embed-primary, var(--td-brand-color));
@@ -201,10 +205,11 @@ watch(headerTitle, (title) => {
 .embed-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--td-component-stroke);
-  background: var(--td-bg-color-container);
+  gap: 10px;
+  min-height: 64px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--musuw-line, #e5e7eb);
+  background: color-mix(in srgb, var(--musuw-canvas, #fff) 94%, transparent);
   flex-shrink: 0;
 
   &__badge {
@@ -213,15 +218,23 @@ watch(headerTitle, (title) => {
     justify-content: center;
     width: 36px;
     height: 36px;
-    border-radius: 10px;
+    border: 1px solid var(--musuw-line, #e5e7eb);
+    border-radius: var(--musuw-radius-control, 8px);
     flex-shrink: 0;
-    background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
-    color: var(--td-brand-color);
+    background: var(--musuw-surface, #fff);
+    color: var(--musuw-ink-strong, #111827);
+    box-shadow: var(--musuw-shadow-subtle, 0 1px 2px rgba(38, 38, 38, 0.045));
   }
 
   &__avatar {
     font-size: 20px;
     line-height: 1;
+  }
+
+  &__logo {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
   }
 
   &__text {
@@ -230,11 +243,18 @@ watch(headerTitle, (title) => {
   }
 
   &__action {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--musuw-line, #e5e7eb);
+    border-radius: var(--musuw-radius-control, 8px);
     flex-shrink: 0;
-    color: var(--td-text-color-secondary);
+    background: var(--musuw-surface, #fff);
+    color: var(--musuw-muted-strong, #4b5563);
 
     &:hover {
-      color: var(--td-brand-color);
+      border-color: var(--musuw-line-strong, #d1d5db);
+      background: var(--musuw-surface-hover, #f3f4f6);
+      color: var(--musuw-ink-strong, #111827);
     }
   }
 
@@ -243,7 +263,7 @@ watch(headerTitle, (title) => {
     font-size: 15px;
     font-weight: 600;
     line-height: 1.35;
-    color: var(--td-text-color-primary);
+    color: var(--musuw-ink-strong, #111827);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -253,7 +273,7 @@ watch(headerTitle, (title) => {
     margin: 2px 0 0;
     font-size: 12px;
     line-height: 1.4;
-    color: var(--td-text-color-secondary);
+    color: var(--musuw-muted, #6b7280);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -264,6 +284,14 @@ watch(headerTitle, (title) => {
 .embed-loading {
   padding: 24px;
   text-align: center;
-  color: var(--td-text-color-placeholder);
+  color: var(--musuw-muted, #6b7280);
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .embed-header {
+    min-height: 60px;
+    padding: 10px 12px;
+  }
 }
 </style>

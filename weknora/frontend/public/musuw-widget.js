@@ -30,10 +30,22 @@
   var EMBED_SOURCE = 'weknora-embed';
   var POSITIONS = ['bottom-right', 'bottom-left', 'top-right', 'top-left'];
   var DEFAULT_POSITION = 'bottom-right';
-  var DEFAULT_COLOR = '#07C05F';
-  var DEFAULT_TITLE = 'AI Assistant';
+  var DEFAULT_COLOR = '#111318';
+  var DEFAULT_TITLE = 'Musuw AI Assistant';
   var DEFAULT_WIDTH = 400;
   var DEFAULT_HEIGHT = 600;
+
+  var CHAT_ICON = [
+    '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" aria-hidden="true">',
+    '<path d="M5.5 18.5 3.7 21l.6-4A8.5 8.5 0 1 1 5.5 18.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<path d="M8 10.5h8M8 13.5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+    '</svg>',
+  ].join('');
+  var CLOSE_ICON = [
+    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">',
+    '<path d="m7.5 7.5 9 9m0-9-9 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+    '</svg>',
+  ].join('');
 
   var instance = null;
   var listeners = {};
@@ -157,39 +169,69 @@
     var launcher = document.createElement('button');
     launcher.type = 'button';
     launcher.setAttribute('aria-label', title);
-    launcher.textContent = '💬';
+    launcher.setAttribute('aria-expanded', 'false');
+    launcher.setAttribute('aria-controls', 'musuw-widget-panel');
+    launcher.setAttribute('data-musuw-widget-launcher', 'true');
+    launcher.className = 'musuw-widget-launcher musuw-widget-position-' + position;
+    launcher.innerHTML = CHAT_ICON;
     launcher.style.cssText = [
       'position:fixed',
       'z-index:2147483000',
       'width:56px',
       'height:56px',
-      'border-radius:50%',
-      'border:none',
+      'display:inline-flex',
+      'align-items:center',
+      'justify-content:center',
+      'padding:0',
+      'border-radius:18px',
+      'border:1px solid rgba(255,255,255,.16)',
       'cursor:pointer',
-      'font-size:24px',
-      'box-shadow:0 4px 16px rgba(0,0,0,.18)',
+      'box-shadow:0 1px 2px rgba(17,19,24,.16),0 16px 36px rgba(17,19,24,.24)',
       'background:' + primaryColor,
       'color:#fff',
       'opacity:0.92',
-      'transition:opacity .2s',
+      'transition:opacity .18s ease,transform .18s ease,box-shadow .18s ease',
+      '-webkit-tap-highlight-color:transparent',
       positionStyles(position, 'launcher'),
     ].join(';');
 
     var panel = document.createElement('div');
+    panel.id = 'musuw-widget-panel';
+    panel.className = 'musuw-widget-panel musuw-widget-position-' + position;
+    panel.setAttribute('aria-hidden', 'true');
     panel.style.cssText = [
       'position:fixed',
       'z-index:2147482999',
       'width:' + panelWidth + 'px',
-      'max-width:calc(100vw - 32px)',
+      'max-width:calc(100vw - 48px)',
       'height:' + panelHeight + 'px',
       'max-height:calc(100vh - 100px)',
-      'border-radius:12px',
+      'border:1px solid rgba(17,19,24,.12)',
+      'border-radius:20px',
       'overflow:hidden',
-      'box-shadow:0 8px 32px rgba(0,0,0,.2)',
+      'box-shadow:0 2px 8px rgba(17,19,24,.08),0 28px 72px rgba(17,19,24,.2)',
       'display:none',
       'background:#fff',
+      'isolation:isolate',
       positionStyles(position, 'panel'),
     ].join(';');
+
+    var widgetStyle = document.createElement('style');
+    widgetStyle.setAttribute('data-musuw-widget-style', 'true');
+    widgetStyle.textContent = [
+      '.musuw-widget-launcher:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(17,19,24,.16),0 20px 44px rgba(17,19,24,.28)}',
+      '.musuw-widget-launcher:active{transform:translateY(0) scale(.96)}',
+      '.musuw-widget-launcher:focus-visible{outline:3px solid rgba(76,114,237,.36);outline-offset:3px}',
+      '@media (max-width:640px){',
+      '.musuw-widget-panel{left:12px!important;right:12px!important;width:auto!important;max-width:none!important;height:min(640px,calc(100dvh - 96px))!important;max-height:calc(100dvh - 96px)!important;border-radius:18px!important}',
+      '.musuw-widget-panel.musuw-widget-position-bottom-right,.musuw-widget-panel.musuw-widget-position-bottom-left{top:auto!important;bottom:80px!important}',
+      '.musuw-widget-panel.musuw-widget-position-top-right,.musuw-widget-panel.musuw-widget-position-top-left{top:80px!important;bottom:auto!important}',
+      '.musuw-widget-launcher.musuw-widget-position-bottom-right,.musuw-widget-launcher.musuw-widget-position-bottom-left{top:auto!important;bottom:12px!important}',
+      '.musuw-widget-launcher.musuw-widget-position-top-right,.musuw-widget-launcher.musuw-widget-position-top-left{top:12px!important;bottom:auto!important}',
+      '.musuw-widget-launcher.musuw-widget-position-bottom-right,.musuw-widget-launcher.musuw-widget-position-top-right{left:auto!important;right:12px!important}',
+      '.musuw-widget-launcher.musuw-widget-position-bottom-left,.musuw-widget-launcher.musuw-widget-position-top-left{left:12px!important;right:auto!important}',
+      '}',
+    ].join('');
 
     var iframe = document.createElement('iframe');
     iframe.src = embedUrl;
@@ -333,7 +375,9 @@
     function setOpen(next) {
       panelOpen = !!next;
       panel.style.display = panelOpen ? 'block' : 'none';
-      launcher.textContent = panelOpen ? '✕' : '💬';
+      panel.setAttribute('aria-hidden', panelOpen ? 'false' : 'true');
+      launcher.setAttribute('aria-expanded', panelOpen ? 'true' : 'false');
+      launcher.innerHTML = panelOpen ? CLOSE_ICON : CHAT_ICON;
       if (panelOpen) {
         emit('open', { channelId: channelId });
       } else {
@@ -352,6 +396,7 @@
       global.removeEventListener('message', onMessage);
       if (launcher.parentNode) launcher.parentNode.removeChild(launcher);
       if (panel.parentNode) panel.parentNode.removeChild(panel);
+      if (widgetStyle.parentNode) widgetStyle.parentNode.removeChild(widgetStyle);
       listeners = {};
       if (instance === api) instance = null;
     }
@@ -364,6 +409,7 @@
       provideToken();
     });
 
+    document.head.appendChild(widgetStyle);
     document.body.appendChild(launcher);
     document.body.appendChild(panel);
     global.addEventListener('message', onMessage);

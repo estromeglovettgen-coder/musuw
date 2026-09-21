@@ -121,6 +121,11 @@ class UiReleaseScopeTest(unittest.TestCase):
             "docs/INTEGRATION_RELEASE_REVIEW_20260921.md",
             "scripts/ci/verify-reviewed-integration-release.py",
             "scripts/ci/verify-reviewed-integration-release.test.py",
+            "weknora/frontend/public/musuw-widget.js",
+            "weknora/frontend/src/views/embed/EmbedChatCore.vue",
+            "weknora/frontend/src/views/embed/EmbedPage.vue",
+            "weknora/frontend/src/views/embed/EmbedBotMessage.vue",
+            "weknora/frontend/src/views/embed/EmbedUserMessage.vue",
         ):
             source = SOURCE_ROOT / path
             if path == "third_party/weknora/v0.7.2-provenance.json":
@@ -174,6 +179,7 @@ class UiReleaseScopeTest(unittest.TestCase):
             "weknora/frontend/src/hooks/useKnowledgeBase.ts",
             "third_party/weknora/v0.7.2-provenance.json",
             "scripts/ci/verify-reviewed-integration-release.py",
+            "weknora/frontend/public/musuw-widget.js",
         ):
             with self.subTest(path=path):
                 self.write(path, "unreviewed executable content\n")

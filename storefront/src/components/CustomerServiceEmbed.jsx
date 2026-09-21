@@ -27,6 +27,7 @@ export function CustomerServiceEmbed({ locale }) {
         baseUrl: config.baseUrl,
         channel: config.channelId,
         position: "bottom-right",
+        primaryColor: "#111318",
         title: locale === "zh-CN" ? "Musuw 智能客服" : "Musuw AI assistant",
         tokenEndpoint: config.tokenEndpoint,
       });

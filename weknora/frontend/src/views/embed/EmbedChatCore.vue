@@ -404,6 +404,7 @@ watch(
   min-height: 0;
   width: 100%;
   position: relative;
+  background: var(--musuw-canvas, #fff);
 }
 
 .embed-chat__scroll {
@@ -416,11 +417,11 @@ watch(
 .embed-chat__messages {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 800px;
+  gap: 18px;
+  max-width: 760px;
   margin: 0 auto;
   width: 100%;
-  padding: 12px 16px 0;
+  padding: 20px 18px 4px;
   box-sizing: border-box;
 }
 
@@ -436,32 +437,32 @@ watch(
   &__title {
     margin: 0 0 8px;
     font-size: 13px;
-    font-weight: 500;
-    color: var(--td-text-color-secondary);
+    font-weight: 600;
+    color: var(--musuw-muted-strong, #4b5563);
   }
 
   &__grid {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
 
   &__card {
     display: block;
     width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--td-component-stroke);
-    border-radius: 10px;
-    background: var(--td-bg-color-container);
+    padding: 11px 13px;
+    border: 1px solid var(--musuw-line, #e5e7eb);
+    border-radius: var(--musuw-radius-control, 8px);
+    background: var(--musuw-surface, #fff);
     text-align: left;
     cursor: pointer;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--musuw-shadow-subtle, 0 1px 2px rgba(38, 38, 38, 0.045));
     transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 
     &:hover {
-      border-color: color-mix(in srgb, var(--td-text-color-primary) 10%, var(--td-component-stroke));
-      background: color-mix(in srgb, var(--td-text-color-primary) 4%, var(--td-bg-color-container));
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      border-color: var(--musuw-line-strong, #d1d5db);
+      background: var(--musuw-surface-hover, #f3f4f6);
+      box-shadow: 0 2px 8px rgba(17, 24, 39, 0.06);
     }
 
     &--skeleton {
@@ -477,7 +478,7 @@ watch(
   &__text {
     font-size: 13px;
     line-height: 1.45;
-    color: var(--td-text-color-primary);
+    color: var(--musuw-ink, #1f2937);
   }
 }
 
@@ -489,25 +490,17 @@ watch(
 
   &__text {
     margin: 0;
-    max-width: min(88%, 520px);
-    padding: 10px 14px;
+    max-width: min(90%, 540px);
+    padding: 11px 14px;
     font-size: 14px;
     line-height: 1.55;
-    color: var(--td-text-color-primary);
+    color: var(--musuw-ink, #1f2937);
     white-space: pre-wrap;
     word-break: break-word;
-    background: color-mix(
-      in srgb,
-      var(--embed-primary, var(--td-brand-color)) 7%,
-      var(--td-bg-color-container, #fff)
-    );
-    border: 1px solid color-mix(
-      in srgb,
-      var(--embed-primary, var(--td-brand-color)) 14%,
-      var(--td-component-stroke, #e7e7e7)
-    );
-    border-radius: 4px 14px 14px 14px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    background: var(--musuw-surface-hover, #f3f4f6);
+    border: 1px solid var(--musuw-line, #e5e7eb);
+    border-radius: 4px 12px 12px 12px;
+    box-shadow: var(--musuw-shadow-subtle, 0 1px 2px rgba(38, 38, 38, 0.045));
   }
 }
 
@@ -533,8 +526,8 @@ watch(
   width: 12px;
   height: 12px;
   box-sizing: border-box;
-  border: 1.5px solid var(--td-component-stroke);
-  border-top-color: var(--td-text-color-secondary);
+  border: 1.5px solid var(--musuw-line, #e5e7eb);
+  border-top-color: var(--musuw-muted-strong, #4b5563);
   border-radius: 50%;
   animation: embedChatTypingSpin 0.8s linear infinite;
 }
@@ -553,8 +546,9 @@ watch(
 
 .embed-chat__input {
   flex-shrink: 0;
-  padding: 8px 16px 16px;
+  padding: 10px 18px 18px;
   box-sizing: border-box;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--musuw-canvas, #fff) 18%);
 }
 
 .msg-skeleton-list {
@@ -601,14 +595,14 @@ watch(
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-stroke);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: var(--musuw-surface, #fff);
+  border: 1px solid var(--musuw-line, #e5e7eb);
+  box-shadow: 0 8px 20px rgba(17, 24, 39, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--td-text-color-secondary);
+  color: var(--musuw-muted-strong, #4b5563);
 }
 
 .scroll-btn-fade-enter-active,
@@ -620,5 +614,20 @@ watch(
 .scroll-btn-fade-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(8px);
+}
+
+@media (max-width: 480px) {
+  .embed-chat__messages {
+    gap: 16px;
+    padding: 16px 12px 4px;
+  }
+
+  .embed-chat__input {
+    padding: 8px 12px 12px;
+  }
+
+  .scroll-to-bottom-btn {
+    bottom: 92px;
+  }
 }
 </style>

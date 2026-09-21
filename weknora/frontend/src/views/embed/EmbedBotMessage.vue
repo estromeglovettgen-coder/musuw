@@ -230,8 +230,9 @@ onMounted(() => {
 
 .embed-bot-msg {
   border-radius: 4px;
-  color: var(--td-text-color-primary);
-  font-size: 16px;
+  color: var(--musuw-ink, #1f2937);
+  font-size: 14px;
+  line-height: 1.65;
   margin-right: auto;
   max-width: 100%;
   box-sizing: border-box;
@@ -289,12 +290,13 @@ onMounted(() => {
   z-index: 10000;
   max-width: 320px;
   padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--td-bg-color-container);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--musuw-line, #e5e7eb);
+  border-radius: var(--musuw-radius-control, 8px);
+  background: var(--musuw-surface, #fff);
+  box-shadow: var(--musuw-shadow-raised, 0 12px 32px rgba(38, 38, 38, 0.06));
   font-size: 12px;
   line-height: 1.5;
-  color: var(--td-text-color-primary);
+  color: var(--musuw-ink, #1f2937);
 
   &__title {
     font-weight: 600;

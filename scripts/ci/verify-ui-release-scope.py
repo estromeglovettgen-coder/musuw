@@ -9,7 +9,22 @@ from pathlib import Path
 
 SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 UI = ("weknora/frontend/src/assets/", "weknora/frontend/src/components/", "weknora/frontend/src/i18n/", "weknora/frontend/src/views/chat/", "weknora/frontend/src/views/knowledge/", "weknora/frontend/e2e/")
-ROOT = {"e2e/knowledge-folder-actions.spec.ts", "e2e/knowledge-toolbar.spec.ts", "e2e/knowledge-folders.spec.ts", "e2e/knowledge-batch-cancel.spec.ts", "e2e/chat-history-feedback.spec.ts", "e2e/document-feedback.spec.ts", "e2e/session-batch-manage.spec.ts", "playwright.session-batch.config.ts", ".github/workflows/ci.yml", "scripts/ci/verify-ui-release-scope.py", "scripts/ci/verify-ui-release-scope.test.py", "third_party/weknora/upgrades/81142df/resolution-ledger.tsv", "third_party/weknora/upgrades/81142df/resolution-overrides.tsv", "third_party/weknora/upgrades/81142df/resolution-summary.json"}
+ROOT = {
+    "e2e/knowledge-folder-actions.spec.ts",
+    "e2e/knowledge-toolbar.spec.ts",
+    "e2e/knowledge-folders.spec.ts",
+    "e2e/knowledge-batch-cancel.spec.ts",
+    "e2e/chat-history-feedback.spec.ts",
+    "e2e/document-feedback.spec.ts",
+    "e2e/session-batch-manage.spec.ts",
+    "playwright.session-batch.config.ts",
+    ".github/workflows/ci.yml",
+    "scripts/ci/verify-ui-release-scope.py",
+    "scripts/ci/verify-ui-release-scope.test.py",
+    "third_party/weknora/upgrades/81142df/resolution-ledger.tsv",
+    "third_party/weknora/upgrades/81142df/resolution-overrides.tsv",
+    "third_party/weknora/upgrades/81142df/resolution-summary.json",
+}
 PROTECTED = ("backend", "billing", "payment", "checkout", "entitlement", "subscription", "auth", "openrouter", "locks", "buildruntimeconfig", "build-runtime-config")
 
 # Reviewed presentation fixes and their accompanying files, including loading feedback.
@@ -18,6 +33,13 @@ PROTECTED = ("backend", "billing", "payment", "checkout", "entitlement", "subscr
 # Pin content, not just sensitive filenames: later edits need a fresh review.
 # The two documentation entries also include this clarification of the policy.
 REVIEWED_UI_CONTENT = {
+    # Embed presentation files also contain session, token, origin, and message
+    # handling. Pin the exact reviewed blobs instead of broadly allowing paths.
+    "weknora/frontend/public/musuw-widget.js": {"ea25bcf9e9e6b7241a15b346424b8f3f4b3ad0c3"},
+    "weknora/frontend/src/views/embed/EmbedChatCore.vue": {"9b35394dab0cb71a4113410cbfb274b32f411974"},
+    "weknora/frontend/src/views/embed/EmbedPage.vue": {"f20ac3e9b03f8970e49cb3c9be32b28a70752894"},
+    "weknora/frontend/src/views/embed/EmbedBotMessage.vue": {"08a85705c180f0d28e34cded6a465522c0884c9f"},
+    "weknora/frontend/src/views/embed/EmbedUserMessage.vue": {"47623ae286d001ce714aa4629dc366d568f6f046"},
     "scripts/ci/verify-reviewed-model-release.test.py": {"2bb3840cce83cb2c8d47ccfc2b5b7f5b2ef05898"},
     "scripts/ci/verify-reviewed-model-release.py": {"2c45c6d2fa40a70f1cc1f3fe56e58009b5e78df1"},
     "docs/MODEL_RELEASE_20260919.md": {"fa7fd465fc253a5781c8e3db700cc23fc3cc2373"},
