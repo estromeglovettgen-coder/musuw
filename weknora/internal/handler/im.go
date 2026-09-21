@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"sort"
@@ -31,6 +32,39 @@ var invalidIMPlatformError = func() string {
 	sort.Strings(names)
 	return "platform must be one of: " + strings.Join(names, ", ")
 }()
+
+// imCredentialPatch distinguishes an omitted credentials field from an
+// explicitly supplied object. Raw values preserve false, zero, empty strings,
+// null, and nested values as exact per-key patch inputs.
+type imCredentialPatch struct {
+	present bool
+	values  map[string]json.RawMessage
+}
+
+func (p *imCredentialPatch) UnmarshalJSON(data []byte) error {
+	p.present = true
+	var values map[string]json.RawMessage
+	if err := json.Unmarshal(data, &values); err != nil || values == nil {
+		return errors.New("credentials must be a JSON object")
+	}
+	p.values = values
+	return nil
+}
+
+func mergeIMCredentialPatch(stored types.JSON, patch map[string]json.RawMessage) (types.JSON, error) {
+	values := make(map[string]json.RawMessage)
+	storedJSON := strings.TrimSpace(string(stored))
+	if storedJSON != "" && storedJSON != "null" {
+		if err := json.Unmarshal(stored, &values); err != nil || values == nil {
+			return nil, errors.New("stored credentials are not a JSON object")
+		}
+	}
+	for key, value := range patch {
+		values[key] = value
+	}
+	merged, err := json.Marshal(values)
+	return types.JSON(merged), err
+}
 
 // IMHandler handles IM platform callback requests and channel CRUD.
 type IMHandler struct {
@@ -114,18 +148,22 @@ func (h *IMHandler) CreateIMChannel(c *gin.Context) {
 	if channel.Credentials == nil {
 		channel.Credentials = types.JSON("{}")
 	}
+	if err := h.imService.SetChannelAgentID(c.Request.Context(), channel, agentID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "agent not found"})
+		return
+	}
 
 	if err := h.imService.CreateChannel(channel); err != nil {
 		logger.Errorf(c.Request.Context(), "[IM] Create channel failed: %v", err)
-		if strings.HasPrefix(err.Error(), "duplicate_bot:") {
-			c.JSON(http.StatusConflict, gin.H{"error": strings.TrimPrefix(err.Error(), "duplicate_bot: ")})
+		if errors.Is(err, im.ErrDuplicateBot) {
+			c.JSON(http.StatusConflict, gin.H{"error": im.ErrDuplicateBot.Error()})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create channel"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": channel})
+	c.JSON(http.StatusOK, gin.H{"data": im.SummarizeIMChannel(*channel)})
 }
 
 // ListIMChannels lists all IM channels for an agent.
@@ -206,18 +244,27 @@ func (h *IMHandler) UpdateIMChannel(c *gin.Context) {
 	}
 
 	var req struct {
-		Name            *string    `json:"name"`
-		Mode            *string    `json:"mode"`
-		OutputMode      *string    `json:"output_mode"`
-		SessionMode     *string    `json:"session_mode"`
-		KnowledgeBaseID *string    `json:"knowledge_base_id"`
-		Credentials     types.JSON `json:"credentials"`
-		Enabled         *bool      `json:"enabled"`
-		AgentID         *string    `json:"agent_id"`
+		Name            *string           `json:"name"`
+		Mode            *string           `json:"mode"`
+		OutputMode      *string           `json:"output_mode"`
+		SessionMode     *string           `json:"session_mode"`
+		KnowledgeBaseID *string           `json:"knowledge_base_id"`
+		Credentials     imCredentialPatch `json:"credentials"`
+		Enabled         *bool             `json:"enabled"`
+		AgentID         *string           `json:"agent_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	var mergedCredentials types.JSON
+	if req.Credentials.present {
+		mergedCredentials, err = mergeIMCredentialPatch(channel.Credentials, req.Credentials.values)
+		if err != nil {
+			logger.Errorf(c.Request.Context(), "[IM] Merge stored channel credentials failed: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update channel credentials"})
+			return
+		}
 	}
 
 	if req.Name != nil {
@@ -235,8 +282,8 @@ func (h *IMHandler) UpdateIMChannel(c *gin.Context) {
 	if req.KnowledgeBaseID != nil {
 		channel.KnowledgeBaseID = *req.KnowledgeBaseID
 	}
-	if req.Credentials != nil {
-		channel.Credentials = req.Credentials
+	if req.Credentials.present {
+		channel.Credentials = mergedCredentials
 	}
 	if req.Enabled != nil {
 		channel.Enabled = *req.Enabled
@@ -254,15 +301,15 @@ func (h *IMHandler) UpdateIMChannel(c *gin.Context) {
 
 	if err := h.imService.UpdateChannel(channel); err != nil {
 		logger.Errorf(c.Request.Context(), "[IM] Update channel failed: %v", err)
-		if strings.HasPrefix(err.Error(), "duplicate_bot:") {
-			c.JSON(http.StatusConflict, gin.H{"error": strings.TrimPrefix(err.Error(), "duplicate_bot: ")})
+		if errors.Is(err, im.ErrDuplicateBot) {
+			c.JSON(http.StatusConflict, gin.H{"error": im.ErrDuplicateBot.Error()})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update channel"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": channel})
+	c.JSON(http.StatusOK, gin.H{"data": im.SummarizeIMChannel(*channel)})
 }
 
 // DeleteIMChannel deletes an IM channel.
@@ -333,7 +380,7 @@ func (h *IMHandler) ToggleIMChannel(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": channel})
+	c.JSON(http.StatusOK, gin.H{"data": im.SummarizeIMChannel(*channel)})
 }
 
 func writeIMCallbackACK(c *gin.Context, platform string) {

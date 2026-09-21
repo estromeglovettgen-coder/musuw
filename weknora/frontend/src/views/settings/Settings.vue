@@ -57,7 +57,7 @@
       <TenantInfo v-else-if="currentSection === 'tenant'" />
       <TenantMembers v-else-if="currentSection === 'members'" />
       <IntegrationSettingsSection
-        v-else-if="isIntegrationSection(currentSection)"
+        v-else-if="isPublicIntegrationSection(currentSection)"
         :tab="integrationTabFromSection(currentSection)"
       />
       <McpSettings v-else-if="currentSection === 'mcp'" />
@@ -103,8 +103,10 @@ import {
   INTEGRATION_PREVIEW_ITEMS,
   INTEGRATION_TAB_CAPABILITY,
   INTEGRATION_TAB_MIN_ROLE,
+  isExposedIntegrationTab,
 } from '@/config/integrations'
 import {
+  canAccessSettingsNavigationSection,
   SETTINGS_SECTION_MIN_ROLE,
   SYSTEM_ADMIN_SETTINGS_SECTIONS,
 } from '@/config/settingsAccess'
@@ -117,7 +119,7 @@ import {
   integrationSectionKey,
   integrationTabFromSection,
   isIntegrationSection,
-  normalizeSettingsSection as normalizeSettingsSectionFromQuery,
+  normalizeExposedIntegrationSettingsSection,
   settingsQueryUnchanged,
 } from '@/config/settingsRoute'
 
@@ -141,21 +143,34 @@ type NavItem = {
 
 const SYSTEM_ADMIN_SECTIONS = SYSTEM_ADMIN_SETTINGS_SECTIONS
 
+const canManageSettingsNavigation = computed(() =>
+  authStore.isSystemAdmin || authStore.canAccessAllTenants || authStore.hasRole('admin'),
+)
+
+const isPublicIntegrationSection = (section: string): boolean => (
+  isIntegrationSection(section)
+  && isExposedIntegrationTab(integrationTabFromSection(section))
+)
+
 const normalizeSettingsSection = (section: string) => {
-  // Preserve Musuw Lite's intentionally narrow settings surface while using
-  // the fixed upstream route aliases for regular deployments.
+  const normalized = normalizeExposedIntegrationSettingsSection(
+    section,
+    route.query.tab as string | undefined,
+  )
+  if (!authStore.isLiteMode || isPublicIntegrationSection(normalized)) return normalized
+  if (!canManageSettingsNavigation.value) return integrationSectionKey('im')
   if (
-    authStore.isLiteMode
-    && section !== 'usage'
-    && section !== 'userprofile'
-    && section !== 'models'
-    && section !== 'mymemory'
-    && section !== 'memory'
-    && section !== 'mcp'
+    normalized === 'general'
+    || normalized === 'usage'
+    || normalized === 'userprofile'
+    || normalized === 'models'
+    || normalized === 'mymemory'
+    || normalized === 'memory'
+    || normalized === 'mcp'
   ) {
-    return 'general'
+    return normalized
   }
-  return normalizeSettingsSectionFromQuery(section, route.query.tab as string | undefined)
+  return 'general'
 }
 
 const syncSettingsRoute = (sectionKey: string) => {
@@ -170,6 +185,7 @@ const syncSettingsRoute = (sectionKey: string) => {
 
 const isSectionSupported = (key: string): boolean => {
   if (isIntegrationSection(key)) {
+    if (!isPublicIntegrationSection(key)) return false
     return deploymentCapabilities.isSupported(
       INTEGRATION_TAB_CAPABILITY[integrationTabFromSection(key)],
     )
@@ -178,6 +194,20 @@ const isSectionSupported = (key: string): boolean => {
 }
 
 const canSeeSection = (key: string): boolean => {
+  if (!canAccessSettingsNavigationSection(
+    key,
+    canManageSettingsNavigation.value,
+    authStore.isLiteMode,
+  )) {
+    return false
+  }
+  if (isIntegrationSection(key)) {
+    if (!isPublicIntegrationSection(key) || !authStore.canManageChannels) return false
+    const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
+    if (!min) return true
+    if (authStore.canAccessAllTenants) return true
+    return authStore.hasRole(min)
+  }
   if (authStore.isLiteMode) {
     if (key === 'mcp') return authStore.canAccessAllTenants || authStore.hasRole('admin')
     return key === 'general'
@@ -187,12 +217,6 @@ const canSeeSection = (key: string): boolean => {
       || key === 'mymemory'
       || key === 'memory'
   }
-  if (isIntegrationSection(key)) {
-    const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
-    if (!min) return true
-    if (authStore.canAccessAllTenants) return true
-    return authStore.hasRole(min)
-  }
   if (SYSTEM_ADMIN_SECTIONS.has(key)) return authStore.isSystemAdmin
   const min = SETTINGS_SECTION_MIN_ROLE[key] ?? 'viewer'
   if (authStore.canAccessAllTenants) return true
@@ -200,8 +224,20 @@ const canSeeSection = (key: string): boolean => {
 }
 
 const navItems = computed<NavItem[]>(() => {
+  const integrationItems: NavItem[] = INTEGRATION_PREVIEW_ITEMS
+    .filter((item) => isExposedIntegrationTab(item.key))
+    .map((item) => ({
+      key: integrationSectionKey(item.key),
+      icon: item.icon.type === 'icon' ? item.icon.name : 'integration',
+      emoji: item.icon.type === 'emoji' ? item.icon.value : undefined,
+      label: t(`integrations.tabs.${item.key}`),
+    }))
+
   if (authStore.isLiteMode) {
-    return [
+    if (!canManageSettingsNavigation.value) {
+      return integrationItems.filter((item) => canSeeSection(item.key) && isSectionSupported(item.key))
+    }
+    const liteItems: NavItem[] = [
       { key: 'general', icon: 'setting', label: t('general.title') },
       { key: 'userprofile', icon: 'user', label: t('userProfile.title') },
       { key: 'models', icon: 'cpu', label: t('modelSettings.sceneModels.navTitle') },
@@ -212,14 +248,11 @@ const navItems = computed<NavItem[]>(() => {
         : []),
       { key: 'usage', icon: 'chart-line', label: t('entitlement.usageTitle') },
     ]
+    const supportedIntegrationItems = integrationItems.filter(
+      (item) => canSeeSection(item.key) && isSectionSupported(item.key),
+    )
+    return [...liteItems, ...supportedIntegrationItems]
   }
-
-  const integrationItems: NavItem[] = INTEGRATION_PREVIEW_ITEMS.map((item) => ({
-    key: integrationSectionKey(item.key),
-    icon: item.icon.type === 'icon' ? item.icon.name : 'integration',
-    emoji: item.icon.type === 'emoji' ? item.icon.value : undefined,
-    label: t(`integrations.tabs.${item.key}`),
-  }))
 
   // Behavior authority is the fixed main commit 81142df. Keep every compatible
   // settings capability while rendering it through Musuw's visual shell.
@@ -251,7 +284,7 @@ const navItems = computed<NavItem[]>(() => {
     ...integrationItems,
   ]
 
-  if (!authStore.currentTenantRole && !authStore.canAccessAllTenants) return []
+  if (!authStore.currentTenantRole && !authStore.canAccessAllTenants && !authStore.isSystemAdmin) return []
   return all.filter((item) => canSeeSection(item.key) && isSectionSupported(item.key))
 })
 
@@ -327,10 +360,10 @@ watch(
       syncSettingsRoute(currentSection.value || 'general')
       return
     }
-    const normalizedSection = normalizeSettingsSectionFromQuery(
-      section,
-      typeof tab === 'string' ? tab : undefined,
-    )
+    const normalizedSection = normalizeSettingsSection(section)
+    if (normalizedSection !== section || (isIntegrationSection(normalizedSection) && tab)) {
+      syncSettingsRoute(normalizedSection)
+    }
     if (capabilitiesLoaded && !isSectionSupported(normalizedSection)) {
       MessagePlugin.warning(t('settings.capabilityUnavailable'))
       const fallback = navItems.value[0]?.key || 'general'
@@ -354,7 +387,7 @@ watch(navItems, (items) => {
     currentSubSection.value = ''
     syncSettingsRoute(fallback)
   }
-})
+}, { immediate: true })
 
 const handleSettingsNav = (event: Event) => {
   const detail = event instanceof CustomEvent ? event.detail : null

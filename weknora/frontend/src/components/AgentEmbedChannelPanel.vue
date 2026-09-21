@@ -8,7 +8,7 @@
       </div>
 
       <t-loading :loading="loading" size="small" class="channels-loading-wrap">
-        <div v-if="!loading && channels.length === 0 && !authStore.hasRole('admin')" class="channels-empty">
+        <div v-if="!loading && channels.length === 0 && !authStore.canManageChannels" class="channels-empty">
           <t-empty :description="$t('embedPublish.empty')" />
         </div>
 
@@ -29,7 +29,7 @@
                 {{ agentDisplayName(ch) }}
               </span>
             </div>
-            <div v-if="authStore.hasRole('admin')" class="channel-card__actions" @click.stop>
+            <div v-if="authStore.canManageChannels" class="channel-card__actions" @click.stop>
               <t-dropdown trigger="click" placement="bottom-right" attach="body" :options="channelMenuOptions(ch)"
                 @click="handleChannelMenuClick($event, ch)">
                 <t-button variant="text" shape="square" size="small" class="channel-card__action-btn channel-card__more"
@@ -51,7 +51,7 @@
             </div>
           </button>
 
-          <button v-if="authStore.hasRole('admin')" type="button" class="channel-card channel-card--add"
+          <button v-if="authStore.canManageChannels" type="button" class="channel-card channel-card--add"
             @click="openCreate">
             <span class="channel-card__badge" aria-hidden="true">
               <t-icon name="add" />
@@ -69,7 +69,7 @@
 
     <SettingDrawer v-model:visible="showDrawer" class="embed-channel-drawer" :title="drawerTitle"
       :description="drawerStepDescription" icon="code" storage-key="setting-drawer:embed-channel" width="560px"
-      :confirm-loading="saving" :confirm-text="drawerConfirmText" :hide-footer="!isAdmin" @confirm="handleDrawerConfirm"
+      :confirm-loading="saving" :confirm-text="drawerConfirmText" :hide-footer="!authStore.canManageChannels" @confirm="handleDrawerConfirm"
       @cancel="closeDrawer">
       <template v-if="wizardStep > 0" #footer-left>
         <t-button variant="outline" @click="prevWizardStep">
@@ -101,7 +101,7 @@
             </div>
           </div>
 
-          <div v-if="editingId && isAdmin" class="setting-row setting-row--last">
+          <div v-if="editingId && authStore.canManageChannels" class="setting-row setting-row--last">
             <div class="setting-info">
               <label>{{ $t('embedPublish.enabled') }}</label>
             </div>
@@ -112,7 +112,7 @@
 
           <div class="form-item">
             <label class="form-label">{{ $t('embedPublish.name') }}</label>
-            <t-input v-model="form.name" :disabled="!isAdmin" :placeholder="$t('embedPublish.namePlaceholder')"
+            <t-input v-model="form.name" :disabled="!authStore.canManageChannels" :placeholder="$t('embedPublish.namePlaceholder')"
               @focus="channelNameTouched = true" />
             <p v-if="!editingId" class="form-desc">{{ $t('embedPublish.nameDefaultHint') }}</p>
             <p v-else class="form-desc">{{ $t('embedPublish.nameDesc') }}</p>
@@ -128,7 +128,7 @@
 
           <div class="form-item">
             <label class="form-label">{{ $t('embedPublish.allowedOrigins') }}</label>
-            <t-textarea v-model="originsText" :disabled="!isAdmin" :placeholder="$t('embedPublish.originsPlaceholder')"
+            <t-textarea v-model="originsText" :disabled="!authStore.canManageChannels" :placeholder="$t('embedPublish.originsPlaceholder')"
               :status="originsError ? 'error' : 'default'" :autosize="{ minRows: 2, maxRows: 4 }"
               @change="originsError = ''" />
             <p v-if="originsError" class="form-desc form-desc--error">{{ originsError }}</p>
@@ -137,14 +137,14 @@
 
           <div class="form-item">
             <label class="form-label">{{ $t('embedPublish.rateLimitLabel') }}</label>
-            <t-input-number v-model="form.rate_limit_per_minute" :disabled="!isAdmin" :min="1" :max="600" theme="column"
+            <t-input-number v-model="form.rate_limit_per_minute" :disabled="!authStore.canManageChannels" :min="1" :max="600" theme="column"
               class="form-number" />
             <p class="form-desc">{{ $t('embedPublish.rateLimitDesc') }}</p>
           </div>
 
           <div class="form-item">
             <label class="form-label">{{ $t('embedPublish.rateLimitDayLabel') }}</label>
-            <t-input-number v-model="form.rate_limit_per_day" :disabled="!isAdmin" :min="1" :max="1000000"
+            <t-input-number v-model="form.rate_limit_per_day" :disabled="!authStore.canManageChannels" :min="1" :max="1000000"
               theme="column" class="form-number" />
             <p class="form-desc">{{ $t('embedPublish.rateLimitDayDesc') }}</p>
           </div>
@@ -158,7 +158,7 @@
 
           <div class="form-item">
             <label class="form-label">{{ $t('embedPublish.welcomeMessage') }}</label>
-            <t-textarea v-model="form.welcome_message" :disabled="!isAdmin"
+            <t-textarea v-model="form.welcome_message" :disabled="!authStore.canManageChannels"
               :placeholder="$t('embedPublish.welcomePlaceholder')" :autosize="{ minRows: 2, maxRows: 4 }" />
             <p class="form-desc">{{ $t('embedPublish.welcomeMessageDesc') }}</p>
           </div>
@@ -170,7 +170,7 @@
                 <p class="desc">{{ $t('embedPublish.showSuggestedQuestionsDesc') }}</p>
               </div>
               <div class="setting-control">
-                <t-switch v-model="form.show_suggested_questions" :disabled="!isAdmin" size="small" />
+                <t-switch v-model="form.show_suggested_questions" :disabled="!authStore.canManageChannels" size="small" />
               </div>
             </div>
 
@@ -183,7 +183,7 @@
                 </p>
               </div>
               <div class="setting-control">
-                <t-switch v-model="form.allow_web_search" :disabled="!isAdmin" size="small" />
+                <t-switch v-model="form.allow_web_search" :disabled="!authStore.canManageChannels" size="small" />
               </div>
             </div>
 
@@ -196,7 +196,7 @@
                 </p>
               </div>
               <div class="setting-control">
-                <t-switch v-model="form.allow_file_upload" :disabled="!isAdmin" size="small" />
+                <t-switch v-model="form.allow_file_upload" :disabled="!authStore.canManageChannels" size="small" />
               </div>
             </div>
           </div>
@@ -210,31 +210,31 @@
 
           <div class="form-item">
             <label class="form-label">{{ $t('embedPublish.pageTitle') }}</label>
-            <t-input v-model="form.page_title" :disabled="!isAdmin"
+            <t-input v-model="form.page_title" :disabled="!authStore.canManageChannels"
               :placeholder="$t('embedPublish.pageTitlePlaceholder')" />
             <p class="form-desc">{{ $t('embedPublish.pageTitleDesc') }}</p>
           </div>
 
           <div class="form-item">
             <label class="form-label">{{ $t('embedPublish.headerTitleMode') }}</label>
-            <t-select v-model="form.header_title_mode" :disabled="!isAdmin" :options="headerTitleModeOptions" />
+            <t-select v-model="form.header_title_mode" :disabled="!authStore.canManageChannels" :options="headerTitleModeOptions" />
             <p class="form-desc">{{ $t('embedPublish.headerTitleModeDesc') }}</p>
           </div>
 
           <div class="form-item">
             <label class="form-label">{{ $t('embedPublish.widgetPosition') }}</label>
-            <t-select v-model="form.widget_position" :disabled="!isAdmin" :options="positionOptions" />
+            <t-select v-model="form.widget_position" :disabled="!authStore.canManageChannels" :options="positionOptions" />
           </div>
 
           <div class="form-item">
             <label class="form-label">{{ $t('embedPublish.defaultLocale') }}</label>
-            <t-select v-model="form.default_locale" :disabled="!isAdmin" :options="defaultLocaleOptions" />
+            <t-select v-model="form.default_locale" :disabled="!authStore.canManageChannels" :options="defaultLocaleOptions" />
             <p class="form-desc">{{ $t('embedPublish.defaultLocaleDesc') }}</p>
           </div>
 
           <div class="form-item">
             <label class="form-label">{{ $t('embedPublish.primaryColor') }}</label>
-            <t-color-picker v-model="form.primary_color" :disabled="!isAdmin" format="HEX"
+            <t-color-picker v-model="form.primary_color" :disabled="!authStore.canManageChannels" format="HEX"
               :color-modes="['monochrome']" />
           </div>
 
@@ -260,14 +260,14 @@
           <div class="settings-group">
             <div class="settings-group__field">
               <label class="form-label">{{ $t('embedPublish.webhookUrl') }}</label>
-              <t-input v-model="form.webhook_url" :disabled="!isAdmin" autocomplete="off"
+              <t-input v-model="form.webhook_url" :disabled="!authStore.canManageChannels" autocomplete="off"
                 :placeholder="$t('embedPublish.webhookUrlPlaceholder')" />
               <p class="form-desc">{{ $t('embedPublish.webhookUrlDesc') }}</p>
             </div>
 
             <div class="settings-group__field">
               <label class="form-label">{{ $t('embedPublish.webhookSecret') }}</label>
-              <t-input v-model="form.webhook_secret" :disabled="!isAdmin" type="password" autocomplete="new-password"
+              <t-input v-model="form.webhook_secret" :disabled="!authStore.canManageChannels" type="password" autocomplete="new-password"
                 :placeholder="webhookSecretPlaceholder" />
               <p class="form-desc">{{ $t('embedPublish.webhookSecretDesc') }}</p>
             </div>
@@ -368,7 +368,7 @@
                   <t-icon name="file-copy" />
                 </t-button>
               </template>
-              <t-popconfirm v-if="isAdmin" theme="warning" :content="$t('embedPublish.resetKeyConfirmBody')"
+              <t-popconfirm v-if="authStore.canManageChannels" theme="warning" :content="$t('embedPublish.resetKeyConfirmBody')"
                 :confirm-btn="{ content: $t('embedPublish.resetKeyConfirmOk'), theme: 'danger' }"
                 :cancel-btn="{ content: $t('common.cancel') }" @confirm="performRotate(editingId)">
                 <t-button size="small" variant="text" theme="danger" :loading="rotating"
@@ -434,7 +434,6 @@ const filterAgentId = defineModel<string>('filterAgentId', { default: '' })
 
 const { t } = useI18n()
 const authStore = useAuthStore()
-const isAdmin = computed(() => authStore.hasRole('admin'))
 
 const loading = ref(false)
 const saving = ref(false)
@@ -543,7 +542,7 @@ const defaultLocaleOptions = computed(() => ([
 
 const channelMenuOptions = (ch: EmbedChannel) => {
   const items: Array<{ content: string; value: string }> = []
-  if (isAdmin.value) {
+  if (authStore.canManageChannels) {
     items.push({ content: t('embedPublish.preview'), value: 'preview' })
   }
   items.push({
@@ -893,7 +892,7 @@ const mapOriginsApiError = (message: string): string | null => {
 }
 
 const saveForm = async () => {
-  if (!isAdmin.value) return
+  if (!authStore.canManageChannels) return
   if (!createAgentId.value) {
     MessagePlugin.warning(t('integrations.selectAgentHint'))
     return

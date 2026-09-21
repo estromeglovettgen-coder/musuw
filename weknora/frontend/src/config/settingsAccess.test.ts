@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { isExposedIntegrationTab } from './integrations'
 import {
+  canAccessSettingsNavigationSection,
   SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE,
   SETTINGS_SECTION_MIN_ROLE,
   SYSTEM_ADMIN_SETTINGS_SECTIONS,
@@ -65,4 +67,31 @@ test('consumer model settings are viewer-visible but not a system-admin section'
   assert.equal(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.models, 'admin')
   assert.equal(SYSTEM_ADMIN_SETTINGS_SECTIONS.has('models'), false)
   assert.equal(SYSTEM_ADMIN_SETTINGS_SECTIONS.has('system-global'), true)
+})
+
+test('the Lite integration surface exposes only IM and web embed', () => {
+  assert.equal(isExposedIntegrationTab('im'), true)
+  assert.equal(isExposedIntegrationTab('embed'), true)
+  assert.equal(isExposedIntegrationTab('api'), false)
+  assert.equal(isExposedIntegrationTab('chrome'), false)
+  assert.equal(isExposedIntegrationTab('claw'), false)
+})
+
+test('ordinary Lite tenant members can reach only the two exposed channel settings', () => {
+  assert.equal(canAccessSettingsNavigationSection('integration-im', false, true), true)
+  assert.equal(canAccessSettingsNavigationSection('integration-embed', false, true), true)
+  assert.equal(canAccessSettingsNavigationSection('general', false, true), false)
+  assert.equal(canAccessSettingsNavigationSection('models', false, true), false)
+})
+
+test('Lite settings managers retain access to the existing settings sections', () => {
+  assert.equal(canAccessSettingsNavigationSection('general', true, true), true)
+  assert.equal(canAccessSettingsNavigationSection('models', true, true), true)
+  assert.equal(canAccessSettingsNavigationSection('integration-im', true, true), true)
+})
+
+test('Standard deployments retain the existing role matrix for ordinary members', () => {
+  assert.equal(canAccessSettingsNavigationSection('general', false, false), true)
+  assert.equal(canAccessSettingsNavigationSection('models', false, false), true)
+  assert.equal(canAccessSettingsNavigationSection('integration-im', false, false), true)
 })

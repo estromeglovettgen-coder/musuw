@@ -37,12 +37,16 @@ import (
 //	      like Owner; Contributor in someone else's KB acts like
 //	      Viewer" hold uniformly.
 //
-//	NO  — Tenant-wide infrastructure: Model, VectorStore, IM channel,
+//	NO  — Tenant-wide infrastructure: Model, VectorStore,
 //	      WebSearchProvider, DataSource, MCPService, WeKnoraCloud
 //	      credentials.
 //	      => Mutating routes use Admin().
 //	      There is no "creator-of-the-vector-store" concept; configuring
 //	      it affects everyone, so only Admin+ may touch it.
+//	      IM and embed channels are the explicit product-policy exception:
+//	      their routes use ManageChannels(), a narrow authority currently
+//	      granted to every active tenant member. Do not model that exception
+//	      by broadening Admin() or promoting the caller's tenant role.
 //
 //	ENTRY POINT — Routes that CREATE a new owned resource (POST
 //	      /knowledge-bases, POST /agents).
@@ -77,8 +81,9 @@ import (
 //   - As Viewer: read everything, mutate nothing.
 //   - Creating new resources (KB, agent, chat session) requires being
 //     at least Contributor.
-//   - Configuring tenant infrastructure (models, vector stores, IM,
-//     etc.) requires Admin+.
+//   - Configuring tenant infrastructure (models, vector stores, etc.)
+//     requires Admin+. IM/embed channel management is the documented
+//     ManageChannels exception.
 //
 // If a route makes a Contributor surprised that they CAN'T do
 // something they own, the gate is too tight (probably Admin where it
@@ -202,6 +207,30 @@ func (g *rbacGuards) Contributor() gin.HandlerFunc {
 
 func (g *rbacGuards) Admin() gin.HandlerFunc {
 	return middleware.RequireRole(types.TenantRoleAdmin, g.cfg)
+}
+
+// ManageChannels is the JWT authority for IM and web-embed channel
+// management. Product policy grants this narrow authority to every active
+// tenant member without granting Viewer or Contributor accounts any unrelated
+// Admin permission. API-key principals remain governed by the independent
+// manage_channels route policy.
+func (g *rbacGuards) ManageChannels() gin.HandlerFunc {
+	roleGuard := middleware.RequireRole(types.TenantRoleViewer, g.cfg)
+	return func(c *gin.Context) {
+		ctx := c.Request.Context()
+		if _, ok := types.TenantAPIKeyScopeFromContext(ctx); ok {
+			c.Next()
+			return
+		}
+		role, ok := ctx.Value(types.TenantRoleContextKey).(types.TenantRole)
+		if !ok || !role.IsValid() {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "Forbidden: valid workspace membership required",
+			})
+			return
+		}
+		roleGuard(c)
+	}
 }
 
 func (g *rbacGuards) AdminOrSystemAdmin() gin.HandlerFunc {

@@ -213,9 +213,16 @@ const (
 	defaultRateLimitMaxRequests = 10
 )
 
-// ErrChannelDisabled reports that a channel row exists but is disabled, so
-// callers can tell it apart from a missing channel or a transient failure.
-var ErrChannelDisabled = errors.New("channel is disabled")
+var (
+	// ErrChannelDisabled reports that a channel row exists but is disabled, so
+	// callers can tell it apart from a missing channel or a transient failure.
+	ErrChannelDisabled = errors.New("channel is disabled")
+
+	// ErrDuplicateBot intentionally omits channel, tenant, and bot metadata.
+	// Bot identity uniqueness is global, so a conflicting channel may belong to
+	// another tenant and its details must not cross the tenant boundary.
+	ErrDuplicateBot = errors.New("this bot is already bound to another channel")
+)
 
 // channelState holds runtime state for a running IM channel.
 type channelState struct {
@@ -2990,8 +2997,8 @@ func (s *Service) ListChannelsByAgent(agentID string, tenantID uint64) ([]IMChan
 
 // ChannelWithAgent augments an IMChannel summary with its owning agent's display name.
 // Credentials are intentionally omitted so this type is safe to return from a
-// tenant-scoped list endpoint; callers that need credentials must use the
-// per-agent endpoint which enforces the same tenant scope anyway.
+// tenant-scoped list endpoint. Existing credentials and derived bot identities
+// are write-only and are not returned by either tenant-wide or per-agent lists.
 type ChannelWithAgent struct {
 	ID          string    `json:"id"`
 	TenantID    uint64    `json:"tenant_id"`
@@ -3003,7 +3010,6 @@ type ChannelWithAgent struct {
 	Mode        string    `json:"mode"`
 	OutputMode  string    `json:"output_mode"`
 	SessionMode string    `json:"session_mode"`
-	BotIdentity string    `json:"bot_identity"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -3020,7 +3026,7 @@ func (s *Service) ListChannelsByTenant(ctx context.Context, tenantID uint64) ([]
 		Select(`c.id, c.tenant_id, c.agent_id,
                 COALESCE(a.name, '') AS agent_name,
                 c.platform, c.name, c.enabled, c.mode, c.output_mode,
-                c.session_mode, c.bot_identity, c.created_at, c.updated_at`).
+				c.session_mode, c.created_at, c.updated_at`).
 		Joins(`LEFT JOIN custom_agents AS a
                ON a.id = c.agent_id AND a.tenant_id = c.tenant_id AND a.deleted_at IS NULL`).
 		Where("c.tenant_id = ? AND c.deleted_at IS NULL", tenantID)
@@ -3048,7 +3054,7 @@ func relocalizeBuiltinChannelAgentNames(ctx context.Context, rows []ChannelWithA
 }
 
 // CreateChannel creates a new IM channel and optionally starts it.
-// Returns a duplicate_bot error if the bot identity is already used by another channel.
+// Returns ErrDuplicateBot if the bot identity is already used by another channel.
 func (s *Service) CreateChannel(channel *IMChannel) error {
 	if err := s.checkDuplicateBot(channel, ""); err != nil {
 		return err
@@ -3083,7 +3089,7 @@ func (s *Service) SetChannelAgentID(ctx context.Context, channel *IMChannel, age
 }
 
 // UpdateChannel updates a channel and restarts it if needed.
-// Returns a duplicate_bot error if the bot identity is already used by another channel.
+// Returns ErrDuplicateBot if the bot identity is already used by another channel.
 func (s *Service) UpdateChannel(channel *IMChannel) error {
 	if err := s.checkDuplicateBot(channel, channel.ID); err != nil {
 		return err
@@ -3182,7 +3188,7 @@ func (s *Service) checkDuplicateBot(channel *IMChannel, excludeID string) error 
 		}
 		return fmt.Errorf("check duplicate bot: %w", err)
 	}
-	return fmt.Errorf("duplicate_bot: this bot is already bound to channel %q (%s); each bot can only be connected to one channel", existing.Name, existing.ID)
+	return ErrDuplicateBot
 }
 
 // ── File message handling ──────────────────────────────────────────────

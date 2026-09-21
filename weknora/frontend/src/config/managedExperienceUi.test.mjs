@@ -102,7 +102,7 @@ test("Lite sidebar does not request hidden IM or embed channel metadata", () => 
   );
 });
 
-test("Lite route guard blocks hidden pages and allows only consumer Settings sections", () => {
+test("Lite route guard blocks hidden pages and allows consumer plus channel Settings sections", () => {
   for (const allowed of [
     "path === '/platform/creatChat'",
     "path.startsWith('/platform/chat/')",
@@ -116,16 +116,20 @@ test("Lite route guard blocks hidden pages and allows only consumer Settings sec
     assert.ok(router.includes(allowed), `Lite route allow-list lost ${allowed}`);
   }
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/);
-  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile' && section !== 'mymemory' && section !== 'memory' && section !== 'mcp'/);
+  assert.match(router, /LITE_SETTINGS_ROUTE_SECTIONS[\s\S]*'integration-im'[\s\S]*'integration-embed'/);
+  assert.match(router, /normalizeExposedIntegrationSettingsSection/);
+  assert.match(router, /!LITE_SETTINGS_ROUTE_SECTIONS\.has\(normalizedSection\)/);
 
   // Standard routes remain in the bundle/source for quick restoration.
   assert.match(router, /AgentList\.vue/);
   assert.match(router, /OrganizationList\.vue/);
 });
 
-test("Lite Settings exposes consumer memory and MCP policy sections while General keeps theme controls", () => {
-  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'userprofile'[\s\S]*key: 'models'[\s\S]*key: 'mymemory'[\s\S]*key: 'memory'[\s\S]*key: 'mcp'[\s\S]*key: 'usage'/);
-  assert.match(settingsView, /if \(\s*authStore\.isLiteMode\s*&&\s*section !== 'usage'\s*&&\s*section !== 'userprofile'\s*&&\s*section !== 'models'\s*&&\s*section !== 'mymemory'\s*&&\s*section !== 'memory'\s*&&\s*section !== 'mcp'\s*\)\s*\{\s*return 'general'/);
+test("Lite Settings exposes member channels and retains manager policy sections while General keeps theme controls", () => {
+  assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'userprofile'[\s\S]*key: 'models'[\s\S]*key: 'mymemory'[\s\S]*key: 'memory'[\s\S]*key: 'mcp'[\s\S]*key: 'usage'[\s\S]*supportedIntegrationItems/);
+  assert.match(settingsView, /if \(!canManageSettingsNavigation\.value\) return integrationSectionKey\('im'\)/);
+  assert.match(settingsView, /if \(!canManageSettingsNavigation\.value\) \{[\s\S]*return integrationItems\.filter/);
+  assert.match(settingsView, /INTEGRATION_PREVIEW_ITEMS[\s\S]*isExposedIntegrationTab/);
   assert.match(settingsView, /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)[\s\S]*return key === 'general'[\s\S]*\|\| key === 'mymemory'[\s\S]*\|\| key === 'memory'/);
   assert.match(settingsView, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/);
   assert.match(settingsView, /<ModelSettings v-else-if="currentSection === 'models'"/);

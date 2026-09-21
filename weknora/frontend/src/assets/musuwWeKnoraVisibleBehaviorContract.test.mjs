@@ -37,7 +37,9 @@ test('Standard WeKnora routes remain in source while Lite route exposure is fail
     "path === '/checkout'",
   ]) assert.ok(router.includes(allowed), `Lite allow-list lost ${allowed}`)
   assert.match(router, /if \(!isAllowedLitePath\(to\.path\)\)[\s\S]*next\(AUTHENTICATED_HOME_PATH\)/)
-  assert.match(router, /section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile' && section !== 'mymemory' && section !== 'memory' && section !== 'mcp'/)
+  assert.match(router, /LITE_SETTINGS_ROUTE_SECTIONS[\s\S]*'integration-im'[\s\S]*'integration-embed'/)
+  assert.match(router, /normalizeExposedIntegrationSettingsSection/)
+  assert.match(router, /!LITE_SETTINGS_ROUTE_SECTIONS\.has\(normalizedSection\)/)
   assert.match(router, /await ensureProductEdition\(authStore\)/)
 })
 
@@ -85,13 +87,16 @@ test('Lite UserMenu cannot reopen management surfaces and keeps valid interactiv
   ]) assert.ok(userMenu.includes(token), `Standard UserMenu source lost ${token}`)
 })
 
-test('Lite Settings also exposes native MCP for admins; Standard settings remain recoverable', () => {
+test('Lite Settings exposes member channels and retains manager settings; Standard remains recoverable', () => {
   const settings = read('../views/settings/Settings.vue')
   const general = read('../views/settings/GeneralSettings.vue')
 
-  assert.match(settings, /if \(\s*authStore\.isLiteMode\s*&&[\s\S]*section !== 'mymemory'[\s\S]*section !== 'memory'[\s\S]*section !== 'mcp'[\s\S]*\) \{\s*return 'general'/)
+  assert.match(settings, /normalizeExposedIntegrationSettingsSection/)
+  assert.match(settings, /if \(!canManageSettingsNavigation\.value\) return integrationSectionKey\('im'\)/)
+  assert.match(settings, /if \(!canManageSettingsNavigation\.value\) \{[\s\S]*return integrationItems\.filter/)
   assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)[\s\S]*key === 'mymemory'[\s\S]*key === 'memory'/)
-  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'userprofile'[\s\S]*key: 'models'[\s\S]*key: 'mymemory'[\s\S]*key: 'memory'[\s\S]*key: 'mcp'[\s\S]*key: 'usage'/)
+  assert.match(settings, /if \(authStore\.isLiteMode\) \{[\s\S]*key: 'general'[\s\S]*key: 'userprofile'[\s\S]*key: 'models'[\s\S]*key: 'mymemory'[\s\S]*key: 'memory'[\s\S]*key: 'mcp'[\s\S]*key: 'usage'[\s\S]*supportedIntegrationItems/)
+  assert.match(settings, /INTEGRATION_PREVIEW_ITEMS[\s\S]*isExposedIntegrationTab/)
   assert.match(settings, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/)
   assert.ok(settings.includes('<ModelSettings v-else-if="currentSection === \'models\'"'))
   assert.ok(settings.includes('UsageBillingSettings'))

@@ -85,3 +85,20 @@ test('an explicit storefront checkout intent still wins before normal app entry'
   assert.notEqual(normalRestore, -1, 'normal app entry must retain safe workspace restore')
   assert.ok(checkoutIntent < normalRestore, 'checkout intent must be handled before normal restore')
 })
+
+test('Lite settings routes keep exposed channel sections and canonicalize hidden integrations', () => {
+  const guardStart = routerSource.indexOf("if (to.path === '/platform/settings')", routerSource.indexOf('if (isLiteEdition(authStore))'))
+  const guardEnd = routerSource.indexOf('\n    }', guardStart)
+
+  assert.notEqual(guardStart, -1, 'Lite settings route guard must exist')
+  assert.notEqual(guardEnd, -1, 'Lite settings route guard must remain bounded')
+
+  const guard = routerSource.slice(guardStart, guardEnd + 6)
+  assert.match(guard, /normalizeExposedIntegrationSettingsSection/)
+  assert.match(guard, /LITE_SETTINGS_ROUTE_SECTIONS/)
+  assert.match(guard, /buildSettingsRouteQuery/)
+  assert.match(
+    routerSource,
+    /LITE_SETTINGS_ROUTE_SECTIONS[\s\S]*'integration-im'[\s\S]*'integration-embed'/,
+  )
+})

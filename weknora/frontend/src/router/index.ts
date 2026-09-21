@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import type { RouteLocationGeneric } from 'vue-router'
+import type { LocationQueryRaw, RouteLocationGeneric } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useOrganizationStore } from '@/stores/organization'
 import { useSettingsStore } from '@/stores/settings'
@@ -15,11 +15,25 @@ import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
 import type { DeploymentCapabilityKey } from '@/config/deploymentCapabilities'
 import { MessagePlugin } from 'tdesign-vue-next'
 import i18n from '@/i18n'
-import { normalizeSettingsSection } from '@/config/settingsRoute'
+import {
+  buildSettingsRouteQuery,
+  normalizeExposedIntegrationSettingsSection,
+} from '@/config/settingsRoute'
 
 /** Lite /桌面 WebView 硬刷新时可能只打开 `/`，用 session 记住上次页面以便恢复 */
 const LITE_LAST_PATH_KEY = 'weknora_lite_last_path'
 const CHECKOUT_INTENT_STORAGE_KEY = 'musuw.checkout.intent'
+const LITE_SETTINGS_ROUTE_SECTIONS = new Set([
+  'general',
+  'usage',
+  'models',
+  'userprofile',
+  'mymemory',
+  'memory',
+  'mcp',
+  'integration-im',
+  'integration-embed',
+])
 
 function authenticatedEntryPath(to: RouteLocationGeneric) {
   // The global OIDC callback handler must finish persisting the native session
@@ -260,7 +274,7 @@ const router = createRouter({
               path: '/platform/settings',
               query: {
                 ...rest,
-                section: normalizeSettingsSection(incoming, tab),
+                section: normalizeExposedIntegrationSettingsSection(incoming, tab),
               },
             }
           },
@@ -501,9 +515,23 @@ router.beforeEach(async (to, from, next) => {
     if (to.path === '/platform/settings') {
       const section = typeof to.query.section === 'string' ? to.query.section : ''
       const tab = typeof to.query.tab === 'string' ? to.query.tab : ''
+      const normalizedSection = normalizeExposedIntegrationSettingsSection(
+        section || 'general',
+        tab || undefined,
+      )
       if (
-        (section && section !== 'general' && section !== 'usage' && section !== 'models' && section !== 'userprofile' && section !== 'mymemory' && section !== 'memory' && section !== 'mcp') ||
-        tab
+        normalizedSection.startsWith('integration-')
+        && (normalizedSection !== section || Boolean(tab))
+      ) {
+        next({
+          path: '/platform/settings',
+          query: buildSettingsRouteQuery(normalizedSection, to.query) as LocationQueryRaw,
+        })
+        return
+      }
+      if (
+        !LITE_SETTINGS_ROUTE_SECTIONS.has(normalizedSection)
+        || (Boolean(tab) && normalizedSection !== 'models')
       ) {
         next({ path: '/platform/settings' })
         return

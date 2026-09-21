@@ -25,15 +25,17 @@ test('settings search never synthesizes a hidden section', () => {
   assert.deepEqual(filterSettingsNavigation(authorizedItems, 'system-global'), [])
 })
 
-test('Lite settings expose complete workspace memory read-only to members without exposing infrastructure', () => {
+test('Lite settings expose only member channels while retaining manager workspace settings', () => {
   assert.match(
     settingsSource,
-    /if \(\s*authStore\.isLiteMode\s*&&[\s\S]*section !== 'mymemory'[\s\S]*section !== 'memory'[\s\S]*section !== 'mcp'[\s\S]*\)\s*\{\s*return 'general'/,
+    /if \(!canManageSettingsNavigation\.value\) return integrationSectionKey\('im'\)/,
   )
   assert.match(
     settingsSource,
-    /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)[\s\S]*return key === 'general'[\s\S]*key === 'mymemory'[\s\S]*key === 'memory'/,
+    /if \(!canManageSettingsNavigation\.value\) \{[\s\S]*return integrationItems\.filter/,
   )
+  assert.match(settingsSource, /INTEGRATION_PREVIEW_ITEMS[\s\S]*isExposedIntegrationTab/)
+  assert.match(settingsSource, /if \(authStore\.isLiteMode\) \{[\s\S]*if \(key === 'mcp'\) return authStore\.canAccessAllTenants \|\| authStore\.hasRole\('admin'\)[\s\S]*key === 'mymemory'[\s\S]*key === 'memory'/)
   assert.match(settingsSource, /\{ key: 'models', icon: 'cpu', label: t\('settings\.modelManagement'\) \}/)
   assert.match(settingsSource, /\{ key: 'mymemory', icon: 'bookmark', label: t\('memorySettings\.title'\) \}/)
   assert.match(settingsSource, /\{ key: 'memory', icon: 'bulletpoint', label: t\('memoryWorkspaceSettings\.title'\) \}/)

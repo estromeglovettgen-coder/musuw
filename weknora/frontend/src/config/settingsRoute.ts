@@ -1,4 +1,8 @@
-import { INTEGRATION_TABS, type IntegrationTab } from './integrations'
+import {
+  INTEGRATION_TABS,
+  isExposedIntegrationTab,
+  type IntegrationTab,
+} from './integrations'
 
 export const INTEGRATION_SECTION_PREFIX = 'integration-'
 
@@ -42,6 +46,18 @@ export function normalizeSettingsSection(section: string, tab?: string | null): 
     return integrationSectionKey(section)
   }
   return section
+}
+
+export function normalizeExposedIntegrationSettingsSection(
+  section: string,
+  tab?: string | null,
+): string {
+  const normalized = normalizeSettingsSection(section, tab)
+  if (!normalized.startsWith(INTEGRATION_SECTION_PREFIX)) return normalized
+  const rawTab = normalized.slice(INTEGRATION_SECTION_PREFIX.length)
+  return isExposedIntegrationTab(rawTab as IntegrationTab)
+    ? normalized
+    : integrationSectionKey('im')
 }
 
 /**
