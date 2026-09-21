@@ -188,7 +188,7 @@ test("homepage keeps the smooth hero while removing examples and repeated workfl
 
   assert.deepEqual(
     MARKETING_NAVIGATION.map(({ label }) => label),
-    ["Features", "Platform", "Pricing", "Security", "Contact"],
+    ["Features", "Platform", "Pricing", "Security", "Contact", "Docs"],
   );
 
   const expectedAssets = new Set([

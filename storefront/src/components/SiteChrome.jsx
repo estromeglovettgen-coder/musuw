@@ -15,8 +15,8 @@ import { readStorefrontAuthentication } from "../storefrontAuthStatus";
 
 const defaultCopy = getStorefrontCopy("en");
 const navigationLabels = Object.freeze({
-  en: Object.freeze(["Features", "Platform", "Pricing", "Security", "Contact"]),
-  zh: Object.freeze(["功能", "平台", "定价", "安全", "联系"]),
+  en: Object.freeze(["Features", "Platform", "Pricing", "Security", "Contact", "Docs"]),
+  zh: Object.freeze(["功能", "平台", "定价", "安全", "联系", "文档"]),
 });
 
 function publicNavigationLabels(copy) {
@@ -25,12 +25,12 @@ function publicNavigationLabels(copy) {
 
 const footerLabels = Object.freeze({
   en: Object.freeze([
-    Object.freeze({ title: "Product", links: Object.freeze(["Features", "Platform", "Pricing"]) }),
+    Object.freeze({ title: "Product", links: Object.freeze(["Features", "Platform", "Pricing", "Docs"]) }),
     Object.freeze({ title: "Trust", links: Object.freeze(["FAQ", "Security", "Contact"]) }),
     Object.freeze({ title: "Legal", links: Object.freeze(["Terms", "Privacy", "Refunds", "Subscription", "Cookies"]) }),
   ]),
   zh: Object.freeze([
-    Object.freeze({ title: "产品", links: Object.freeze(["功能", "平台", "定价"]) }),
+    Object.freeze({ title: "产品", links: Object.freeze(["功能", "平台", "定价", "文档"]) }),
     Object.freeze({ title: "信任", links: Object.freeze(["常见问题", "安全", "联系"]) }),
     Object.freeze({ title: "法律", links: Object.freeze(["服务条款", "隐私", "退款", "订阅与取消", "Cookie"]) }),
   ]),

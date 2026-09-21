@@ -253,7 +253,7 @@ frontend/src/components/GlobalCommandPalette/ResultItem.vue	M	-	100644	cec0c8ed8
 frontend/src/components/GlobalCommandPalette/commands.ts	M	-	100644	8f41581bf5033b4ef9697e0b587037cd5510d651	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/components/GlobalCommandPalette/useSearch.ts	M	M	100644	2c00429c163c157289d14316c639c88681e4328d	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/components/GlobalInvitationBell.vue	M	-	100644	53f3c8ab793c9f4547b44fafcad9d0f0e934d06e	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/components/IMChannelPanel.vue	-	M	100644	97a50874de68c11a730315212ffeeaef28d29c47	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
+frontend/src/components/IMChannelPanel.vue	-	M	100644	49a42b19591274fa4e6a9f96340d8563f0d385cb	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/components/Input-field.agent-switch.test.mjs	M	-	100644	4de22cf74fc50b597a4d7fe0ed7e77d5acc3ae19	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/components/Input-field.consumerScene.test.mjs	A	-	100644	fbac2dd2c27cadef7e748bd47acee73c5fcc3833	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/components/Input-field.vue	M	M	100644	fec56dea766ab2150f7a3efb485e6f97ce25460b	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
@@ -474,7 +474,7 @@ frontend/src/views/embed/EmbedChatCore.vue	-	M	100644	9b35394dab0cb71a4113410cbf
 frontend/src/views/integrations/ApiIntegrationSettings.vue	M	M	100644	f60c4e8e3c6bab19a056aff8a4aeeb6c002c58cb	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/views/integrations/ChromeExtensionLanding.vue	-	M	100644	79801388a2edb701e789b23c3bd8e1c9aa27a29e	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/integrations/ClawSkillLanding.vue	-	M	100644	064c29aab3a8485dff298c4a1560c03bb1df6094	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-frontend/src/views/integrations/IntegrationSettingsSection.vue	M	-	100644	52a7b26f72552c3380187106e26f19d52bc7b754	preserve-musuw-exact		audited local-only content is byte-identical
+frontend/src/views/integrations/IntegrationSettingsSection.vue	M	-	100644	08c0c4a5da3342e0a4305ecb6ff8b7be9621b638	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/integrations/apiKeyScope.test.ts	-	A	100644	47a54c217cdeeb59f36c33b4c8f708ca453d07ea	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/integrations/apiKeyScope.ts	-	A	100644	b4183967c75e85869a4ccc1c92a8ea6717354a0c	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/integrations/apiPlaygroundSSE.test.ts	-	A	100644	524df8f458e187fbc33e36c029e19caeedfec32a	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
