@@ -455,6 +455,11 @@ func (s *marketplaceService) projectProduct(
 		PaidThrough:       sub.PaidThrough,
 		CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
 	}
+	// Match the durable checkout fence: a refund revokes access without ending
+	// the provider subscription. Only canceled/failed rows allow a replacement.
+	if sub.PaddleSubscriptionID != "" && sub.Status != "canceled" && sub.Status != "failed" {
+		out.CheckoutAvailable = false
+	}
 	return &out, nil
 }
 

@@ -11,7 +11,8 @@ const frozen = new Map([
   ['./business-baselines/Input-field.pre-view.vue', '57a5ae94ad8fb21b61f57e73d2ae6796670a6d31'],
   ['./business-baselines/KnowledgeBase.pre-view.vue', '77905990552ca5baa76310c0ea34c0c29df1d638'],
   ['./business-baselines/manual-knowledge-editor.pre-view.vue', '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e'],
-  ['../composables/useChatCitationPopover.ts', '948dad67061997eafc97664fabdf2d1307b203c4'],
+  // creator-marketplace-subscriptions: approved message-scoped snippets-only drawer and hover behavior.
+  ['../composables/useChatCitationPopover.ts', '2c119360d4df7a48c25999306d1b863dc83fc231'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],
   ['../views/knowledge/wiki/WikiFolderActions.vue', 'f461dacf3a42a51afee8535a1ceea90e350a84c2'],
   ['../views/knowledge/wiki/WikiRevisionDrawer.vue', 'ad87842ea929a642f6001bcf5c97ced49ab17cf5'],

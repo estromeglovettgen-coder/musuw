@@ -23,6 +23,11 @@
           <t-button :loading="openingChat" @click="startChat">{{ t('creatorMarketplace.startChat') }}</t-button>
           <t-button v-if="product.access.subscription_id && product.access.portal_available" theme="default" :loading="portalOpening" @click="openPortal">{{ t('creatorMarketplace.manageSubscription') }}</t-button>
         </template>
+        <template v-else-if="!product.checkout_available && product.access?.subscription_id && product.access.portal_available">
+          <h2>{{ t(marketStatusKey(product.access.status)) }}</h2>
+          <p class="market-note">{{ t('creatorMarketplace.existingSubscription') }}</p>
+          <t-button theme="default" :loading="portalOpening" @click="openPortal">{{ t('creatorMarketplace.manageSubscription') }}</t-button>
+        </template>
         <template v-else>
           <div class="market-period" role="group" :aria-label="t('creatorMarketplace.period')"><button type="button" :aria-pressed="period === 'monthly'" @click="period = 'monthly'">{{ t('creatorMarketplace.monthly') }}</button><button type="button" :aria-pressed="period === 'yearly'" @click="period = 'yearly'">{{ t('creatorMarketplace.yearly') }}</button></div>
           <div class="market-price">{{ displayPrice }}<small>{{ t(period === 'yearly' ? 'creatorMarketplace.perYear' : 'creatorMarketplace.perMonth') }}</small></div>
@@ -47,7 +52,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { getMarketplaceProduct, createMarketplacePortal, type MarketplaceProduct, type MarketplaceBillingPeriod } from '@/api/creator-marketplace'
 import MarketplaceHeader from './MarketplaceHeader.vue'
 import MarketplaceCheckout from './MarketplaceCheckout.vue'
-import { formatMarketPrice, formatMarketDate } from './marketplacePresentation'
+import { formatMarketPrice, formatMarketDate, marketStatusKey } from './marketplacePresentation'
 import './marketplace.css'
 const { t, locale } = useI18n()
 const route = useRoute()

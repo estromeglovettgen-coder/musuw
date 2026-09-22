@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 
 const taylor = { id: 'taylor', title: '泰勒·测试环境样例', description: 'A curated question-answering service.', category: '知识', agent_id: 'platform-agent', agent_name: '泰勒专属智能体', knowledge_base_ids: ['platform-kb'], knowledge_base_names: ['泰勒知识库'], sample_questions: ['如何理解长期主义？'], default_model_id: 'builtin-deepseek-v4-flash', currency: 'USD', monthly_amount: 1900, yearly_amount: 19000, status: 'published', featured: true, fixture: false, checkout_available: true, created_at: '2026-09-22T00:00:00Z', updated_at: '2026-09-22T00:00:00Z', access: { can_chat: false, cancel_at_period_end: false } }
-async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; pending?: boolean; creatorDraft?: boolean; pendingOrder?: boolean; refundedOrder?: boolean } = {}) {
+async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; pending?: boolean; creatorDraft?: boolean; pendingOrder?: boolean; refundedOrder?: boolean; existingSubscription?: 'refunded' | 'canceled'; checkoutAvailable?: boolean } = {}) {
   let paid = options.paid || false
   const requests: Array<{ path: string; body: any }> = []
   const counts = { chat: 0, suggestion: 0, details: 0 }
@@ -12,7 +12,7 @@ async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; 
     ;(window as any).__completePaddle = () => callback?.({ name: 'checkout.completed' })
     ;(window as any).__emitPaddleEvent = (name: string) => callback?.({ name })
   })
-  const product = () => ({ ...taylor, access: { can_chat: paid, portal_available: paid, subscription_id: paid ? 'sub_owned' : undefined, status: paid ? 'active' : undefined, paid_through: paid ? '2026-10-22T00:00:00Z' : undefined, cancel_at_period_end: false } })
+  const product = () => ({ ...taylor, checkout_available: options.checkoutAvailable ?? taylor.checkout_available, access: { can_chat: paid, portal_available: paid || Boolean(options.existingSubscription), subscription_id: paid || options.existingSubscription ? 'sub_owned' : undefined, status: options.existingSubscription || (paid ? 'active' : undefined), paid_through: paid || options.existingSubscription ? '2026-10-22T00:00:00Z' : undefined, cancel_at_period_end: false } })
   await page.route('**/api/v1/**', async route => {
     const path = new URL(route.request().url()).pathname
     const method = route.request().method()
@@ -232,4 +232,85 @@ test('a refunded subscription does not promise access through its retained paid-
   await expect(page.locator('.subscription-row .market-badge')).toHaveText('已退款')
   await expect(page.getByRole('button', { name: '开始提问', exact: true })).toHaveCount(0)
   await expect(page.locator('.subscription-row')).not.toContainText('可使用至')
+})
+
+test('mobile market pages own their scrolling and keep payment status labels on one line', async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 932 })
+  await mockMarket(page, { paid: true })
+  await page.goto('/e2e/mobile-harness.html?page=/platform/orders')
+  await expect(page.locator('.subscription-row')).toBeVisible()
+  const outlet = page.locator('.platform-route-outlet')
+  const bounds = await outlet.evaluate(element => ({ height: element.clientHeight, scrollHeight: element.scrollHeight }))
+  expect.soft(bounds.scrollHeight).toBe(bounds.height)
+  await page.getByRole('tab', { name: '付款记录', exact: true }).click()
+  const lines = await page.locator('.market-table .market-badge').evaluate(element => {
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    return range.getClientRects().length
+  })
+  expect.soft(lines).toBe(1)
+  // Focus/navigation must not leave the persistent shell scrolled behind its fixed mobile header.
+  await outlet.evaluate(element => { element.scrollTop = 32 })
+  await page.locator('.market-table').getByRole('link', { name: taylor.title, exact: true }).click()
+  await expect(page.locator('.market-detail-copy h1')).toHaveText(taylor.title)
+  const headingBounds = await page.locator('.market-header h1').boundingBox()
+  const headerBounds = await page.locator('.visual-mobile-header').boundingBox()
+  expect(headingBounds!.y).toBeGreaterThanOrEqual(headerBounds!.y + headerBounds!.height)
+  expect(await outlet.evaluate(element => element.scrollTop)).toBe(0)
+})
+
+for (const marketplace of [true, false]) {
+  test(`restored ${marketplace ? 'marketplace' : 'ordinary'} history keeps citation permissions after changing the composer`, async ({ page }) => {
+    const api = await mockMarket(page)
+    let chunkRequests = 0
+    const reference = { id: '11111111-1111-4111-8111-111111111111', knowledge_id: 'source-doc', knowledge_base_id: 'source-kb', knowledge_title: 'Saved source', content: 'Saved citation snippet', chunk_type: 'text' }
+    await page.route('**/api/v1/chunks/by-id/*', route => { chunkRequests++; return route.fulfill({ json: { data: { content: 'Source-only chunk text' } } }) })
+    await page.route('**/api/v1/messages/chat-fixture/load?*', route => route.fulfill({ json: { success: true, data: [
+      { id: 'saved-user', role: 'user', content: 'A saved question', is_completed: true, created_at: '2026-09-22T00:00:00Z' },
+      { id: 'saved-answer', role: 'assistant', marketplace_product_id: marketplace ? 'taylor' : undefined, content: `Saved answer <kb doc="Saved source" chunk_id="${reference.id}" kb_id="source-kb" />`, is_completed: true, created_at: '2026-09-22T00:00:01Z', model_id: 'builtin-deepseek-v4-flash', knowledge_references: [reference], agent_steps: [{ iteration: 0, thought: '', timestamp: '2026-09-22T00:00:01Z', tool_calls: [{ id: 'saved-search', name: 'knowledge_search', args: {}, result: { success: true, data: { results: [reference], count: 1 } } }] }] },
+    ] } }))
+    await visit(page)
+    await expect(page.locator('.market-featured')).toBeVisible()
+    await page.evaluate(async () => {
+      const harness = (window as any).__marketplaceHarness
+      harness.settings.selectAgent('builtin-quick-answer')
+      await harness.router.push('/platform/chat/chat-fixture')
+    })
+    const citation = page.locator('.visual-chat-message-row.is-assistant .citation-kb').first()
+    await expect(citation).toBeVisible()
+    await page.evaluate(() => (window as any).__marketplaceHarness.settings.selectAgent('builtin-smart-reasoning'))
+    await citation.hover()
+    await expect(page.locator('.visual-citation-float')).toContainText(/Saved citation snippet|Source-only chunk text/)
+    expect.soft(chunkRequests).toBe(marketplace ? 0 : 1)
+    await citation.click()
+    await expect(page.locator('.visual-references-panel')).toContainText('Saved citation snippet')
+    await expect.soft(page.locator('.visual-reference-item__open')).toHaveCount(marketplace ? 0 : 1)
+    await page.locator('.visual-references-panel__close').click()
+    await page.locator('.visual-rag-pipeline__summary').first().click()
+    await page.locator('.visual-rag-step.is-clickable').first().click()
+    await expect(page.locator('.visual-references-panel')).toContainText('Saved citation snippet')
+    await expect(page.locator('.visual-reference-item__open')).toHaveCount(marketplace ? 0 : 1)
+    expect(api.counts.chat).toBe(0)
+  })
+}
+
+test('a provider-bound refunded product offers subscription management instead of another checkout', async ({ page }) => {
+  const api = await mockMarket(page, { existingSubscription: 'refunded', checkoutAvailable: false })
+  await visit(page, '/platform/marketplace/taylor')
+  await expect(page.locator('.market-purchase')).toContainText('已退款')
+  await expect(page.locator('.market-purchase')).toContainText('该商品已有订阅，请先管理现有订阅。')
+  await expect(page.getByRole('button', { name: '订阅使用', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '管理订阅', exact: true }).click()
+  await expect(page).toHaveURL(/portal-confirmed/)
+  expect(api.requests.map(request => request.path)).toEqual(['/api/v1/creator-marketplace/subscriptions/sub_owned/portal'])
+})
+
+test('a terminal canceled product can start a new checkout when the server allows it', async ({ page }) => {
+  const api = await mockMarket(page, { existingSubscription: 'canceled', checkoutAvailable: true })
+  await visit(page, '/platform/marketplace/taylor')
+  await page.getByRole('button', { name: '年付', exact: true }).click()
+  await page.getByRole('button', { name: '订阅使用', exact: true }).click()
+  await expect(page.locator('iframe[title="Paddle checkout"]')).toBeAttached()
+  expect(api.requests.find(request => request.path.endsWith('/checkout'))?.body.billing_period).toBe('yearly')
 })

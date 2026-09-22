@@ -6,8 +6,9 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-test('audited inline citation controller stays byte-for-byte frozen after the visual selector bridge', () => {
-  assert.equal(blobSha(read('../composables/useChatCitationPopover.ts')), '948dad67061997eafc97664fabdf2d1307b203c4')
+test('audited inline citation controller stays pinned to its reviewed business behavior', () => {
+  // creator-marketplace-subscriptions: approved message-scoped snippets-only drawer and hover behavior.
+  assert.equal(blobSha(read('../composables/useChatCitationPopover.ts')), '2c119360d4df7a48c25999306d1b863dc83fc231')
 })
 
 test('rebuilt answer reference summary preserves grouping, drawer handoff and KB navigation', () => {

@@ -989,6 +989,7 @@ const {
   scheduleClose: scheduleCitationClose,
 } = useChatCitationPopover(rootElement, {
   getKnowledgeReferences: () => props.session?.knowledge_references,
+  marketplaceProductId: () => props.session?.marketplace_product_id,
   embedChannelId: () => (props.embeddedMode ? props.embedChannelId : undefined),
   embedToken: () => (props.embeddedMode ? props.embedToken : undefined),
   sessionId: () => props.sessionId,

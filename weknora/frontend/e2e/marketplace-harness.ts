@@ -42,7 +42,7 @@ const router = createRouter({ history: createMemoryHistory(), routes: [
   { path: '/platform/creator-products', name: 'creatorProducts', component: CreatorProducts },
   { path: '/platform/marketplace-admin', name: 'marketplaceAdmin', component: AdminMarketplace },
   { path: '/platform/creatChat', name: 'globalCreatChat', component: CreateChat },
-  { path: '/platform/chat/:id', name: 'chat', component: Chat },
+  { path: '/platform/chat/:chatid', name: 'chat', component: Chat },
   { path: '/references', component: ReferenceHarness },
   { path: '/plans', component: { render: () => h('p', 'Membership management') } },
 ] })

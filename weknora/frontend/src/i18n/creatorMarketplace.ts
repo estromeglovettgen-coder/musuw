@@ -1,4 +1,5 @@
 export const creatorMarketplaceEn = {
+  existingSubscription: 'This product already has a subscription. Please manage the existing subscription first.',
   boundResources: 'This service uses its published knowledge sources.',
   savePublication: 'Save publication settings', contact: 'Contact information', authorization: 'Rights and authorization details', coverInvalid: 'Use an HTTPS image URL.', rightsConfirmed: 'Rights confirmed by submitter', rightsMissing: 'Rights confirmation missing', platformAgent: 'Platform service agent', platformKnowledgeBases: 'Platform service knowledge bases', platformMappingNote: 'Select the platform-owned service resources used for customer delivery. Creator source resources are reviewed separately.', mappingRequired: 'Select platform resources and provide all three Paddle catalog IDs before publishing.',
   title: 'Knowledge Market', subtitle: 'Ask questions with knowledge and methods curated by creators.',
@@ -53,6 +54,7 @@ export const creatorMarketplaceEn = {
 }
 
 export const creatorMarketplaceZh = {
+  existingSubscription: '该商品已有订阅，请先管理现有订阅。',
   boundResources: '专属服务使用已发布的固定知识来源。',
   savePublication: '保存发布配置', contact: '联系方式', authorization: '内容权利与发布授权说明', coverInvalid: '请使用 HTTPS 图片地址。', rightsConfirmed: '投稿人已确认发布权利', rightsMissing: '尚未确认发布权利', platformAgent: '平台交付智能体', platformKnowledgeBases: '平台交付知识库', platformMappingNote: '选择由平台持有、用于向买家交付服务的智能体与知识库。创作者的源资料单独审核。', mappingRequired: '上架前请选择平台交付资源，并填写三个 Paddle 商品与价格 ID。',
   title: '知识市场', subtitle: '向创作者整理的知识与方法提问，获得有依据的回答。',
@@ -108,11 +110,13 @@ export const creatorMarketplaceZh = {
 
 export const creatorMarketplaceKo = {
   ...creatorMarketplaceEn,
+  existingSubscription: '이 상품에는 기존 구독이 있습니다. 먼저 기존 구독을 관리하세요.',
   title: '지식 마켓', subtitle: '크리에이터가 정리한 지식과 방법을 바탕으로 질문하세요.', orders: '주문 및 구독', creator: '크리에이터 스튜디오', admin: '마켓 관리', browse: '마켓 둘러보기', featured: '추천', testing: '테스트 상품', testBadge: '테스트 상품', search: '상품 검색', empty: '표시할 상품이 없습니다.', monthly: '월간', yearly: '연간', perMonth: '/ 월', perYear: '/ 년', subscribe: '구독', startChat: '질문 시작', back: '마켓으로 돌아가기', viewDetails: '상세 보기', mySubscriptions: '내 구독', paymentHistory: '결제 내역', refresh: '새로고침', save: '변경 사항 저장', cancel: '취소', newProduct: '새 상품 제출', saveDraft: '초안 저장', submitReview: '검토 요청', statusLabel: '상태', amount: '금액', date: '날짜', product: '상품', period: '결제 주기', retry: '다시 시도',
   status: { in_flight: '결제 준비 중', checkout_created: '결제 대기', creating: '결제 준비 중', uncertain: '확인 대기', failed: '실패', chargeback: '지불 거절', disputed: '결제 분쟁', pending_payment: '결제 대기', draft: '초안', pending: '검토 대기', published: '게시됨', rejected: '수정 요청', unpublished: '게시 중단', active: '사용 중', trialing: '체험 중', past_due: '결제 연체', canceled: '취소됨', cancelled: '취소됨', expired: '만료됨', paid: '결제 완료', completed: '완료', refunded: '환불됨', billed: '결제 대기', ready: '준비됨', paused: '일시 정지', unknown: '사용 불가' },
 }
 export const creatorMarketplaceRu = {
   ...creatorMarketplaceEn,
+  existingSubscription: 'Для этого продукта уже оформлена подписка. Сначала откройте управление существующей подпиской.',
   title: 'Маркет знаний', subtitle: 'Задавайте вопросы по знаниям и методам авторов.', orders: 'Заказы и подписки', creator: 'Студия автора', admin: 'Управление маркетом', browse: 'Открыть маркет', featured: 'Избранное', testing: 'Тестовые продукты', testBadge: 'Тестовый продукт', search: 'Поиск продуктов', empty: 'Нет продуктов для отображения.', monthly: 'Ежемесячно', yearly: 'Ежегодно', perMonth: '/ месяц', perYear: '/ год', subscribe: 'Подписаться', startChat: 'Задать вопрос', back: 'Вернуться в маркет', viewDetails: 'Подробнее', mySubscriptions: 'Мои подписки', paymentHistory: 'История платежей', refresh: 'Обновить', save: 'Сохранить изменения', cancel: 'Отмена', newProduct: 'Новый продукт', saveDraft: 'Сохранить черновик', submitReview: 'Отправить на проверку', statusLabel: 'Статус', amount: 'Сумма', date: 'Дата', product: 'Продукт', period: 'Период оплаты', retry: 'Повторить',
   status: { in_flight: 'Подготовка оплаты', checkout_created: 'Ожидает оплаты', creating: 'Подготовка оплаты', uncertain: 'Ожидает подтверждения', failed: 'Ошибка', chargeback: 'Оспорено банком', disputed: 'Спорный платёж', pending_payment: 'Ожидает оплаты', draft: 'Черновик', pending: 'На проверке', published: 'Опубликован', rejected: 'Требуются изменения', unpublished: 'Снят с публикации', active: 'Активна', trialing: 'Пробный период', past_due: 'Просрочен платёж', canceled: 'Отменена', cancelled: 'Отменена', expired: 'Истекла', paid: 'Оплачен', completed: 'Завершён', refunded: 'Возвращён', billed: 'Ожидает оплаты', ready: 'Готов', paused: 'Приостановлена', unknown: 'Недоступно' },
 }

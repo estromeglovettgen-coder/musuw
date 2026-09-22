@@ -33,6 +33,7 @@ export function stripIncompleteCitationTag(content: string): string {
 
 export type CitationKnowledgeRef = {
   id?: string
+  content?: string
   knowledge_id?: string
   knowledge_title?: string
   knowledge_filename?: string
