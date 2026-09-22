@@ -49,4 +49,4 @@
 - [x] 7.1 Reuse the owned-library grid, card geometry and native knowledge detail shell.
 - [x] 7.2 Remove redundant subscription/billing fields while retaining unavailable-state feedback and read-only controls.
 - [x] 7.3 Verify actual desktop/mobile geometry, scoped reading behavior, native compatibility, type/build and consolidated review.
-- [ ] 7.4 Deploy the exact CI-green revision to staging and inspect the actual rendered library, Wiki and graph.
+- [x] 7.4 Deploy the exact CI-green revision to staging and inspect the actual rendered library, Wiki and graph.
