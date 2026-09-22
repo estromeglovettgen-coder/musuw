@@ -33,4 +33,4 @@
 - [x] 5.3 Hide product-page management actions and the left-sidebar order shortcut, retain market-header order management, and support free-service presentation and approval.
 - [x] 5.4 Copy the full Taylor library/persona and reconcile all persisted asset manifests plus native retrieval.
 - [x] 5.5 Publish three true free examples, verify free and paid buyer authorization/billing, and preserve native chat defaults.
-- [ ] 5.6 Complete bounded review, required checks, immutable staging deployment, actual desktop/mobile acceptance and report scope.
+- [x] 5.6 Complete bounded review, required checks, immutable staging deployment, actual desktop/mobile acceptance and report scope.
