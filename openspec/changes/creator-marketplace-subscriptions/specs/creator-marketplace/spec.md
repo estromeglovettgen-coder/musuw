@@ -97,3 +97,29 @@ Taylor staging delivery SHALL contain the complete inventoried production librar
 #### Scenario: Verified full migration
 - **WHEN** the bounded full-data copy completes
 - **THEN** source/target manifests reconcile, native retrieval and necessary citations work, the existing paid product remains usable, and the page accurately describes the complete delivered content
+
+### Requirement: Purchased libraries in the knowledge workspace
+Buyers SHALL see previously purchased services in the knowledge workspace with read-only and current entitlement status. Each entry SHALL reference approved platform assets rather than duplicate them into the buyer tenant. Unpaid checkout intents MUST NOT grant a library. Expired or revoked purchases SHALL retain a locked entry while paid period-end cancellation SHALL preserve access until the paid term ends.
+
+#### Scenario: Find and reuse a purchased library
+- **WHEN** a buyer opens knowledge bases after a confirmed purchase
+- **THEN** the service appears as a read-only subscribed entry and opens its approved published Wiki and graph, with native go-use available for authorized questions
+
+#### Scenario: Expired library
+- **WHEN** its subscription expires or current entitlement is revoked
+- **THEN** the entry remains visible as locked, every new content read is denied, and historical conversation records remain intact
+
+### Requirement: Scoped read-only Wiki and graph
+Authorized buyers SHALL read published Wiki pages, folders, search results, links and graph for the exact approved KB set. Every read MUST revalidate current service entitlement and resource scope while retaining buyer identity. Reads SHALL NOT invoke models or change storage/billing. Unpublished pages, raw source documents/downloads, exports, revision history, credentials, creator details and agent prompts MUST remain inaccessible.
+
+#### Scenario: Read and navigate without writes
+- **WHEN** an active buyer browses Wiki, follows a published internal link, searches or opens graph nodes
+- **THEN** native content is displayed within the approved KB scope, mutation/maintenance controls are absent, and no model usage is created
+
+#### Scenario: Scope and mutation denial
+- **WHEN** an anonymous, unentitled or expired caller requests content, or an entitled caller injects another KB/page, accesses unpublished material, downloads source files, or calls edit/delete/generation/fix/rollback/share operations
+- **THEN** the backend rejects the request without disclosing private content, changing source assets or switching buyer billing identity
+
+#### Scenario: Owned-library compatibility
+- **WHEN** the buyer opens a knowledge base they own
+- **THEN** the existing authorized editing and Wiki/graph behavior remain available, and the subscribed read-only mode does not affect it

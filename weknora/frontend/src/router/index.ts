@@ -269,6 +269,12 @@ const router = createRouter({
           meta: { requiresInit: true, requiresAuth: true },
         },
         {
+          path: "marketplace/:productId/knowledge-bases/:kbId",
+          name: "marketplaceKnowledgeBase",
+          component: () => import("../views/marketplace/MarketplaceKnowledgeBase.vue"),
+          meta: { requiresInit: true, requiresAuth: true },
+        },
+        {
           path: "marketplace/:productId",
           name: "marketplaceProduct",
           component: () => import("../views/marketplace/ProductDetail.vue"),

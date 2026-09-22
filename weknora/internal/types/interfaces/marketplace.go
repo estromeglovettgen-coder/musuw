@@ -50,6 +50,7 @@ type MarketplaceService interface {
 	SubmitProduct(context.Context, string) (*types.MarketplaceProduct, error)
 	ReviewProduct(context.Context, string, types.MarketplaceReviewInput) (*types.MarketplaceProduct, error)
 	Orders(context.Context) (*types.MarketplaceOrders, error)
+	Library(context.Context) ([]*types.MarketplaceLibraryEntry, error)
 	Checkout(context.Context, string, string, string) (*types.MarketplaceCheckout, error)
 	Portal(context.Context, string) (string, error)
 	AuthorizeAccess(context.Context, uint64, string, time.Time) (*types.MarketplaceAccess, error)

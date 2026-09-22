@@ -160,3 +160,24 @@ export async function reviewMarketplaceProduct(id: string, input: MarketplaceRev
   const response = await post<{ data: MarketplaceProduct }>(`${admin}/products/${idPath(id)}/review`, input)
   return response.data
 }
+
+
+/** A purchased knowledge base projection; never an editable source resource. */
+export interface MarketplaceLibraryEntry {
+  product_id: string
+  product_title: string
+  agent_id: string
+  knowledge_base_id: string
+  name: string
+  description: string
+  wiki_enabled: boolean
+  can_read: boolean
+  status: string
+  paid_through?: string
+  cancel_at_period_end: boolean
+}
+
+export async function listMarketplaceLibrary(): Promise<MarketplaceLibraryEntry[]> {
+  const response = await get<{ data: MarketplaceLibraryEntry[] }>(`${base}/library`)
+  return response.data
+}

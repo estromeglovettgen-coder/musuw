@@ -299,6 +299,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterModelRoutes(v1, params.ModelHandler, params.ModelCredentialsHandler, rbacGuards)
 		v1.GET("/entitlements/current", params.EntitlementHandler.Current)
 		RegisterMarketplaceRoutes(v1, params.MarketplaceHandler, rbacGuards)
+		RegisterMarketplaceLibraryRoutes(v1, params.MarketplaceHandler, params.WikiPageHandler, rbacGuards)
 		v1.POST("/billing/paddle/portal-session", rbacGuards.Admin(), params.EntitlementHandler.PaddlePortalSession)
 		v1.POST("/billing/paddle/checkout-intent", rbacGuards.Admin(), params.EntitlementHandler.PaddleCheckoutIntent)
 		v1.POST("/billing/paddle/subscription-upgrade/preview", rbacGuards.Admin(), params.EntitlementHandler.PaddleSubscriptionUpgradePreview)

@@ -114,6 +114,7 @@ const requestDelete = () => {
     </header>
 
     <div class="visual-reference-kb-card__strategies" :aria-label="$t('knowledgeEditor.indexing.title')">
+      <slot name="strategies">
       <span v-if="hasRagStrategy" data-indexing-strategy="rag" class="visual-reference-kb-card__strategy">
         <t-icon name="layers" />
         <span>RAG</span>
@@ -126,11 +127,13 @@ const requestDelete = () => {
         <t-icon name="error-circle" />
         <span>{{ $t('knowledgeList.features.unconfigured') }}</span>
       </span>
+      </slot>
     </div>
 
     <p class="visual-reference-kb-card__description">{{ kb.description?.trim() || $t('knowledgeBase.noDescription') }}</p>
 
     <footer class="visual-reference-kb-card__footer">
+      <slot name="footer">
       <span class="visual-reference-kb-card__badge">
         <t-icon :name="kb.type === 'faq' ? 'chat-bubble-help' : 'file'" />
         <span v-if="kb.type === 'faq'">{{ kb.chunk_count ?? 0 }} Q&A</span>
@@ -146,6 +149,7 @@ const requestDelete = () => {
       <span class="visual-reference-kb-card__spacer" />
       <ResourceOriginBadge v-if="showOriginBadge" :variant="originVariant" :creator-name="creatorName" />
       <span v-else-if="orgName" class="visual-reference-kb-card__origin" :title="orgName"><t-icon name="usergroup" /><span>{{ orgName }}</span></span>
+      </slot>
     </footer>
   </article>
 </template>

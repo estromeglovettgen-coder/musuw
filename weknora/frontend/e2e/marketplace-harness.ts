@@ -9,6 +9,9 @@ import { useSettingsStore } from '@/stores/settings'
 import { useMenuStore } from '@/stores/menu'
 import { provideChatReferencesDrawer } from '@/composables/useChatReferencesDrawer'
 import { installTDesignIconOfflineGuard } from '@/utils/tdesign-icon-offline'
+import WikiBrowser from '@/views/knowledge/wiki/WikiBrowser.vue'
+import MarketplaceKnowledgeBase from '@/views/marketplace/MarketplaceKnowledgeBase.vue'
+import KnowledgeBaseList from '@/views/knowledge/KnowledgeBaseList.vue'
 import Marketplace from '@/views/marketplace/Marketplace.vue'
 import ProductDetail from '@/views/marketplace/ProductDetail.vue'
 import Orders from '@/views/marketplace/Orders.vue'
@@ -36,6 +39,8 @@ const ReferenceHarness = defineComponent({ setup() {
   return () => h('div', [h('button', { onClick: () => settings.selectAgent('builtin-smart-reasoning') }, 'Switch composer to normal'), h(DocInfo, { session }), h(ChatReferencesDrawer)])
 } })
 const router = createRouter({ history: createMemoryHistory(), routes: [
+  { path: '/platform/marketplace/:productId/knowledge-bases/:kbId', name: 'marketplaceKnowledgeBase', component: MarketplaceKnowledgeBase },
+  { path: '/platform/knowledge-bases', component: KnowledgeBaseList },
   { path: '/platform/marketplace', name: 'marketplace', component: Marketplace },
   { path: '/platform/marketplace/:productId', name: 'marketplaceProduct', component: ProductDetail },
   { path: '/platform/orders', name: 'marketplaceOrders', component: Orders },
@@ -43,6 +48,7 @@ const router = createRouter({ history: createMemoryHistory(), routes: [
   { path: '/platform/marketplace-admin', name: 'marketplaceAdmin', component: AdminMarketplace },
   { path: '/platform/creatChat', name: 'globalCreatChat', component: CreateChat },
   { path: '/platform/chat/:chatid', name: 'chat', component: Chat },
+  { path: '/native-wiki', component: { render: () => h('div', { style: 'height: 800px' }, [h(WikiBrowser, { knowledgeBaseId: 'own-kb', canEdit: params.get('editable') === 'true' })]) } },
   { path: '/references', component: ReferenceHarness },
   { path: '/plans', component: { render: () => h('p', 'Membership management') } },
 ] })

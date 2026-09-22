@@ -84,6 +84,22 @@ type MarketplaceProductAccess struct {
 	CancelAtPeriodEnd bool       `json:"cancel_at_period_end"`
 }
 
+// MarketplaceLibraryEntry exposes a purchased knowledge base without source
+// configuration. Expired purchases remain visible; CanRead is authoritative.
+type MarketplaceLibraryEntry struct {
+	ProductID         string     `json:"product_id"`
+	ProductTitle      string     `json:"product_title"`
+	AgentID           string     `json:"agent_id"`
+	KnowledgeBaseID   string     `json:"knowledge_base_id"`
+	Name              string     `json:"name"`
+	Description       string     `json:"description"`
+	WikiEnabled       bool       `json:"wiki_enabled"`
+	CanRead           bool       `json:"can_read"`
+	Status            string     `json:"status"`
+	PaidThrough       *time.Time `json:"paid_through,omitempty"`
+	CancelAtPeriodEnd bool       `json:"cancel_at_period_end"`
+}
+
 // MarketplaceProductInput contains editable submission fields.
 type MarketplaceProductInput struct {
 	Title                  string   `json:"title"`

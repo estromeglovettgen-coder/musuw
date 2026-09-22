@@ -1,4 +1,7 @@
 export const creatorMarketplaceEn = {
+  libraryUnavailable: 'Access unavailable',
+  libraryPageMissing: 'This page does not exist or has not been published.',
+  libraryTitle: 'Subscribed knowledge bases', libraryReadOnly: 'Read only', libraryBack: 'Back to knowledge bases', libraryGraph: 'Graph', libraryDenied: 'This subscription does not currently allow access. View its status in Orders & subscriptions.', libraryLoadFailed: 'Temporarily unable to load this knowledge base. Please try again.', libraryEmpty: 'No Wiki has been published yet. You can still ask questions.',
   free: 'Free', freeAccessNote: 'Sign in and start asking. No product purchase is needed.', freeAllowanceNote: 'AI requests use your own Musuw model allowance.', freeUnavailable: 'This free service is currently unavailable.',
   freePriceHint: 'Set the monthly price to 0 to offer free access. Users still use their own model allowance.', freeMappingNote: 'Free services do not need Paddle products or prices.', platformMappingRequired: 'Select the platform service agent and knowledge bases.', pricingModeLocked: 'A reviewed product cannot switch between free and paid access.',
   existingSubscription: 'This product already has a subscription. Go to Orders & subscriptions to view and manage it.',
@@ -14,7 +17,7 @@ export const creatorMarketplaceEn = {
   monthly: 'Monthly', yearly: 'Yearly', perMonth: '/ month', perYear: '/ year', annualSaving: '12 months for the price of 10',
   subscribe: 'Subscribe', startChat: 'Start asking', openingChat: 'Opening your service…',
   availableUntil: 'Access until {date}', nextRenewal: 'Next renewal {date}', cancelScheduled: 'Renewal canceled · available until {date}',
-  qaOnly: 'Question-answering access', scopeNote: 'Ask questions and read supporting citations. Full source documents and bulk downloads are not included.',
+  qaOnly: 'Questions, Wiki and graph', scopeNote: 'Ask questions and read published Wiki pages and graphs with an active paid subscription. Original materials, agent prompts and bulk downloads stay private.',
   allowanceNote: 'The content subscription is separate from your Musuw membership. AI requests use your own Musuw model allowance.',
   renewalNote: 'Renews automatically each month or year until canceled. Manage renewal through your orders.',
   checkoutPriceNote: 'Prices shown are before any applicable tax. Paddle confirms the final amount and currency at checkout.',
@@ -40,7 +43,7 @@ export const creatorMarketplaceEn = {
   agent: 'Source agent', knowledgeBases: 'Source knowledge bases', monthlyPrice: 'Monthly price (USD)', yearlyPrice: 'Yearly price (USD)',
   yearlyRule: 'The annual price is automatically set to 10 × the monthly price.',
   titleRequired: 'Complete the product details, resources, price, contact, and rights confirmation.',
-  sourceNote: 'Choose resources you own. Buyers receive question-answering access; source resources stay under your control.',
+  sourceNote: 'Choose resources you own. Buyers can ask questions and read published Wiki pages and graphs; original materials and agent prompts stay private.',
   examplesLabel: 'Example questions (one per line)', chooseAgent: 'Choose an agent', chooseKnowledgeBases: 'Choose knowledge bases',
   noSources: 'Create an agent and knowledge base first.', openAgents: 'Open agents', openKnowledgeBases: 'Open knowledge bases',
   adminIntro: 'Review submissions, configure product pricing, and publish only after checkout is ready.',
@@ -56,6 +59,9 @@ export const creatorMarketplaceEn = {
 }
 
 export const creatorMarketplaceZh = {
+  libraryUnavailable: '不可访问',
+  libraryPageMissing: '页面不存在或尚未公开。',
+  libraryTitle: '订阅知识库', libraryReadOnly: '只读', libraryBack: '返回知识库', libraryGraph: '图谱', libraryDenied: '当前订阅不可访问，请前往订单管理查看状态。', libraryLoadFailed: '暂时无法加载知识库，请稍后重试。', libraryEmpty: '暂未发布 Wiki，您仍可向专属服务提问。',
   free: '免费', freeAccessNote: '登录后即可提问，无需购买商品。', freeAllowanceNote: 'AI 问答消耗您自己的 Musuw 模型额度。', freeUnavailable: '该免费服务暂不可用。',
   freePriceHint: '月费填写 0 可免费提供服务，使用者仍消耗自己的模型额度。', freeMappingNote: '免费服务无需配置 Paddle 商品或价格。', platformMappingRequired: '请选择平台交付智能体与知识库。', pricingModeLocked: '已审核商品不能在免费与付费之间切换。',
   existingSubscription: '该商品已有订阅，请前往订单管理查看和管理现有订阅。',
@@ -71,7 +77,7 @@ export const creatorMarketplaceZh = {
   monthly: '月付', yearly: '年付', perMonth: '/ 月', perYear: '/ 年', annualSaving: '10 个月价格，使用 12 个月',
   subscribe: '订阅使用', startChat: '开始提问', openingChat: '正在打开专属服务…',
   availableUntil: '使用权有效至 {date}', nextRenewal: '下次续费 {date}', cancelScheduled: '已取消续费 · 可使用至 {date}',
-  qaOnly: '知识问答使用权', scopeNote: '支持提问和查看必要引用，不包含完整原文阅读与批量下载。',
+  qaOnly: '知识问答、Wiki 与图谱', scopeNote: '支持提问和查看必要引用；有效付费订阅还可只读浏览已发布的 Wiki 与图谱。原始资料、智能体提示词与整库下载不公开。',
   allowanceNote: '知识订阅与 Musuw 会员分别计费；AI 问答消耗您自己的 Musuw 模型额度。',
   renewalNote: '订阅按月或按年自动续费，可在订单管理中取消续费。',
   checkoutPriceNote: '展示价格未含适用税费，最终金额与币种以 Paddle 结账页为准。',
@@ -97,7 +103,7 @@ export const creatorMarketplaceZh = {
   agent: '来源智能体', knowledgeBases: '来源知识库', monthlyPrice: '月费（美元）', yearlyPrice: '年费（美元）',
   yearlyRule: '年费自动按月费 × 10 计算。',
   titleRequired: '请完整填写商品信息、资源、月费、联系方式和授权说明，并确认发布权利。',
-  sourceNote: '请选择您拥有的资源。买家获得问答使用权，源资料仍由您维护。',
+  sourceNote: '请选择您拥有的资源。买家可提问并只读浏览已发布的 Wiki 与图谱，原始资料和提示词不公开。',
   examplesLabel: '示例问题（每行一个）', chooseAgent: '选择智能体', chooseKnowledgeBases: '选择知识库',
   noSources: '请先创建智能体和知识库。', openAgents: '前往智能体', openKnowledgeBases: '前往知识库',
   adminIntro: '审核投稿、配置价格，并在结账配置就绪后发布商品。',
@@ -114,6 +120,10 @@ export const creatorMarketplaceZh = {
 
 export const creatorMarketplaceKo = {
   ...creatorMarketplaceEn,
+  libraryUnavailable: '접근 불가',
+  qaOnly: '질문, Wiki 및 그래프', scopeNote: '질문하고 관련 인용을 확인하세요. 유효한 유료 구독으로 게시된 Wiki와 그래프를 읽을 수 있습니다. 원본 자료, 에이전트 프롬프트 및 전체 다운로드는 비공개입니다.', sourceNote: '본인 소유의 자료를 선택하세요. 구매자는 질문하고 게시된 Wiki와 그래프를 읽을 수 있습니다. 원본 자료와 프롬프트는 비공개입니다.',
+  libraryPageMissing: '페이지가 없거나 아직 게시되지 않았습니다.',
+  libraryTitle: '구독 지식 베이스', libraryReadOnly: '읽기 전용', libraryBack: '지식 베이스로 돌아가기', libraryGraph: '그래프', libraryDenied: '현재 이 구독으로 접근할 수 없습니다. 주문에서 상태를 확인하세요.', libraryLoadFailed: '일시적으로 지식 베이스를 불러올 수 없습니다. 다시 시도하세요.', libraryEmpty: '아직 게시된 Wiki가 없습니다. 질문은 계속할 수 있습니다.',
   free: '무료', freeAccessNote: '로그인 후 바로 질문하세요. 상품 구매가 필요하지 않습니다.', freeAllowanceNote: 'AI 질문은 본인의 Musuw 모델 사용량을 소비합니다.', freeUnavailable: '현재 이 무료 서비스를 이용할 수 없습니다.',
   freePriceHint: '월 요금을 0으로 설정하면 무료로 제공됩니다. 사용자는 본인의 모델 사용량을 소비합니다.', freeMappingNote: '무료 서비스에는 Paddle 상품이나 가격 설정이 필요하지 않습니다.', platformMappingRequired: '플랫폼 서비스 에이전트와 지식 베이스를 선택하세요.', pricingModeLocked: '검토된 상품은 무료와 유료 간에 전환할 수 없습니다.',
   existingSubscription: '이 상품에는 기존 구독이 있습니다. 주문 및 구독에서 확인하고 관리하세요.',
@@ -122,6 +132,10 @@ export const creatorMarketplaceKo = {
 }
 export const creatorMarketplaceRu = {
   ...creatorMarketplaceEn,
+  libraryUnavailable: 'Нет доступа',
+  qaOnly: 'Вопросы, Wiki и граф', scopeNote: 'Задавайте вопросы и просматривайте цитаты. Активная платная подписка также позволяет читать опубликованные Wiki и графы. Исходные материалы, промпты агента и выгрузка базы остаются закрытыми.', sourceNote: 'Выберите собственные ресурсы. Покупатели могут задавать вопросы и читать опубликованные Wiki и графы; исходные материалы и промпты остаются закрытыми.',
+  libraryPageMissing: 'Страница не существует или ещё не опубликована.',
+  libraryTitle: 'Базы знаний по подписке', libraryReadOnly: 'Только чтение', libraryBack: 'Назад к базам знаний', libraryGraph: 'Граф', libraryDenied: 'Эта подписка сейчас не предоставляет доступ. Проверьте статус в заказах.', libraryLoadFailed: 'Временно не удалось загрузить базу знаний. Повторите попытку.', libraryEmpty: 'Wiki ещё не опубликована. Вы по-прежнему можете задавать вопросы.',
   free: 'Бесплатно', freeAccessNote: 'Войдите и задавайте вопросы. Покупать продукт не нужно.', freeAllowanceNote: 'Запросы к ИИ расходуют вашу квоту моделей Musuw.', freeUnavailable: 'Этот бесплатный сервис сейчас недоступен.',
   freePriceHint: 'Укажите месячную цену 0 для бесплатного доступа. Пользователи расходуют собственную квоту моделей.', freeMappingNote: 'Бесплатному сервису не нужны продукты и цены Paddle.', platformMappingRequired: 'Выберите агента сервиса и базы знаний платформы.', pricingModeLocked: 'Проверенный продукт нельзя переключать между бесплатным и платным доступом.',
   existingSubscription: 'Для этого продукта уже оформлена подписка. Просмотреть её и управлять ею можно в разделе «Заказы и подписки».',

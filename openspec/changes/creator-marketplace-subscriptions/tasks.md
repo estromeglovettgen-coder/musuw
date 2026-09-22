@@ -34,3 +34,11 @@
 - [x] 5.4 Copy the full Taylor library/persona and reconcile all persisted asset manifests plus native retrieval.
 - [x] 5.5 Publish three true free examples, verify free and paid buyer authorization/billing, and preserve native chat defaults.
 - [x] 5.6 Complete bounded review, required checks, immutable staging deployment, actual desktop/mobile acceptance and report scope.
+
+## 6. Authorized follow-up: subscribed-library browsing
+
+- [x] 6.1 Freeze the narrow read-only API/UI contract and update entitlement/content rules.
+- [x] 6.2 Implement purchased-library projection and reauthorized native published Wiki/graph reads, with denial and lifecycle tests.
+- [x] 6.3 Reuse existing Musuw library and Wiki/graph UI with read-only controls, locked states and service go-use.
+- [x] 6.4 Verify contracts, owned-view compatibility, desktop/mobile and one consolidated adversarial review.
+- [ ] 6.5 Pass exact-revision CI, deploy staging only and complete real browser/API acceptance with no model use.

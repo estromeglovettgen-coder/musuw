@@ -1,6 +1,6 @@
 ## Why
 
-Musuw users need to subscribe to reviewed knowledge services and immediately use their dedicated agents without copying private assets or changing their platform membership. The initial release proved real Paddle Sandbox payment, authorization, and chat behavior on staging within the authorized ten-hour execution window (2026-09-22 01:11–11:11 UTC). The authorized follow-up completes Taylor content, adds genuine free examples, and consolidates subscription management in orders.
+Musuw users need to subscribe to reviewed knowledge services and immediately use their dedicated agents without copying private assets or changing their platform membership. The initial release proved real Paddle Sandbox payment, authorization, and chat behavior on staging within the authorized ten-hour execution window (2026-09-22 01:11–11:11 UTC). The authorized follow-up completes Taylor content, adds genuine free examples, and consolidates subscription management in orders. The next authorized refinement exposes purchased libraries in the knowledge workspace with read-only published Wiki and graph browsing.
 
 ## What Changes
 
@@ -14,6 +14,7 @@ Musuw users need to subscribe to reviewed knowledge services and immediately use
 - Support approved zero-price services without checkout or subscription records, retaining buyer-owned model usage and the same resource scope.
 - Copy the complete current Taylor library and persona into isolated staging delivery assets, verifying documents, chunks, indexes and available derived data without modifying production.
 - Hide product-page subscription-management buttons while retaining the order-management entry.
+- Show purchased services in the existing knowledge workspace, retaining locked cards after expiry and exposing published Wiki and graph browsing through the existing subscription authorization. Source files, agent configuration and all writes remain private.
 
 ## Capabilities
 

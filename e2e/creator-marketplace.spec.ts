@@ -504,3 +504,146 @@ for (const free of [true, false]) {
     expect(api.requests).toHaveLength(0)
   })
 }
+
+
+const libraryEntry = { product_id: 'taylor', product_title: taylor.title, agent_id: 'platform-agent', knowledge_base_id: 'platform-kb', name: '已订阅泰勒知识库', description: 'Published Wiki and graph.', wiki_enabled: true, can_read: true, status: 'active', paid_through: '2026-10-22T00:00:00Z', cancel_at_period_end: true }
+async function mockLibrary(page: Page, options: { denied?: boolean; empty?: boolean } = {}) {
+  await mockMarket(page, { paid: true })
+  const reads: string[] = []
+  const forbidden: string[] = []
+  let contentFailure = 0
+  const entry = { ...libraryEntry, can_read: !options.denied, wiki_enabled: !options.empty, status: options.denied ? 'refunded' : 'active' }
+  const second = { ...libraryEntry, product_id: 'other', knowledge_base_id: 'other-kb', name: '第二个订阅库' }
+  const wikiPage = (name: string) => ({ id: name, slug: 'published', title: name, page_type: 'concept', status: 'published', content: `# ${name}\n公开 Wiki 正文。[[other|下一页]]\n![private](/api/v1/knowledge/platform-kb/file)\n[原文件](/api/v1/knowledge/source-doc/download)\n<svg><image href="/api/v1/knowledge/source-doc/file" /></svg><span style="background-image:url(/api/v1/knowledge/source-doc/background)">已发布文本</span>`, source_refs: ['source-doc'], in_links: [], out_links: ['other'], aliases: [], category_path: [], version: 1, created_at: '2026-09-22T00:00:00Z', updated_at: '2026-09-22T00:00:00Z' })
+  await page.route('**/api/v1/**', async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/v1/knowledge-bases') return route.fulfill({ json: { success: true, data: [] } })
+    if (path === '/api/v1/creator-marketplace/library') return route.fulfill({ json: { data: [entry, second] } })
+    if (path.includes('/wiki') || path.includes('/knowledge/') || path.includes('/files/')) {
+      reads.push(path)
+      if (route.request().method() !== 'GET' || !path.includes('/creator-marketplace/') || /issues|revisions|file|download/.test(path)) forbidden.push(path)
+      if (contentFailure && path.includes('/pages/')) return route.fulfill({ status: contentFailure, json: { message: 'Access unavailable' } })
+      const name = path.includes('/other/') ? '第二个订阅库正文' : '泰勒公开页面'
+      if (path.endsWith('/pages')) return route.fulfill({ json: { data: { pages: [wikiPage(name)], total: 1, page: 1, page_size: 100, total_pages: 1 } } })
+      if (path.endsWith('/folders')) return route.fulfill({ json: { data: { folders: [{ id: 'folder', name: '已发布目录', path: '已发布目录', depth: 0, page_count: 1, has_children: false }] } } })
+      if (path.endsWith('/index')) return route.fulfill({ json: { data: { intro: `[[published|${name}]]`, groups: [] } } })
+      if (path.endsWith('/stats')) return route.fulfill({ json: { data: { total_pages: 1, pages_by_type: { concept: 1 }, total_links: 1, orphan_count: 0, recent_updates: [], pending_tasks: 0, pending_issues: 2, is_active: false } } })
+      if (path.endsWith('/graph')) return route.fulfill({ json: { data: { nodes: [{ slug: 'published', title: name, page_type: 'concept', link_count: 0 }], edges: [], meta: { mode: 'overview', total: 1, returned: 1, truncated: false } } } })
+      if (path.endsWith('/search')) return route.fulfill({ json: { data: { pages: [wikiPage(name)] } } })
+      return route.fulfill({ json: { data: wikiPage(name) } })
+    }
+    return route.fallback()
+  })
+  return { reads, forbidden, fail: (status: number) => { contentFailure = status } }
+}
+const libraryPath = '/platform/marketplace/taylor/knowledge-bases/platform-kb'
+
+test('subscribed knowledge cards open existing read-only Wiki and retain the product chat entry', async ({ page }) => {
+  const api = await mockLibrary(page)
+  await visit(page, '/platform/knowledge-bases')
+  const section = page.getByRole('region', { name: '订阅知识库', exact: true })
+  await expect(section).toContainText('已订阅泰勒知识库')
+  await expect(section).toContainText('只读')
+  await expect(page.locator('.visual-kb-empty')).toHaveCount(0)
+  await expect(section.getByRole('button', { name: /更多|收藏|复制/ })).toHaveCount(0)
+  await section.getByText('已订阅泰勒知识库', { exact: true }).click()
+  await expect(page.locator('.wiki-browser')).toBeVisible()
+  await page.locator('.wiki-content-link').filter({ hasText: '泰勒公开页面' }).first().click()
+  await expect(page.locator('.wiki-reader')).toContainText('公开 Wiki 正文')
+  await expect(page.getByRole('button', { name: /编辑|历史|删除|新建|修复|导出|下载/ })).toHaveCount(0)
+  await expect(page.locator('.wiki-browser [draggable="true"]')).toHaveCount(0)
+  await expect(page.locator('.wiki-reader img')).toHaveCount(0)
+  await expect(page.locator('.wiki-reader a[href*="/api/v1/"]')).toHaveCount(0)
+  expect(api.forbidden).toEqual([])
+  await page.getByRole('button', { name: '开始提问', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText(taylor.title)
+  expect(await page.evaluate(() => (window as any).__marketplaceHarness.settings.settings.marketplaceProductId)).toBe('taylor')
+})
+
+test('expired subscriptions remain visible but never request Wiki content', async ({ page }) => {
+  const api = await mockLibrary(page, { denied: true })
+  await visit(page, '/platform/knowledge-bases')
+  const section = page.getByRole('region', { name: '订阅知识库', exact: true })
+  await expect(section).toContainText('已退款')
+  await section.getByText('已订阅泰勒知识库', { exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('当前订阅不可访问')
+  await expect(page.getByRole('link', { name: '订单管理', exact: true })).toBeVisible()
+  await expect(page.locator('.wiki-browser')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toHaveCount(0)
+  expect(api.reads).toEqual([])
+})
+
+test('subscribed library handles absent Wiki without fetching native assets', async ({ page }) => {
+  const api = await mockLibrary(page, { empty: true })
+  await visit(page, libraryPath)
+  await expect(page.getByRole('status')).toContainText('暂未发布 Wiki')
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toBeVisible()
+  expect(api.reads).toEqual([])
+})
+
+test('subscription changes clear the previous Wiki and graph fits mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 932 })
+  const api = await mockLibrary(page)
+  await visit(page, libraryPath)
+  await expect(page.locator('.wiki-content-link').first()).toContainText('泰勒公开页面')
+  await page.evaluate(() => (window as any).__marketplaceHarness.router.push('/platform/marketplace/other/knowledge-bases/other-kb'))
+  await expect(page.locator('.wiki-content-link').first()).toContainText('第二个订阅库正文')
+  await expect(page.locator('.wiki-browser')).not.toContainText('泰勒公开页面')
+  await page.getByRole('button', { name: '图谱', exact: true }).click()
+  await expect.poll(() => api.reads.some(path => path.includes('/other/') && path.endsWith('/graph'))).toBe(true)
+  await expect(page.locator('.wiki-graph-search-container')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  expect(api.forbidden).toEqual([])
+})
+
+for (const status of [403, 503]) test(`a fresh Wiki ${status} clears content without restoring another library`, async ({ page }) => {
+  const api = await mockLibrary(page)
+  await visit(page, libraryPath)
+  await expect(page.locator('.wiki-content-link').first()).toContainText('泰勒公开页面')
+  api.fail(status)
+  await page.locator('.wiki-content-link').first().click()
+  await expect(page.locator('.wiki-browser')).toHaveCount(0)
+  await expect(page.getByRole('alert')).toContainText(status === 403 ? '当前订阅不可访问' : '暂时无法加载')
+  if (status === 503) await expect(page.getByRole('button', { name: '重试', exact: true })).toBeVisible()
+  expect(api.forbidden).toEqual([])
+})
+
+
+for (const editable of [true, false]) test(`native Wiki preserves ${editable ? 'editing' : 'ordinary read-only history'} without market scope`, async ({ page }) => {
+  await mockMarket(page)
+  const requests: string[] = []
+  const entry = { id: 'own-page', slug: 'own-page', title: '自建知识页面', page_type: 'concept', status: 'published', content: 'Own Wiki text', source_refs: [], in_links: [], out_links: [], aliases: [], version: 1 }
+  await page.route('**/api/v1/knowledgebase/own-kb/wiki/**', route => {
+    const path = new URL(route.request().url()).pathname
+    requests.push(path)
+    if (path.endsWith('/index')) return route.fulfill({ json: { data: { intro: '[[own-page|自建知识页面]]', groups: [] } } })
+    if (path.endsWith('/pages')) return route.fulfill({ json: { data: { pages: [entry], total: 1 } } })
+    if (path.endsWith('/folders')) return route.fulfill({ json: { data: { folders: [] } } })
+    if (path.endsWith('/issues')) return route.fulfill({ json: { data: [] } })
+    if (path.endsWith('/stats')) return route.fulfill({ json: { data: { total_pages: 1, pages_by_type: { concept: 1 }, pending_tasks: 0, pending_issues: 0, is_active: false } } })
+    if (path.includes('/revisions/')) return route.fulfill({ json: { data: { revisions: [], total: 0 } } })
+    return route.fulfill({ json: { data: entry } })
+  })
+  await page.goto(`/e2e/marketplace-harness.html?path=/native-wiki&editable=${editable}`)
+  await page.locator('.wiki-content-link').filter({ hasText: '自建知识页面' }).first().click()
+  await expect(page.locator('.wiki-reader')).toContainText('Own Wiki text')
+  await page.getByRole('button', { name: '历史', exact: true }).click()
+  await expect.poll(() => requests.some(path => path.includes('/revisions/'))).toBe(true)
+  if (editable) await expect(page.getByRole('button', { name: '编辑', exact: true })).toBeVisible()
+  else await expect(page.getByRole('button', { name: '编辑', exact: true })).toHaveCount(0)
+})
+
+
+test('a stale unpublished Wiki link reports page absence without locking the subscription', async ({ page }) => {
+  const api = await mockLibrary(page)
+  await visit(page, libraryPath)
+  await expect(page.locator('.wiki-content-link').first()).toContainText('泰勒公开页面')
+  api.fail(404)
+  await page.locator('.wiki-content-link').first().click()
+  await expect(page.getByText('页面不存在或尚未公开。', { exact: true })).toBeVisible()
+  await expect(page.locator('.wiki-browser')).toBeVisible()
+  await expect(page.locator('.wiki-content-link').first()).toContainText('泰勒公开页面')
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toBeVisible()
+  await expect(page.locator('.market-library-reader [role="alert"]')).toHaveCount(0)
+  expect(api.forbidden).toEqual([])
+})

@@ -26,3 +26,23 @@ func RegisterMarketplaceRoutes(r *gin.RouterGroup, h *handler.MarketplaceHandler
 	admin.PUT("/:id", h.UpdateAdminProduct)
 	admin.POST("/:id/review", h.ReviewProduct)
 }
+
+// RegisterMarketplaceLibraryRoutes reuses native Wiki reads behind the current
+// product entitlement. No source-management, attachment or mutation aliases exist.
+func RegisterMarketplaceLibraryRoutes(
+	r *gin.RouterGroup,
+	h *handler.MarketplaceHandler,
+	wiki *handler.WikiPageHandler,
+	g *rbacGuards,
+) {
+	market := r.Group("/creator-marketplace", g.Viewer())
+	market.GET("/library", h.Library)
+	read := market.Group("/products/:id/knowledge-bases/:kb_id/wiki", h.AuthorizeLibraryKnowledgeBase)
+	read.GET("/pages", wiki.ListPages)
+	read.GET("/pages/*slug", wiki.GetPage)
+	read.GET("/folders", wiki.ListFolders)
+	read.GET("/index", wiki.GetIndex)
+	read.GET("/graph", wiki.GetGraph)
+	read.GET("/stats", wiki.GetStats)
+	read.GET("/search", wiki.SearchPages)
+}

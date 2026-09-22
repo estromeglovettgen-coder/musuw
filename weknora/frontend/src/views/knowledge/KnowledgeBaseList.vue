@@ -1,5 +1,5 @@
 <script lang="ts">
-import { computed, defineComponent, onUnmounted, type SetupContext } from 'vue'
+import { computed, defineComponent, onUnmounted, ref, type SetupContext } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import LegacyKnowledgeBaseListBusiness from '@/assets/business-baselines/KnowledgeBaseList.pre-view.vue'
@@ -9,6 +9,7 @@ import KnowledgeBaseEditorModal from './KnowledgeBaseEditorModal.vue'
 import ShareKnowledgeBaseDialog from '@/components/ShareKnowledgeBaseDialog.vue'
 import KnowledgeBaseListReferenceCard from './components/KnowledgeBaseListReferenceCard.vue'
 import ListSpaceSidebar from '@/components/ListSpaceSidebar.vue'
+import MarketplaceLibraryCards from '@/views/marketplace/MarketplaceLibraryCards.vue'
 import ContextualGuide from '@/components/ContextualGuide.vue'
 
 const legacy = LegacyKnowledgeBaseListBusiness as any
@@ -24,9 +25,11 @@ export default defineComponent({
     KnowledgeBaseListReferenceCard,
     ListSpaceSidebar,
     ContextualGuide,
+    MarketplaceLibraryCards,
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
     const authStore = useAuthStore()
+    const marketLibraryCount = ref(-1)
     const state = legacySetup?.(props, context)
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
       const legacyState = state as Record<string, any>
@@ -48,7 +51,7 @@ export default defineComponent({
       legacyState.allKnowledgeBases = computed(() =>
         authStore.isLiteMode
           ? (readRef(legacyState.kbs) || []).length
-          : readRef(baseAllKnowledgeBases),
+          : readRef(baseAllKnowledgeBases) + Math.max(0, marketLibraryCount.value),
       )
       legacyState.spaceSelectionOrgId = computed(() =>
         authStore.isLiteMode ? false : readRef(baseSpaceSelectionOrgId),
@@ -119,7 +122,7 @@ export default defineComponent({
         await copyById(kb.id)
       }
       state.handleDuplicateById = copyById
-      return { ...state }
+      return { ...state, marketLibraryCount }
     }
     return state
   },
@@ -160,6 +163,8 @@ export default defineComponent({
           </div>
         </article>
       </section>
+
+      <MarketplaceLibraryCards v-if="authStore.isLiteMode || spaceSelection === 'all'" @count="marketLibraryCount = $event" />
 
       <section class="visual-kb-list__content">
         <div v-if="loading && kbs.length === 0 && !spaceSelectionOrgId" class="visual-kb-grid" aria-hidden="true">
@@ -260,10 +265,10 @@ export default defineComponent({
           </template>
         </div>
 
-        <section v-else-if="spaceSelection === 'all' && !filteredKnowledgeBases.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq') && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" class="empty-state-btn" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
+        <section v-else-if="marketLibraryCount === 0 && spaceSelection === 'all' && !filteredKnowledgeBases.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq') && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" class="empty-state-btn" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
         <section v-else-if="spaceSelection === 'favorites' && !filteredKnowledgeBases.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq') && !loading" class="visual-kb-empty"><t-icon name="star" /><strong>{{ $t('knowledgeList.empty.favoritesTitle') }}</strong><p>{{ $t('knowledgeList.empty.favoritesDescription') }}</p></section>
         <section v-else-if="spaceSelection === 'recents' && !filteredKnowledgeBases.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq') && !loading" class="visual-kb-empty"><t-icon name="history" /><strong>{{ $t('knowledgeList.empty.recentsTitle') }}</strong><p>{{ $t('knowledgeList.empty.recentsDescription') }}</p></section>
-        <section v-else-if="spaceSelection === 'mine' && !sortedMineKbs.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq') && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" class="empty-state-btn" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
+        <section v-else-if="(!authStore.isLiteMode || marketLibraryCount === 0) && spaceSelection === 'mine' && !sortedMineKbs.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq') && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" class="empty-state-btn" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
         <section v-else-if="spaceSelectionOrgId && !spaceKbsLoading && !spaceKbsList.some((shared: { knowledge_base?: { type?: string } }) => !authStore.isLiteMode || shared.knowledge_base?.type !== 'faq')" class="visual-kb-empty"><t-icon name="usergroup" /><strong>{{ $t('knowledgeList.empty.sharedTitle') }}</strong><p>{{ $t('knowledgeList.empty.sharedDescription') }}</p></section>
       </section>
 
