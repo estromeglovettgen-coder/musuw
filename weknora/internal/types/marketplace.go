@@ -7,12 +7,15 @@ import (
 )
 
 const (
+	// MarketplaceDefaultModelID is the built-in model used for reviewed products.
 	MarketplaceDefaultModelID = CheapestChatModelID
-	TypeMarketplaceWebhook    = "creator_marketplace:webhook"
+	// TypeMarketplaceWebhook identifies verified marketplace billing tasks.
+	TypeMarketplaceWebhook = "creator_marketplace:webhook"
 )
 
+// Marketplace errors distinguish invalid input, authorization and retryable conflicts.
 var (
-	ErrMarketplaceCheckoutRejected = errors.New("Paddle checkout was rejected before creation")
+	ErrMarketplaceCheckoutRejected = errors.New("paddle checkout was rejected before creation")
 	ErrMarketplaceNotFound         = errors.New("marketplace resource not found")
 	ErrMarketplaceForbidden        = errors.New("marketplace access denied")
 	ErrMarketplaceConflict         = errors.New("marketplace state conflicts with this operation")
@@ -22,45 +25,50 @@ var (
 // MarketplaceProduct is the reviewed catalog entry. Source configuration is
 // internal; buyer responses never serialize prompts, credentials or tenant IDs.
 type MarketplaceProduct struct {
-	CheckoutAvailable        bool                      `json:"checkout_available" gorm:"-"`
-	ID                       string                    `json:"id" gorm:"type:varchar(36);primaryKey"`
-	CreatorTenantID          uint64                    `json:"-" gorm:"not null;index"`
-	CreatorUserID            string                    `json:"-" gorm:"type:varchar(36);not null"`
-	CreatorName              string                    `json:"-" gorm:"type:varchar(255)"`
-	Contact                  string                    `json:"contact,omitempty" gorm:"type:text"`
-	Authorization            string                    `json:"authorization,omitempty" gorm:"type:text"`
-	AuthorizationConfirmed   bool                      `json:"authorization_confirmed,omitempty" gorm:"not null;default:false"`
-	PublishedTenantID        uint64                    `json:"-" gorm:"not null;default:0"`
-	PlatformAgentID          string                    `json:"platform_agent_id,omitempty" gorm:"type:varchar(36)"`
-	PlatformKnowledgeBaseIDs StringArray               `json:"platform_knowledge_base_ids,omitempty" gorm:"type:json;not null"`
-	Title                    string                    `json:"title" gorm:"type:varchar(160);not null"`
-	Description              string                    `json:"description" gorm:"type:text"`
-	Category                 string                    `json:"category" gorm:"type:varchar(64);index"`
-	CoverURL                 string                    `json:"cover_url" gorm:"type:text"`
-	AgentID                  string                    `json:"agent_id" gorm:"type:varchar(36);not null"`
-	AgentName                string                    `json:"agent_name" gorm:"type:varchar(255)"`
-	KnowledgeBaseIDs         StringArray               `json:"knowledge_base_ids" gorm:"type:json;not null"`
-	KnowledgeBaseNames       StringArray               `json:"knowledge_base_names" gorm:"type:json;not null"`
-	SampleQuestions          StringArray               `json:"sample_questions" gorm:"type:json;not null"`
-	AgentSnapshot            CustomAgentConfig         `json:"-" gorm:"type:json;not null"`
-	DefaultModelID           string                    `json:"default_model_id" gorm:"type:varchar(128);not null"`
-	Currency                 string                    `json:"currency" gorm:"type:varchar(3);not null"`
-	MonthlyAmount            int64                     `json:"monthly_amount" gorm:"not null"`
-	YearlyAmount             int64                     `json:"yearly_amount" gorm:"not null"`
-	PaddleProductID          string                    `json:"paddle_product_id,omitempty" gorm:"type:varchar(64)"`
-	MonthlyPriceID           string                    `json:"monthly_price_id,omitempty" gorm:"type:varchar(64);index"`
-	YearlyPriceID            string                    `json:"yearly_price_id,omitempty" gorm:"type:varchar(64);index"`
-	Status                   string                    `json:"status" gorm:"type:varchar(24);not null;index"`
-	Featured                 bool                      `json:"featured" gorm:"not null;default:false"`
-	Fixture                  bool                      `json:"fixture" gorm:"not null;default:false"`
-	ReviewNote               string                    `json:"review_note,omitempty" gorm:"type:text"`
-	ReviewedBy               string                    `json:"-" gorm:"type:varchar(36)"`
-	ReviewedAt               *time.Time                `json:"reviewed_at,omitempty"`
-	CreatedAt                time.Time                 `json:"created_at"`
-	UpdatedAt                time.Time                 `json:"updated_at"`
-	Access                   *MarketplaceProductAccess `json:"access,omitempty" gorm:"-"`
+	CheckoutAvailable bool   `json:"checkout_available" gorm:"-"`
+	ID                string `json:"id" gorm:"type:varchar(36);primaryKey"`
+	CreatorTenantID   uint64 `json:"-" gorm:"not null;index"`
+	CreatorUserID     string `json:"-" gorm:"type:varchar(36);not null"`
+	CreatorName       string `json:"-" gorm:"type:varchar(255)"`
+	Contact           string `json:"contact,omitempty" gorm:"type:text"`
+	Authorization     string `json:"authorization,omitempty" gorm:"type:text"`
+
+	AuthorizationConfirmed bool `json:"authorization_confirmed,omitempty" gorm:"not null;default:false"`
+
+	PublishedTenantID uint64 `json:"-" gorm:"not null;default:0"`
+	PlatformAgentID   string `json:"platform_agent_id,omitempty" gorm:"type:varchar(36)"`
+
+	PlatformKnowledgeBaseIDs StringArray `json:"platform_knowledge_base_ids,omitempty" gorm:"type:json;not null"`
+
+	Title              string                    `json:"title" gorm:"type:varchar(160);not null"`
+	Description        string                    `json:"description" gorm:"type:text"`
+	Category           string                    `json:"category" gorm:"type:varchar(64);index"`
+	CoverURL           string                    `json:"cover_url" gorm:"type:text"`
+	AgentID            string                    `json:"agent_id" gorm:"type:varchar(36);not null"`
+	AgentName          string                    `json:"agent_name" gorm:"type:varchar(255)"`
+	KnowledgeBaseIDs   StringArray               `json:"knowledge_base_ids" gorm:"type:json;not null"`
+	KnowledgeBaseNames StringArray               `json:"knowledge_base_names" gorm:"type:json;not null"`
+	SampleQuestions    StringArray               `json:"sample_questions" gorm:"type:json;not null"`
+	AgentSnapshot      CustomAgentConfig         `json:"-" gorm:"type:json;not null"`
+	DefaultModelID     string                    `json:"default_model_id" gorm:"type:varchar(128);not null"`
+	Currency           string                    `json:"currency" gorm:"type:varchar(3);not null"`
+	MonthlyAmount      int64                     `json:"monthly_amount" gorm:"not null"`
+	YearlyAmount       int64                     `json:"yearly_amount" gorm:"not null"`
+	PaddleProductID    string                    `json:"paddle_product_id,omitempty" gorm:"type:varchar(64)"`
+	MonthlyPriceID     string                    `json:"monthly_price_id,omitempty" gorm:"type:varchar(64);index"`
+	YearlyPriceID      string                    `json:"yearly_price_id,omitempty" gorm:"type:varchar(64);index"`
+	Status             string                    `json:"status" gorm:"type:varchar(24);not null;index"`
+	Featured           bool                      `json:"featured" gorm:"not null;default:false"`
+	Fixture            bool                      `json:"fixture" gorm:"not null;default:false"`
+	ReviewNote         string                    `json:"review_note,omitempty" gorm:"type:text"`
+	ReviewedBy         string                    `json:"-" gorm:"type:varchar(36)"`
+	ReviewedAt         *time.Time                `json:"reviewed_at,omitempty"`
+	CreatedAt          time.Time                 `json:"created_at"`
+	UpdatedAt          time.Time                 `json:"updated_at"`
+	Access             *MarketplaceProductAccess `json:"access,omitempty" gorm:"-"`
 }
 
+// MarketplaceProductAccess is the buyer's current access and management projection.
 type MarketplaceProductAccess struct {
 	PortalAvailable   bool       `json:"portal_available"`
 	CanChat           bool       `json:"can_chat"`
@@ -70,6 +78,7 @@ type MarketplaceProductAccess struct {
 	CancelAtPeriodEnd bool       `json:"cancel_at_period_end"`
 }
 
+// MarketplaceProductInput contains editable submission fields.
 type MarketplaceProductInput struct {
 	Title                  string   `json:"title"`
 	Description            string   `json:"description"`
@@ -86,6 +95,7 @@ type MarketplaceProductInput struct {
 	AuthorizationConfirmed bool     `json:"authorization_confirmed"`
 }
 
+// MarketplaceCheckoutConfig exposes checkout settings and internal portal readiness.
 type MarketplaceCheckoutConfig struct {
 	PortalConfigured bool   `json:"-"`
 	Environment      string `json:"environment"`
@@ -93,17 +103,20 @@ type MarketplaceCheckoutConfig struct {
 	Configured       bool   `json:"configured"`
 }
 
+// MarketplaceCheckout identifies one server-created checkout transaction.
 type MarketplaceCheckout struct {
 	MarketplaceCheckoutConfig
 	TransactionID  string `json:"transaction_id"`
 	SubscriptionID string `json:"subscription_id"`
 }
 
+// MarketplaceCheckoutRecovery describes an exact provider transaction found during recovery.
 type MarketplaceCheckoutRecovery struct {
 	TransactionID string
 	Status        string
 }
 
+// MarketplaceReviewInput binds a reviewed submission to platform assets and Paddle prices.
 type MarketplaceReviewInput struct {
 	Action                   string   `json:"action"`
 	PaddleProductID          string   `json:"paddle_product_id"`
@@ -116,15 +129,17 @@ type MarketplaceReviewInput struct {
 	PlatformKnowledgeBaseIDs []string `json:"platform_knowledge_base_ids"`
 }
 
-// A row owns one product subscription and its initial checkout. Its immutable
+// MarketplaceSubscription owns one product subscription and its initial checkout. Its immutable
 // price snapshot lets existing subscriptions renew after a catalog price edit.
 type MarketplaceSubscription struct {
-	ID                    string     `json:"id" gorm:"type:varchar(36);primaryKey"`
-	TenantID              uint64     `json:"-" gorm:"not null;index;uniqueIndex:ux_marketplace_checkout_key"`
-	UserID                string     `json:"-" gorm:"type:varchar(36);not null"`
-	ProductID             string     `json:"product_id" gorm:"type:varchar(36);not null;index"`
-	ProductTitle          string     `json:"product_title" gorm:"type:varchar(160);not null"`
-	OperationKey          string     `json:"-" gorm:"type:varchar(128);not null;uniqueIndex:ux_marketplace_checkout_key"`
+	ID           string `json:"id" gorm:"type:varchar(36);primaryKey"`
+	TenantID     uint64 `json:"-" gorm:"not null;index;uniqueIndex:ux_marketplace_checkout_key"`
+	UserID       string `json:"-" gorm:"type:varchar(36);not null"`
+	ProductID    string `json:"product_id" gorm:"type:varchar(36);not null;index"`
+	ProductTitle string `json:"product_title" gorm:"type:varchar(160);not null"`
+
+	OperationKey string `json:"-" gorm:"type:varchar(128);not null;uniqueIndex:ux_marketplace_checkout_key"`
+
 	BillingPeriod         string     `json:"billing_period" gorm:"type:varchar(16);not null"`
 	PriceID               string     `json:"price_id" gorm:"type:varchar(64);not null"`
 	Currency              string     `json:"currency" gorm:"type:varchar(3);not null"`
@@ -146,6 +161,7 @@ type MarketplaceSubscription struct {
 	PortalAvailable       bool       `json:"portal_available" gorm:"-"`
 }
 
+// HasAccess reports whether the subscription has a usable paid term at the given instant.
 func (s MarketplaceSubscription) HasAccess(at time.Time) bool {
 	return (s.Status == "active" || s.Status == "past_due") && s.PaidThrough != nil && s.PaidThrough.After(at.UTC())
 }
@@ -170,6 +186,7 @@ type MarketplaceTransaction struct {
 	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
+// MarketplaceOrders combines product subscriptions and confirmed invoices for one buyer.
 type MarketplaceOrders struct {
 	Subscriptions            []*MarketplaceSubscription `json:"subscriptions"`
 	Transactions             []*MarketplaceTransaction  `json:"transactions"`
@@ -210,14 +227,18 @@ type MarketplaceBillingEvent struct {
 	ScheduledChangeAt    *time.Time `json:"scheduled_change_at,omitempty"`
 }
 
+// MarketplaceProcessedEvent deduplicates provider events after durable processing.
 type MarketplaceProcessedEvent struct {
 	EventID        string `gorm:"type:varchar(64);primaryKey"`
 	SubscriptionID string `gorm:"type:varchar(36);not null;index"`
 	CreatedAt      time.Time
 }
 
+// Validate rejects incomplete events before they enter or leave the billing queue.
 func (e MarketplaceBillingEvent) Validate() error {
-	if e.EventID == "" || len(e.EventID) > 64 || e.OccurredAt.IsZero() || e.SubscriptionID == "" || e.PaddleSubscriptionID == "" || e.CustomerID == "" {
+	if e.EventID == "" || len(e.EventID) > 64 || e.OccurredAt.IsZero() || e.SubscriptionID == "" ||
+		e.PaddleSubscriptionID == "" ||
+		e.CustomerID == "" {
 		return ErrMarketplaceInvalid
 	}
 	switch {

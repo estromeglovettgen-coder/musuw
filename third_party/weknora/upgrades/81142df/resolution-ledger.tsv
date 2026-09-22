@@ -954,7 +954,7 @@ internal/container/sandbox.go	-	A	100644	ceae1f826ea5b01de618ca69000dd0e914e27b1
 internal/container/sandbox_test.go	-	A	100644	cb9f664e26a810f7cf950dfd8be9541a3f97d32d	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/container/ssrf_test.go	-	A	100644	69173a501b23417d3b6e2bed7b710fa2d78d840f	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/database/migration_sqlite_test.go	-	A	100644	dcaa83e6215c47d679901e491bbba1eb1a573050	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/database/migration_sqlite_versioned_schema_test.go	-	A	100644	a46458daa4a19a9c091f62e4ef655d765cb20049	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
+internal/database/migration_sqlite_versioned_schema_test.go	-	A	100644	93af8986e7fe5d4d429fc0312ddde1836a3f756d	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/datasource/connector.go	-	M	100644	c7c51baab45ce17262d198c7ee1ed02cc6390322	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/datasource/connector/gitlab/client.go	-	A	100644	710d51f894fbd5130452073328467133461a0d2a	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/datasource/connector/gitlab/client_test.go	-	A	100644	3654bbdd158ae87042ad876293eaa086500c14cd	adopt-upstream-exact		fixed-target upstream-only content is byte-identical

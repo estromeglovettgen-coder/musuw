@@ -2,9 +2,10 @@ package service
 
 import (
 	"context"
+	"testing"
+
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 type accountMarketplaceGuardStub struct {
@@ -21,6 +22,7 @@ func (s *accountMarketplaceGuardStub) PrepareAccountDeletion(context.Context, ui
 	s.prepares++
 	return s.prepareErr
 }
+
 func (s *accountMarketplaceGuardStub) EnsureAccountTerminal(context.Context, uint64) error {
 	return s.terminalErr
 }
@@ -29,7 +31,10 @@ func TestAccountErasureSchedulesMarketplaceOnlyBuyerAndDefersUnknownCheckout(t *
 	target := eligibleErasureTarget()
 	target.PaddleSubscriptionID = ""
 	target.IsDeletionPending = false
-	target.MarketplaceBilling = []types.AccountErasureBillingReference{{PaddleCustomerID: "ctm-market", PaddleSubscriptionID: "sub-market"}, {PaddleCustomerID: "ctm-market", PaddleSubscriptionID: "sub-other"}}
+	target.MarketplaceBilling = []types.AccountErasureBillingReference{
+		{PaddleCustomerID: "ctm-market", PaddleSubscriptionID: "sub-market"},
+		{PaddleCustomerID: "ctm-market", PaddleSubscriptionID: "sub-other"},
+	}
 	repo := &accountErasureRepoStub{target: target}
 	billing := &accountErasureBillingStub{}
 	queue := &accountErasureTaskStub{}
@@ -48,7 +53,9 @@ func TestAccountErasureWorkerWaitsForMarketplaceCheckoutRecovery(t *testing.T) {
 	target.PaddleSubscriptionID = ""
 	repo := &accountErasureRepoStub{target: target}
 	guard := &accountMarketplaceGuardStub{repo: repo, prepareErr: types.ErrMarketplaceConflict}
-	svc := newAccountErasureService(repo, nil, nil, nil, nil, nil, &accountErasureBillingStub{}, &accountErasureIdentityStub{})
+	svc := newAccountErasureService(
+		repo, nil, nil, nil, nil, nil, &accountErasureBillingStub{}, &accountErasureIdentityStub{},
+	)
 	svc.marketplace = guard
 	task, err := NewAccountErasureTask(target.UserID)
 	require.NoError(t, err)

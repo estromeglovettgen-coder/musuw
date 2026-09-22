@@ -2,13 +2,15 @@ package repository
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"os"
-	"testing"
-	"time"
 )
 
 func marketplaceTestDB(t *testing.T) *gorm.DB {
@@ -18,9 +20,29 @@ func marketplaceTestDB(t *testing.T) *gorm.DB {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&types.MarketplaceProduct{}, &types.MarketplaceSubscription{}, &types.MarketplaceTransaction{}, &types.MarketplaceProcessedEvent{}, &types.User{}))
-	require.NoError(t, db.Create(&types.User{ID: "buyer", Username: "buyer", Email: "buyer@example.test", TenantID: 7, IsActive: true}).Error)
-	require.NoError(t, db.Exec("CREATE UNIQUE INDEX ux_marketplace_current_product ON marketplace_subscriptions(tenant_id, product_id) WHERE status NOT IN ('canceled','failed')").Error)
+	require.NoError(
+		t,
+		db.AutoMigrate(
+			&types.MarketplaceProduct{},
+			&types.MarketplaceSubscription{},
+			&types.MarketplaceTransaction{},
+			&types.MarketplaceProcessedEvent{},
+			&types.User{},
+		),
+	)
+	require.NoError(
+		t,
+		db.Create(
+			&types.User{ID: "buyer", Username: "buyer", Email: "buyer@example.test", TenantID: 7, IsActive: true},
+		).Error,
+	)
+	require.NoError(
+		t,
+		db.Exec(
+			"CREATE UNIQUE INDEX ux_marketplace_current_product ON marketplace_subscriptions(tenant_id, product_id) "+
+				"WHERE status NOT IN ('canceled','failed')",
+		).Error,
+	)
 	return db
 }
 
@@ -31,9 +53,35 @@ func TestMarketplaceRefundOnlyRevokesTheAdjustedPaidTerm(t *testing.T) {
 	at := time.Date(2026, 9, 22, 1, 0, 0, 0, time.UTC)
 	firstEnd := at.AddDate(0, 1, 0)
 	secondEnd := firstEnd.AddDate(0, 1, 0)
-	sub := &types.MarketplaceSubscription{ID: "local", TenantID: 7, UserID: "buyer", ProductID: "one", ProductTitle: "One", OperationKey: "one", BillingPeriod: "monthly", PriceID: "pri_one", Currency: "USD", Status: "active", PaddleCustomerID: "ctm_one", PaddleSubscriptionID: "sub_one", PaidThrough: &firstEnd}
+	sub := &types.MarketplaceSubscription{
+		ID:                   "local",
+		TenantID:             7,
+		UserID:               "buyer",
+		ProductID:            "one",
+		ProductTitle:         "One",
+		OperationKey:         "one",
+		BillingPeriod:        "monthly",
+		PriceID:              "pri_one",
+		Currency:             "USD",
+		Status:               "active",
+		PaddleCustomerID:     "ctm_one",
+		PaddleSubscriptionID: "sub_one",
+		PaidThrough:          &firstEnd,
+	}
 	require.NoError(t, db.Create(sub).Error)
-	first := types.MarketplaceBillingEvent{EventID: "evt_first", EventType: "transaction.completed", OccurredAt: at, SubscriptionID: sub.ID, PaddleSubscriptionID: "sub_one", CustomerID: "ctm_one", TransactionID: "txn_first", PriceID: "pri_one", Status: "completed", PeriodStartsAt: &at, PeriodEndsAt: &firstEnd}
+	first := types.MarketplaceBillingEvent{
+		EventID:              "evt_first",
+		EventType:            "transaction.completed",
+		OccurredAt:           at,
+		SubscriptionID:       sub.ID,
+		PaddleSubscriptionID: "sub_one",
+		CustomerID:           "ctm_one",
+		TransactionID:        "txn_first",
+		PriceID:              "pri_one",
+		Status:               "completed",
+		PeriodStartsAt:       &at,
+		PeriodEndsAt:         &firstEnd,
+	}
 	_, err := repo.ApplyBillingEvent(ctx, first)
 	require.NoError(t, err)
 	second := first
@@ -106,9 +154,35 @@ func TestMarketplaceLateCurrentInvoiceRefundWinsOverOrdinarySubscriptionUpdate(t
 	ctx := context.Background()
 	at := time.Date(2026, 9, 22, 1, 0, 0, 0, time.UTC)
 	end := at.AddDate(0, 1, 0)
-	sub := &types.MarketplaceSubscription{ID: "local", TenantID: 7, UserID: "buyer", ProductID: "one", ProductTitle: "One", OperationKey: "one", BillingPeriod: "monthly", PriceID: "pri_one", Currency: "USD", Status: "active", PaddleCustomerID: "ctm_one", PaddleSubscriptionID: "sub_one", PaidThrough: &end}
+	sub := &types.MarketplaceSubscription{
+		ID:                   "local",
+		TenantID:             7,
+		UserID:               "buyer",
+		ProductID:            "one",
+		ProductTitle:         "One",
+		OperationKey:         "one",
+		BillingPeriod:        "monthly",
+		PriceID:              "pri_one",
+		Currency:             "USD",
+		Status:               "active",
+		PaddleCustomerID:     "ctm_one",
+		PaddleSubscriptionID: "sub_one",
+		PaidThrough:          &end,
+	}
 	require.NoError(t, db.Create(sub).Error)
-	paid := types.MarketplaceBillingEvent{EventID: "evt_paid", EventType: "transaction.completed", OccurredAt: at, SubscriptionID: sub.ID, PaddleSubscriptionID: "sub_one", CustomerID: "ctm_one", TransactionID: "txn_paid", PriceID: "pri_one", Status: "completed", PeriodStartsAt: &at, PeriodEndsAt: &end}
+	paid := types.MarketplaceBillingEvent{
+		EventID:              "evt_paid",
+		EventType:            "transaction.completed",
+		OccurredAt:           at,
+		SubscriptionID:       sub.ID,
+		PaddleSubscriptionID: "sub_one",
+		CustomerID:           "ctm_one",
+		TransactionID:        "txn_paid",
+		PriceID:              "pri_one",
+		Status:               "completed",
+		PeriodStartsAt:       &at,
+		PeriodEndsAt:         &end,
+	}
 	_, err := repo.ApplyBillingEvent(ctx, paid)
 	require.NoError(t, err)
 	updated := paid
@@ -135,8 +209,35 @@ func TestMarketplaceLateCurrentInvoiceRefundWinsOverOrdinarySubscriptionUpdate(t
 func TestMarketplaceBillingRejectsAnotherProviderIdentityWithoutConsumingEvent(t *testing.T) {
 	db := marketplaceTestDB(t)
 	repo := NewMarketplaceRepository(db)
-	require.NoError(t, db.Create(&types.MarketplaceSubscription{ID: "local", TenantID: 7, UserID: "buyer", ProductID: "one", ProductTitle: "One", OperationKey: "one", BillingPeriod: "monthly", PriceID: "pri_one", Currency: "USD", Status: "active", PaddleCustomerID: "ctm_owned", PaddleSubscriptionID: "sub_owned"}).Error)
-	event := types.MarketplaceBillingEvent{EventID: "evt_mismatch", EventType: "subscription.canceled", OccurredAt: time.Now(), SubscriptionID: "local", PaddleSubscriptionID: "sub_other", CustomerID: "ctm_other", PriceID: "pri_one", Status: "canceled"}
+	require.NoError(
+		t,
+		db.Create(
+			&types.MarketplaceSubscription{
+				ID:                   "local",
+				TenantID:             7,
+				UserID:               "buyer",
+				ProductID:            "one",
+				ProductTitle:         "One",
+				OperationKey:         "one",
+				BillingPeriod:        "monthly",
+				PriceID:              "pri_one",
+				Currency:             "USD",
+				Status:               "active",
+				PaddleCustomerID:     "ctm_owned",
+				PaddleSubscriptionID: "sub_owned",
+			},
+		).Error,
+	)
+	event := types.MarketplaceBillingEvent{
+		EventID:              "evt_mismatch",
+		EventType:            "subscription.canceled",
+		OccurredAt:           time.Now(),
+		SubscriptionID:       "local",
+		PaddleSubscriptionID: "sub_other",
+		CustomerID:           "ctm_other",
+		PriceID:              "pri_one",
+		Status:               "canceled",
+	}
 	_, err := repo.ApplyBillingEvent(context.Background(), event)
 	require.ErrorIs(t, err, types.ErrMarketplaceForbidden)
 	var count int64
@@ -151,7 +252,22 @@ func TestMarketplaceSQLiteMigrationSupportsActualRepositoryRoundTrip(t *testing.
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(string(migration)).Error)
 	repo := NewMarketplaceRepository(db)
-	product := &types.MarketplaceProduct{ID: "product", CreatorTenantID: 7, CreatorUserID: "creator", Title: "Test", AgentID: "agent", KnowledgeBaseIDs: types.StringArray{"kb"}, KnowledgeBaseNames: types.StringArray{"Knowledge"}, PlatformKnowledgeBaseIDs: types.StringArray{}, SampleQuestions: types.StringArray{"Question?"}, DefaultModelID: types.CheapestChatModelID, Currency: "USD", MonthlyAmount: 100, YearlyAmount: 1000, Status: "draft"}
+	product := &types.MarketplaceProduct{
+		ID:                       "product",
+		CreatorTenantID:          7,
+		CreatorUserID:            "creator",
+		Title:                    "Test",
+		AgentID:                  "agent",
+		KnowledgeBaseIDs:         types.StringArray{"kb"},
+		KnowledgeBaseNames:       types.StringArray{"Knowledge"},
+		PlatformKnowledgeBaseIDs: types.StringArray{},
+		SampleQuestions:          types.StringArray{"Question?"},
+		DefaultModelID:           types.CheapestChatModelID,
+		Currency:                 "USD",
+		MonthlyAmount:            100,
+		YearlyAmount:             1000,
+		Status:                   "draft",
+	}
 	require.NoError(t, repo.SaveProduct(context.Background(), product, time.Time{}))
 	loaded, err := repo.GetProduct(context.Background(), product.ID)
 	require.NoError(t, err)
@@ -168,7 +284,21 @@ func TestMarketplaceRenewalIsIdempotentAndDoesNotChangeAnotherProduct(t *testing
 	ctx := context.Background()
 	at := time.Date(2026, 9, 22, 1, 0, 0, 0, time.UTC)
 	end := at.AddDate(0, 1, 0)
-	first := &types.MarketplaceSubscription{ID: "sub-local-one", TenantID: 7, UserID: "buyer", ProductID: "one", ProductTitle: "One", OperationKey: "one", BillingPeriod: "monthly", PriceID: "pri_one", Currency: "USD", Status: "active", PaddleCustomerID: "ctm_one", PaddleSubscriptionID: "sub_one", PaidThrough: &end}
+	first := &types.MarketplaceSubscription{
+		ID:                   "sub-local-one",
+		TenantID:             7,
+		UserID:               "buyer",
+		ProductID:            "one",
+		ProductTitle:         "One",
+		OperationKey:         "one",
+		BillingPeriod:        "monthly",
+		PriceID:              "pri_one",
+		Currency:             "USD",
+		Status:               "active",
+		PaddleCustomerID:     "ctm_one",
+		PaddleSubscriptionID: "sub_one",
+		PaidThrough:          &end,
+	}
 	second := *first
 	second.ID = "sub-local-two"
 	second.ProductID = "two"
@@ -177,7 +307,21 @@ func TestMarketplaceRenewalIsIdempotentAndDoesNotChangeAnotherProduct(t *testing
 	require.NoError(t, db.Create(first).Error)
 	require.NoError(t, db.Create(&second).Error)
 	renewed := end.AddDate(0, 1, 0)
-	event := types.MarketplaceBillingEvent{EventID: "evt_renew", EventType: "transaction.completed", OccurredAt: end, SubscriptionID: first.ID, PaddleSubscriptionID: "sub_one", CustomerID: "ctm_one", TransactionID: "txn_renew", PriceID: "pri_one", Status: "completed", Currency: "USD", Amount: "500", PeriodStartsAt: &end, PeriodEndsAt: &renewed}
+	event := types.MarketplaceBillingEvent{
+		EventID:              "evt_renew",
+		EventType:            "transaction.completed",
+		OccurredAt:           end,
+		SubscriptionID:       first.ID,
+		PaddleSubscriptionID: "sub_one",
+		CustomerID:           "ctm_one",
+		TransactionID:        "txn_renew",
+		PriceID:              "pri_one",
+		Status:               "completed",
+		Currency:             "USD",
+		Amount:               "500",
+		PeriodStartsAt:       &end,
+		PeriodEndsAt:         &renewed,
+	}
 	applied, err := repo.ApplyBillingEvent(ctx, event)
 	require.NoError(t, err)
 	require.True(t, applied)
@@ -209,7 +353,19 @@ func TestMarketplaceRenewalIsIdempotentAndDoesNotChangeAnotherProduct(t *testing
 func TestMarketplaceCheckoutIsIndependentPerProductAndRejectsChangedReplay(t *testing.T) {
 	repo := NewMarketplaceRepository(marketplaceTestDB(t))
 	ctx := context.Background()
-	first := &types.MarketplaceSubscription{ID: "first", TenantID: 7, UserID: "buyer", ProductID: "one", ProductTitle: "One", OperationKey: "key-one", BillingPeriod: "monthly", PriceID: "pri_one", Currency: "USD", Amount: 500, Status: "pending"}
+	first := &types.MarketplaceSubscription{
+		ID:            "first",
+		TenantID:      7,
+		UserID:        "buyer",
+		ProductID:     "one",
+		ProductTitle:  "One",
+		OperationKey:  "key-one",
+		BillingPeriod: "monthly",
+		PriceID:       "pri_one",
+		Currency:      "USD",
+		Amount:        500,
+		Status:        "pending",
+	}
 	saved, created, err := repo.ClaimCheckout(ctx, first)
 	require.NoError(t, err)
 	require.True(t, created)
@@ -239,11 +395,25 @@ func TestMarketplaceDeletionFenceRejectsBothNewCheckoutAndClaimedCheckoutStart(t
 	db := marketplaceTestDB(t)
 	repo := NewMarketplaceRepository(db)
 	ctx := context.Background()
-	candidate := &types.MarketplaceSubscription{ID: "pending", TenantID: 7, UserID: "buyer", ProductID: "one", ProductTitle: "One", OperationKey: "operation", BillingPeriod: "monthly", PriceID: "pri_one", Currency: "USD", Status: "pending"}
+	candidate := &types.MarketplaceSubscription{
+		ID:            "pending",
+		TenantID:      7,
+		UserID:        "buyer",
+		ProductID:     "one",
+		ProductTitle:  "One",
+		OperationKey:  "operation",
+		BillingPeriod: "monthly",
+		PriceID:       "pri_one",
+		Currency:      "USD",
+		Status:        "pending",
+	}
 	_, created, err := repo.ClaimCheckout(ctx, candidate)
 	require.NoError(t, err)
 	require.True(t, created)
-	require.NoError(t, db.Model(&types.User{}).Where("id = ?", "buyer").Update("deletion_requested_at", time.Now()).Error)
+	require.NoError(
+		t,
+		db.Model(&types.User{}).Where("id = ?", "buyer").Update("deletion_requested_at", time.Now()).Error,
+	)
 	_, err = repo.UpdateCheckout(ctx, candidate.ID, []string{"pending"}, "in_flight", "", "")
 	require.ErrorIs(t, err, types.ErrMarketplaceForbidden)
 	candidate.ID, candidate.ProductID, candidate.OperationKey = "later", "two", "later-operation"
@@ -260,9 +430,32 @@ func TestMarketplaceQueuedEventCannotReidentifyOrReactivateErasedSubscription(t 
 	ctx := context.Background()
 	at := time.Now().UTC()
 	end := at.AddDate(0, 1, 0)
-	sub := &types.MarketplaceSubscription{ID: "erased", TenantID: 0, UserID: "", ProductID: "one", ProductTitle: "One", OperationKey: "erased", BillingPeriod: "monthly", PriceID: "pri_one", Currency: "USD", Status: "canceled"}
+	sub := &types.MarketplaceSubscription{
+		ID:            "erased",
+		TenantID:      0,
+		UserID:        "",
+		ProductID:     "one",
+		ProductTitle:  "One",
+		OperationKey:  "erased",
+		BillingPeriod: "monthly",
+		PriceID:       "pri_one",
+		Currency:      "USD",
+		Status:        "canceled",
+	}
 	require.NoError(t, db.Create(sub).Error)
-	event := types.MarketplaceBillingEvent{EventID: "evt_before_erasure", EventType: "transaction.completed", OccurredAt: at, SubscriptionID: sub.ID, PaddleSubscriptionID: "sub_previous", CustomerID: "ctm_previous", TransactionID: "txn_previous", PriceID: "pri_one", Status: "completed", PeriodStartsAt: &at, PeriodEndsAt: &end}
+	event := types.MarketplaceBillingEvent{
+		EventID:              "evt_before_erasure",
+		EventType:            "transaction.completed",
+		OccurredAt:           at,
+		SubscriptionID:       sub.ID,
+		PaddleSubscriptionID: "sub_previous",
+		CustomerID:           "ctm_previous",
+		TransactionID:        "txn_previous",
+		PriceID:              "pri_one",
+		Status:               "completed",
+		PeriodStartsAt:       &at,
+		PeriodEndsAt:         &end,
+	}
 	applied, err := repo.ApplyBillingEvent(ctx, event)
 	require.NoError(t, err)
 	require.True(t, applied)
@@ -280,4 +473,54 @@ func TestMarketplaceQueuedEventCannotReidentifyOrReactivateErasedSubscription(t 
 	require.NoError(t, db.Model(&types.MarketplaceProcessedEvent{}).Count(&eventCount).Error)
 	require.Zero(t, invoiceCount)
 	require.EqualValues(t, 1, eventCount)
+}
+
+func TestMarketplaceCheckoutReplacementCASCompetesWithStartingProviderWrite(t *testing.T) {
+	for _, startFirst := range []bool{false, true} {
+		t.Run(fmt.Sprintf("provider-starts-first-%t", startFirst), func(t *testing.T) {
+			repo := NewMarketplaceRepository(marketplaceTestDB(t))
+			ctx := context.Background()
+			monthly := &types.MarketplaceSubscription{
+				ID:            "monthly",
+				TenantID:      7,
+				UserID:        "buyer",
+				ProductID:     "one",
+				ProductTitle:  "One",
+				OperationKey:  "monthly-key",
+				BillingPeriod: "monthly",
+				PriceID:       "pri_month",
+				Currency:      "USD",
+				Status:        "pending",
+			}
+			_, created, err := repo.ClaimCheckout(ctx, monthly)
+			require.NoError(t, err)
+			require.True(t, created)
+			first, second := "failed", "in_flight"
+			if startFirst {
+				first, second = second, first
+			}
+			changed, err := repo.UpdateCheckout(ctx, monthly.ID, []string{"pending"}, first, "", "")
+			require.NoError(t, err)
+			require.True(t, changed)
+			changed, err = repo.UpdateCheckout(ctx, monthly.ID, []string{"pending"}, second, "", "")
+			require.NoError(t, err)
+			require.False(t, changed)
+			yearly := *monthly
+			yearly.ID = "yearly"
+			yearly.OperationKey = "yearly-key"
+			yearly.BillingPeriod = "yearly"
+			yearly.PriceID = "pri_year"
+			current, created, err := repo.ClaimCheckout(ctx, &yearly)
+			require.NoError(t, err)
+			require.Equal(t, !startFirst, created)
+			if startFirst {
+				require.Equal(t, monthly.ID, current.ID)
+			} else {
+				require.Equal(t, yearly.ID, current.ID)
+			}
+			yearly.OperationKey = monthly.OperationKey
+			_, _, err = repo.ClaimCheckout(ctx, &yearly)
+			require.ErrorIs(t, err, types.ErrMarketplaceConflict)
+		})
+	}
 }

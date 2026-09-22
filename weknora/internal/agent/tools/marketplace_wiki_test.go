@@ -3,9 +3,10 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"testing"
+
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestMarketplaceWikiKeepsModelBodyPrivateFromStreamAndHistory(t *testing.T) {
@@ -14,7 +15,10 @@ func TestMarketplaceWikiKeepsModelBodyPrivateFromStreamAndHistory(t *testing.T) 
 	svc := &fakeWikiPageService{pages: map[string]*types.WikiPage{wikiPageKey("kb", page.Slug): page}}
 	tool := NewWikiReadPageTool(svc, nil, []WikiScope{{KnowledgeBaseID: "kb"}}, nil)
 	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(7))
-	ctx = types.WithMarketplaceScope(ctx, 7, &types.MarketplaceAccess{ProductID: "product", SourceTenantID: 9, Agent: &types.CustomAgent{ID: "agent", TenantID: 9}, KnowledgeBaseIDs: []string{"kb"}})
+	ctx = types.WithMarketplaceScope(ctx, 7, &types.MarketplaceAccess{
+		ProductID: "product", SourceTenantID: 9,
+		Agent: &types.CustomAgent{ID: "agent", TenantID: 9}, KnowledgeBaseIDs: []string{"kb"},
+	})
 	args := json.RawMessage(`{"slugs":["concept/example"]}`)
 	result, err := tool.Execute(ctx, args)
 	require.NoError(t, err)
@@ -23,12 +27,17 @@ func TestMarketplaceWikiKeepsModelBodyPrivateFromStreamAndHistory(t *testing.T) 
 	public, err := json.Marshal(SanitizeToolResultForClient(ToolWikiReadPage, result))
 	require.NoError(t, err)
 	require.NotContains(t, string(public), page.Content)
-	steps := SanitizeAgentStepsForStorage([]types.AgentStep{{ToolCalls: []types.ToolCall{{Name: ToolWikiReadPage, Result: result}}}})
+	steps := SanitizeAgentStepsForStorage([]types.AgentStep{{
+		ToolCalls: []types.ToolCall{{Name: ToolWikiReadPage, Result: result}},
+	}})
 	stored, err := json.Marshal(steps)
 	require.NoError(t, err)
 	require.NotContains(t, string(stored), page.Content)
 	require.Contains(t, result.Output, page.Content, "sanitizing must not mutate model input")
 	ordinary, err := tool.Execute(context.Background(), args)
 	require.NoError(t, err)
-	require.Contains(t, SanitizeToolResultForClient(ToolWikiReadPage, ordinary)["output"], page.Content, "ordinary upstream behavior remains unchanged")
+	require.Contains(
+		t, SanitizeToolResultForClient(ToolWikiReadPage, ordinary)["output"], page.Content,
+		"ordinary upstream behavior remains unchanged",
+	)
 }

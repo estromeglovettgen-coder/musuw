@@ -2,10 +2,12 @@ package interfaces
 
 import (
 	"context"
-	"github.com/Tencent/WeKnora/internal/types"
 	"time"
+
+	"github.com/Tencent/WeKnora/internal/types"
 )
 
+// MarketplaceCatalogQuery scopes and pages catalog or submission listings.
 type MarketplaceCatalogQuery struct {
 	CreatorUserID           string
 	Query, Category, Status string
@@ -14,6 +16,7 @@ type MarketplaceCatalogQuery struct {
 	Limit, Offset           int
 }
 
+// MarketplaceRepository persists catalog, subscription, invoice and event state.
 type MarketplaceRepository interface {
 	ListProducts(context.Context, MarketplaceCatalogQuery) ([]*types.MarketplaceProduct, int64, error)
 	GetProduct(context.Context, string) (*types.MarketplaceProduct, error)
@@ -28,7 +31,7 @@ type MarketplaceRepository interface {
 	ApplyBillingEvent(context.Context, types.MarketplaceBillingEvent) (bool, error)
 }
 
-// The gateway owns Paddle's catalog verification, checkout inventory recovery,
+// MarketplacePaymentGateway owns Paddle's catalog verification, checkout inventory recovery,
 // and portal implementation; application callers never coordinate SDK details.
 type MarketplacePaymentGateway interface {
 	Config() types.MarketplaceCheckoutConfig
@@ -39,6 +42,7 @@ type MarketplacePaymentGateway interface {
 	CreatePortal(context.Context, *types.MarketplaceSubscription) (string, error)
 }
 
+// MarketplaceService coordinates publication, purchase and buyer authorization.
 type MarketplaceService interface {
 	ListProducts(context.Context, MarketplaceCatalogQuery, bool, bool) ([]*types.MarketplaceProduct, int64, error)
 	GetProduct(context.Context, string) (*types.MarketplaceProduct, error)

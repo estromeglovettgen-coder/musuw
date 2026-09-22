@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Marketplace purchases belong to the authenticated personal workspace. API
+// RegisterMarketplaceRoutes binds purchases to the authenticated workspace. API
 // keys are intentionally undeclared and denied by the existing API-key gate.
 func RegisterMarketplaceRoutes(r *gin.RouterGroup, h *handler.MarketplaceHandler, g *rbacGuards) {
 	market := r.Group("/creator-marketplace")

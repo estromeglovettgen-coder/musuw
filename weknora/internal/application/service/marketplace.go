@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Tencent/WeKnora/internal/application/repository"
-	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/Tencent/WeKnora/internal/types/interfaces"
-	"github.com/google/uuid"
 	"math"
 	"net/url"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/Tencent/WeKnora/internal/application/repository"
+	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/google/uuid"
 )
 
 type marketplaceService struct {
@@ -24,8 +25,21 @@ type marketplaceService struct {
 	gateway        interfaces.MarketplacePaymentGateway
 }
 
-func NewMarketplaceService(repo interfaces.MarketplaceRepository, entitlements interfaces.EntitlementService, knowledgeBases interfaces.KnowledgeBaseRepository, agents interfaces.CustomAgentRepository, gateway interfaces.MarketplacePaymentGateway) interfaces.MarketplaceService {
-	return &marketplaceService{repo: repo, entitlements: entitlements, knowledgeBases: knowledgeBases, agents: agents, gateway: gateway}
+// NewMarketplaceService coordinates reviewed products and independent product subscriptions.
+func NewMarketplaceService(
+	repo interfaces.MarketplaceRepository,
+	entitlements interfaces.EntitlementService,
+	knowledgeBases interfaces.KnowledgeBaseRepository,
+	agents interfaces.CustomAgentRepository,
+	gateway interfaces.MarketplacePaymentGateway,
+) interfaces.MarketplaceService {
+	return &marketplaceService{
+		repo:           repo,
+		entitlements:   entitlements,
+		knowledgeBases: knowledgeBases,
+		agents:         agents,
+		gateway:        gateway,
+	}
 }
 
 func marketplaceActor(ctx context.Context) (uint64, string, error) {
@@ -57,8 +71,8 @@ func (s *marketplaceService) requireCreator(ctx context.Context) error {
 	return nil
 }
 
-func marketplaceStringList(values []string, max int) ([]string, error) {
-	if len(values) == 0 || len(values) > max {
+func marketplaceStringList(values []string, limit int) ([]string, error) {
+	if len(values) == 0 || len(values) > limit {
 		return nil, types.ErrMarketplaceInvalid
 	}
 	result := make([]string, 0, len(values))
@@ -74,7 +88,12 @@ func marketplaceStringList(values []string, max int) ([]string, error) {
 	return result, nil
 }
 
-func (s *marketplaceService) validateSources(ctx context.Context, tenant uint64, agentID string, kbIDs []string) (*types.CustomAgent, []string, error) {
+func (s *marketplaceService) validateSources(
+	ctx context.Context,
+	tenant uint64,
+	agentID string,
+	kbIDs []string,
+) (*types.CustomAgent, []string, error) {
 	if s.agents == nil || s.knowledgeBases == nil {
 		return nil, nil, types.ErrMarketplaceInvalid
 	}
@@ -106,7 +125,11 @@ func validateMarketplaceInput(input *types.MarketplaceProductInput) error {
 	input.AgentID = strings.TrimSpace(input.AgentID)
 	input.Contact = strings.TrimSpace(input.Contact)
 	input.Authorization = strings.TrimSpace(input.Authorization)
-	if input.Title == "" || utf8.RuneCountInString(input.Title) > 160 || input.Description == "" || utf8.RuneCountInString(input.Description) > 8000 || len(input.Category) > 64 || input.AgentID == "" || len(input.AgentID) > 36 {
+	if input.Title == "" || utf8.RuneCountInString(input.Title) > 160 || input.Description == "" ||
+		utf8.RuneCountInString(input.Description) > 8000 ||
+		len(input.Category) > 64 ||
+		input.AgentID == "" ||
+		len(input.AgentID) > 36 {
 		return types.ErrMarketplaceInvalid
 	}
 	if input.MonthlyAmount <= 0 || input.MonthlyAmount > math.MaxInt64/10 {
@@ -133,7 +156,8 @@ func validateMarketplaceInput(input *types.MarketplaceProductInput) error {
 	input.CoverURL = strings.TrimSpace(input.CoverURL)
 	if input.CoverURL != "" {
 		parsed, err := url.Parse(input.CoverURL)
-		if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || len(input.CoverURL) > 2048 {
+		if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil ||
+			len(input.CoverURL) > 2048 {
 			return fmt.Errorf("%w: cover must be an HTTPS URL", types.ErrMarketplaceInvalid)
 		}
 	}
@@ -142,7 +166,12 @@ func validateMarketplaceInput(input *types.MarketplaceProductInput) error {
 	return err
 }
 
-func (s *marketplaceService) SaveProduct(ctx context.Context, id string, input types.MarketplaceProductInput, asAdmin bool) (*types.MarketplaceProduct, error) {
+func (s *marketplaceService) SaveProduct(
+	ctx context.Context,
+	id string,
+	input types.MarketplaceProductInput,
+	asAdmin bool,
+) (*types.MarketplaceProduct, error) {
 	tenant, user, err := marketplaceActor(ctx)
 	if err != nil {
 		return nil, err
@@ -157,7 +186,15 @@ func (s *marketplaceService) SaveProduct(ctx context.Context, id string, input t
 	if err := validateMarketplaceInput(&input); err != nil {
 		return nil, err
 	}
-	p := &types.MarketplaceProduct{ID: uuid.NewString(), CreatorTenantID: tenant, CreatorUserID: user, Status: "draft", PlatformKnowledgeBaseIDs: types.StringArray{}, KnowledgeBaseNames: types.StringArray{}, SampleQuestions: types.StringArray{}}
+	p := &types.MarketplaceProduct{
+		ID:                       uuid.NewString(),
+		CreatorTenantID:          tenant,
+		CreatorUserID:            user,
+		Status:                   "draft",
+		PlatformKnowledgeBaseIDs: types.StringArray{},
+		KnowledgeBaseNames:       types.StringArray{},
+		SampleQuestions:          types.StringArray{},
+	}
 	expected := time.Time{}
 	if id != "" {
 		p, err = s.repo.GetProduct(ctx, id)
@@ -222,7 +259,10 @@ func (s *marketplaceService) SubmitProduct(ctx context.Context, id string) (*typ
 		return nil, types.ErrMarketplaceConflict
 	}
 	if p.Contact == "" || p.Authorization == "" || !p.AuthorizationConfirmed {
-		return nil, fmt.Errorf("%w: contact and confirmed publication authorization are required", types.ErrMarketplaceInvalid)
+		return nil, fmt.Errorf(
+			"%w: contact and confirmed publication authorization are required",
+			types.ErrMarketplaceInvalid,
+		)
 	}
 	if _, _, err := s.validateSources(ctx, p.CreatorTenantID, p.AgentID, p.KnowledgeBaseIDs); err != nil {
 		return nil, err
@@ -262,13 +302,25 @@ func marketplaceReviewedConfig(agent *types.CustomAgent, kbIDs []string) (types.
 	cfg.WebFetchEnabled = false
 	cfg.WebSearchProviderID = ""
 	cfg.DataAnalysisEnabled = false
-	cfg.AllowedTools = []string{"knowledge_search", "wiki_search", "wiki_read_page", "wiki_read_source_doc", "grep_chunks", "list_knowledge_chunks", "get_document_info"}
+	cfg.AllowedTools = []string{
+		"knowledge_search",
+		"wiki_search",
+		"wiki_read_page",
+		"wiki_read_source_doc",
+		"grep_chunks",
+		"list_knowledge_chunks",
+		"get_document_info",
+	}
 	disabled := false
 	cfg.MemoryEnabled = &disabled
 	return cfg, nil
 }
 
-func (s *marketplaceService) ReviewProduct(ctx context.Context, id string, input types.MarketplaceReviewInput) (*types.MarketplaceProduct, error) {
+func (s *marketplaceService) ReviewProduct(
+	ctx context.Context,
+	id string,
+	input types.MarketplaceReviewInput,
+) (*types.MarketplaceProduct, error) {
 	tenant, user, err := marketplaceActor(ctx)
 	if err != nil {
 		return nil, err
@@ -303,14 +355,17 @@ func (s *marketplaceService) ReviewProduct(ctx context.Context, id string, input
 				return nil, err
 			}
 			if kb.EmbeddingModelID != types.PlatformKnowledgeBaseEmbeddingModelID {
-				return nil, fmt.Errorf("%w: published knowledge bases must use the platform embedding model", types.ErrMarketplaceInvalid)
+				return nil, fmt.Errorf(
+					"%w: published knowledge bases must use the platform embedding model",
+					types.ErrMarketplaceInvalid,
+				)
 			}
 		}
 		p.PaddleProductID = strings.TrimSpace(input.PaddleProductID)
 		p.MonthlyPriceID = strings.TrimSpace(input.MonthlyPriceID)
 		p.YearlyPriceID = strings.TrimSpace(input.YearlyPriceID)
 		if s.gateway == nil {
-			return nil, fmt.Errorf("Paddle catalog verification is unavailable")
+			return nil, fmt.Errorf("paddle catalog verification is unavailable")
 		}
 		if err := s.gateway.ValidateCatalog(ctx, p); err != nil {
 			return nil, err
@@ -358,9 +413,15 @@ func (s *marketplaceService) ReviewProduct(ctx context.Context, id string, input
 	return p, nil
 }
 
-func (s *marketplaceService) projectProduct(ctx context.Context, p *types.MarketplaceProduct, manage bool) (*types.MarketplaceProduct, error) {
+func (s *marketplaceService) projectProduct(
+	ctx context.Context,
+	p *types.MarketplaceProduct,
+	manage bool,
+) (*types.MarketplaceProduct, error) {
 	out := *p
-	out.CheckoutAvailable = s.gateway != nil && s.gateway.Config().Configured && p.Status == "published" && p.MonthlyPriceID != "" && p.YearlyPriceID != ""
+	out.CheckoutAvailable = s.gateway != nil && s.gateway.Config().Configured && p.Status == "published" &&
+		p.MonthlyPriceID != "" &&
+		p.YearlyPriceID != ""
 	if !manage {
 		out.Contact = ""
 		out.Authorization = ""
@@ -386,11 +447,22 @@ func (s *marketplaceService) projectProduct(ctx context.Context, p *types.Market
 	if err != nil {
 		return nil, err
 	}
-	out.Access = &types.MarketplaceProductAccess{CanChat: sub.HasAccess(time.Now().UTC()) && p.PublishedTenantID != 0, PortalAvailable: s.portalAvailable(sub), SubscriptionID: sub.ID, Status: sub.Status, PaidThrough: sub.PaidThrough, CancelAtPeriodEnd: sub.CancelAtPeriodEnd}
+	out.Access = &types.MarketplaceProductAccess{
+		CanChat:           sub.HasAccess(time.Now().UTC()) && p.PublishedTenantID != 0,
+		PortalAvailable:   s.portalAvailable(sub),
+		SubscriptionID:    sub.ID,
+		Status:            sub.Status,
+		PaidThrough:       sub.PaidThrough,
+		CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
+	}
 	return &out, nil
 }
 
-func (s *marketplaceService) ListProducts(ctx context.Context, q interfaces.MarketplaceCatalogQuery, creator, admin bool) ([]*types.MarketplaceProduct, int64, error) {
+func (s *marketplaceService) ListProducts(
+	ctx context.Context,
+	q interfaces.MarketplaceCatalogQuery,
+	creator, admin bool,
+) ([]*types.MarketplaceProduct, int64, error) {
 	tenant, user, err := marketplaceActor(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -442,7 +514,12 @@ func (s *marketplaceService) GetProduct(ctx context.Context, id string) (*types.
 	return projected, nil
 }
 
-func (s *marketplaceService) AuthorizeAccess(ctx context.Context, tenantID uint64, productID string, at time.Time) (*types.MarketplaceAccess, error) {
+func (s *marketplaceService) AuthorizeAccess(
+	ctx context.Context,
+	tenantID uint64,
+	productID string,
+	at time.Time,
+) (*types.MarketplaceAccess, error) {
 	if tenantID == 0 {
 		return nil, types.ErrMarketplaceForbidden
 	}
@@ -457,7 +534,8 @@ func (s *marketplaceService) AuthorizeAccess(ctx context.Context, tenantID uint6
 		}
 		return nil, err
 	}
-	if !sub.HasAccess(at) || p.PublishedTenantID == 0 || p.PlatformAgentID == "" || len(p.PlatformKnowledgeBaseIDs) == 0 {
+	if !sub.HasAccess(at) || p.PublishedTenantID == 0 || p.PlatformAgentID == "" ||
+		len(p.PlatformKnowledgeBaseIDs) == 0 {
 		return nil, types.ErrMarketplaceForbidden
 	}
 	// Unlisting stops new sales; existing paid buyers keep the reviewed service
@@ -479,8 +557,21 @@ func (s *marketplaceService) AuthorizeAccess(ctx context.Context, tenantID uint6
 	if err = json.Unmarshal(raw, &cfg); err != nil {
 		return nil, err
 	}
-	agent := &types.CustomAgent{ID: p.PlatformAgentID, TenantID: p.PublishedTenantID, Name: p.AgentName, Description: p.Description, Config: cfg}
-	return &types.MarketplaceAccess{ProductID: p.ID, SourceTenantID: p.PublishedTenantID, Agent: agent, KnowledgeBaseIDs: append([]string{}, p.PlatformKnowledgeBaseIDs...), SubscriptionID: sub.ID, DefaultModelID: p.DefaultModelID}, nil
+	agent := &types.CustomAgent{
+		ID:          p.PlatformAgentID,
+		TenantID:    p.PublishedTenantID,
+		Name:        p.AgentName,
+		Description: p.Description,
+		Config:      cfg,
+	}
+	return &types.MarketplaceAccess{
+		ProductID:        p.ID,
+		SourceTenantID:   p.PublishedTenantID,
+		Agent:            agent,
+		KnowledgeBaseIDs: append([]string{}, p.PlatformKnowledgeBaseIDs...),
+		SubscriptionID:   sub.ID,
+		DefaultModelID:   p.DefaultModelID,
+	}, nil
 }
 
 func (s *marketplaceService) Orders(ctx context.Context) (*types.MarketplaceOrders, error) {
@@ -512,7 +603,10 @@ func validMarketplaceOperationKey(key string) bool {
 	return true
 }
 
-func (s *marketplaceService) Checkout(ctx context.Context, productID, period, key string) (*types.MarketplaceCheckout, error) {
+func (s *marketplaceService) Checkout(
+	ctx context.Context,
+	productID, period, key string,
+) (*types.MarketplaceCheckout, error) {
 	tenant, user, err := marketplaceActor(ctx)
 	if err != nil {
 		return nil, err
@@ -521,7 +615,7 @@ func (s *marketplaceService) Checkout(ctx context.Context, productID, period, ke
 		return nil, types.ErrMarketplaceInvalid
 	}
 	if s.gateway == nil || !s.gateway.Config().Configured {
-		return nil, fmt.Errorf("Paddle checkout is unavailable")
+		return nil, fmt.Errorf("paddle checkout is unavailable")
 	}
 	p, err := s.repo.GetProduct(ctx, productID)
 	if err != nil {
@@ -538,7 +632,19 @@ func (s *marketplaceService) Checkout(ctx context.Context, productID, period, ke
 		price = p.YearlyPriceID
 		amount = p.YearlyAmount
 	}
-	candidate := &types.MarketplaceSubscription{ID: uuid.NewString(), TenantID: tenant, UserID: user, ProductID: p.ID, ProductTitle: p.Title, OperationKey: key, BillingPeriod: period, PriceID: price, Currency: p.Currency, Amount: amount, Status: "pending"}
+	candidate := &types.MarketplaceSubscription{
+		ID:            uuid.NewString(),
+		TenantID:      tenant,
+		UserID:        user,
+		ProductID:     p.ID,
+		ProductTitle:  p.Title,
+		OperationKey:  key,
+		BillingPeriod: period,
+		PriceID:       price,
+		Currency:      p.Currency,
+		Amount:        amount,
+		Status:        "pending",
+	}
 	if s.entitlements != nil {
 		membership, err := s.entitlements.Current(ctx, time.Now())
 		if err != nil {
@@ -565,9 +671,50 @@ func (s *marketplaceService) Checkout(ctx context.Context, productID, period, ke
 		return nil, err
 	}
 	if sub.BillingPeriod != period || sub.PriceID != price {
-		return nil, fmt.Errorf("%w: another checkout or subscription already exists for this product", types.ErrMarketplaceConflict)
+		if sub.OperationKey == key || sub.PaddleSubscriptionID != "" {
+			return nil, fmt.Errorf("%w: manage the existing product subscription", types.ErrMarketplaceConflict)
+		}
+		switch sub.Status {
+		case "pending", "checkout_created":
+		case "in_flight", "uncertain":
+			if time.Since(sub.UpdatedAt) < 2*time.Minute {
+				return nil, fmt.Errorf("%w: checkout is being prepared; retry shortly", types.ErrMarketplaceConflict)
+			}
+		default:
+			return nil, fmt.Errorf("%w: manage the existing product subscription", types.ErrMarketplaceConflict)
+		}
+		// An unsent pending operation can be released only if its provider write
+		// has not won the CAS. All other operations require confirmed provider
+		// cancellation, including recovery of a previously unknown write.
+		if sub.Status != "pending" || sub.CheckoutTransactionID != "" {
+			if err := s.gateway.CancelCheckout(ctx, sub); err != nil {
+				return nil, err
+			}
+		}
+		released, err := s.repo.UpdateCheckout(
+			ctx,
+			sub.ID,
+			[]string{sub.Status},
+			"failed",
+			"",
+			"replaced unpaid checkout",
+		)
+		if err != nil {
+			return nil, err
+		}
+		if !released {
+			return nil, fmt.Errorf("%w: checkout changed while switching billing period", types.ErrMarketplaceConflict)
+		}
+		sub, _, err = s.repo.ClaimCheckout(ctx, candidate)
+		if err != nil {
+			return nil, err
+		}
+		if sub.BillingPeriod != period || sub.PriceID != price {
+			return nil, fmt.Errorf("%w: another billing selection is being prepared", types.ErrMarketplaceConflict)
+		}
 	}
-	if sub.Status != "pending" && sub.Status != "in_flight" && sub.Status != "uncertain" && sub.Status != "checkout_created" {
+	if sub.Status != "pending" && sub.Status != "in_flight" && sub.Status != "uncertain" &&
+		sub.Status != "checkout_created" {
 		return nil, fmt.Errorf("%w: manage the existing product subscription", types.ErrMarketplaceConflict)
 	}
 	if sub.CheckoutTransactionID != "" {
@@ -576,17 +723,31 @@ func (s *marketplaceService) Checkout(ctx context.Context, productID, period, ke
 			return nil, err
 		}
 		if recovered == nil {
-			return nil, fmt.Errorf("Paddle checkout could not be recovered")
+			return nil, fmt.Errorf("paddle checkout could not be recovered")
 		}
 		switch recovered.Status {
 		case "draft", "ready", "past_due":
-			return &types.MarketplaceCheckout{MarketplaceCheckoutConfig: s.gateway.Config(), TransactionID: recovered.TransactionID, SubscriptionID: sub.ID}, nil
+			return &types.MarketplaceCheckout{
+				MarketplaceCheckoutConfig: s.gateway.Config(),
+				TransactionID:             recovered.TransactionID,
+				SubscriptionID:            sub.ID,
+			}, nil
 		case "canceled":
-			_, err = s.repo.UpdateCheckout(ctx, sub.ID, []string{"pending", "in_flight", "uncertain", "checkout_created"}, "failed", recovered.TransactionID, "")
+			_, err = s.repo.UpdateCheckout(
+				ctx,
+				sub.ID,
+				[]string{"pending", "in_flight", "uncertain", "checkout_created"},
+				"failed",
+				recovered.TransactionID,
+				"",
+			)
 			if err != nil {
 				return nil, err
 			}
-			return nil, fmt.Errorf("%w: checkout was canceled; retry with a new operation key", types.ErrMarketplaceConflict)
+			return nil, fmt.Errorf(
+				"%w: checkout was canceled; retry with a new operation key",
+				types.ErrMarketplaceConflict,
+			)
 		default:
 			return nil, fmt.Errorf("%w: payment is processing", types.ErrMarketplaceConflict)
 		}
@@ -602,20 +763,31 @@ func (s *marketplaceService) Checkout(ctx context.Context, productID, period, ke
 		// An empty inventory result cannot prove that a timed-out write failed.
 		// Keep the fence and allow another recovery attempt; never blindly rebill.
 		if recovered == nil {
-			return nil, fmt.Errorf("Paddle checkout recovery is pending")
+			return nil, fmt.Errorf("paddle checkout recovery is pending")
 		}
 		status := "checkout_created"
 		if recovered.Status == "canceled" {
 			status = "failed"
 		}
-		changed, err := s.repo.UpdateCheckout(ctx, sub.ID, []string{"in_flight", "uncertain"}, status, recovered.TransactionID, "")
+		changed, err := s.repo.UpdateCheckout(
+			ctx,
+			sub.ID,
+			[]string{"in_flight", "uncertain"},
+			status,
+			recovered.TransactionID,
+			"",
+		)
 		if err != nil {
 			return nil, err
 		}
 		if !changed || (recovered.Status != "draft" && recovered.Status != "ready" && recovered.Status != "past_due") {
 			return nil, fmt.Errorf("%w: recovered payment is processing or canceled", types.ErrMarketplaceConflict)
 		}
-		return &types.MarketplaceCheckout{MarketplaceCheckoutConfig: s.gateway.Config(), TransactionID: recovered.TransactionID, SubscriptionID: sub.ID}, nil
+		return &types.MarketplaceCheckout{
+			MarketplaceCheckoutConfig: s.gateway.Config(),
+			TransactionID:             recovered.TransactionID,
+			SubscriptionID:            sub.ID,
+		}, nil
 	}
 	started, err := s.repo.UpdateCheckout(ctx, sub.ID, []string{"pending"}, "in_flight", "", "")
 	if err != nil {
@@ -630,16 +802,30 @@ func (s *marketplaceService) Checkout(ctx context.Context, productID, period, ke
 		if errors.Is(providerErr, types.ErrMarketplaceCheckoutRejected) {
 			status = "failed"
 		}
-		_, saveErr := s.repo.UpdateCheckout(ctx, sub.ID, []string{"in_flight"}, status, "", "Paddle checkout creation needs reconciliation")
+		_, saveErr := s.repo.UpdateCheckout(
+			ctx,
+			sub.ID,
+			[]string{"in_flight"},
+			status,
+			"",
+			"Paddle checkout creation needs reconciliation",
+		)
 		if saveErr != nil {
 			return nil, saveErr
 		}
 		return nil, providerErr
 	}
-	if _, err := s.repo.UpdateCheckout(ctx, sub.ID, []string{"in_flight", "uncertain"}, "checkout_created", transactionID, ""); err != nil {
+	_, err = s.repo.UpdateCheckout(
+		ctx, sub.ID, []string{"in_flight", "uncertain"}, "checkout_created", transactionID, "",
+	)
+	if err != nil {
 		return nil, err
 	}
-	return &types.MarketplaceCheckout{MarketplaceCheckoutConfig: s.gateway.Config(), TransactionID: transactionID, SubscriptionID: sub.ID}, nil
+	return &types.MarketplaceCheckout{
+		MarketplaceCheckoutConfig: s.gateway.Config(),
+		TransactionID:             transactionID,
+		SubscriptionID:            sub.ID,
+	}, nil
 }
 
 func (s *marketplaceService) Portal(ctx context.Context, id string) (string, error) {
@@ -661,7 +847,8 @@ func (s *marketplaceService) Portal(ctx context.Context, id string) (string, err
 }
 
 func (s *marketplaceService) portalAvailable(sub *types.MarketplaceSubscription) bool {
-	return s.gateway != nil && s.gateway.Config().PortalConfigured && sub != nil && sub.PaddleCustomerID != "" && sub.PaddleSubscriptionID != ""
+	return s.gateway != nil && s.gateway.Config().PortalConfigured && sub != nil && sub.PaddleCustomerID != "" &&
+		sub.PaddleSubscriptionID != ""
 }
 
 // Called only after the account's durable deletion fence. Checkout claims and
@@ -687,7 +874,14 @@ func (s *marketplaceService) PrepareAccountDeletion(ctx context.Context, tenantI
 				return err
 			}
 		}
-		changed, err := s.repo.UpdateCheckout(ctx, sub.ID, []string{"pending", "in_flight", "uncertain", "checkout_created"}, "failed", "", "account deletion canceled unpaid checkout")
+		changed, err := s.repo.UpdateCheckout(
+			ctx,
+			sub.ID,
+			[]string{"pending", "in_flight", "uncertain", "checkout_created"},
+			"failed",
+			"",
+			"account deletion canceled unpaid checkout",
+		)
 		if err != nil {
 			return err
 		}
@@ -711,12 +905,23 @@ func (s *marketplaceService) EnsureAccountTerminal(ctx context.Context, tenantID
 	return nil
 }
 
-func (s *marketplaceService) GetBillingSubscription(ctx context.Context, id string) (*types.MarketplaceSubscription, error) {
+func (s *marketplaceService) GetBillingSubscription(
+	ctx context.Context,
+	id string,
+) (*types.MarketplaceSubscription, error) {
 	return s.repo.GetSubscription(ctx, id)
 }
-func (s *marketplaceService) ResolveBillingSubscription(ctx context.Context, providerID, transactionID string) (*types.MarketplaceSubscription, error) {
+
+func (s *marketplaceService) ResolveBillingSubscription(
+	ctx context.Context,
+	providerID, transactionID string,
+) (*types.MarketplaceSubscription, error) {
 	return s.repo.ResolveSubscription(ctx, providerID, transactionID)
 }
-func (s *marketplaceService) ProcessBillingEvent(ctx context.Context, event types.MarketplaceBillingEvent) (bool, error) {
+
+func (s *marketplaceService) ProcessBillingEvent(
+	ctx context.Context,
+	event types.MarketplaceBillingEvent,
+) (bool, error) {
 	return s.repo.ApplyBillingEvent(ctx, event)
 }

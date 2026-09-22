@@ -2,22 +2,29 @@ package handler
 
 import (
 	"errors"
+	"net/http"
+	"strconv"
+
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/gin-gonic/gin"
-	"net/http"
-	"strconv"
 )
 
+// MarketplaceHandler serves buyer, creator and platform review endpoints.
 type MarketplaceHandler struct {
 	service interfaces.MarketplaceService
 	billing *EntitlementHandler
 	tasks   interfaces.TaskEnqueuer
 }
 
-func NewMarketplaceHandler(service interfaces.MarketplaceService, billing *EntitlementHandler, tasks interfaces.TaskEnqueuer) *MarketplaceHandler {
+// NewMarketplaceHandler connects marketplace endpoints to verified Paddle webhook dispatch.
+func NewMarketplaceHandler(
+	service interfaces.MarketplaceService,
+	billing *EntitlementHandler,
+	tasks interfaces.TaskEnqueuer,
+) *MarketplaceHandler {
 	h := &MarketplaceHandler{service: service, billing: billing, tasks: tasks}
 	if billing != nil {
 		billing.marketplace = h
@@ -44,7 +51,18 @@ func marketplaceHTTPError(c *gin.Context, err error) {
 func (h *MarketplaceHandler) list(c *gin.Context, creator, admin bool) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
-	products, total, err := h.service.ListProducts(c.Request.Context(), interfaces.MarketplaceCatalogQuery{Query: c.Query("q"), Category: c.Query("category"), Status: c.Query("status"), Limit: limit, Offset: offset}, creator, admin)
+	products, total, err := h.service.ListProducts(
+		c.Request.Context(),
+		interfaces.MarketplaceCatalogQuery{
+			Query:    c.Query("q"),
+			Category: c.Query("category"),
+			Status:   c.Query("status"),
+			Limit:    limit,
+			Offset:   offset,
+		},
+		creator,
+		admin,
+	)
 	if err != nil {
 		marketplaceHTTPError(c, err)
 		return
@@ -52,9 +70,17 @@ func (h *MarketplaceHandler) list(c *gin.Context, creator, admin bool) {
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, gin.H{"data": products, "total": total})
 }
-func (h *MarketplaceHandler) ListProducts(c *gin.Context)        { h.list(c, false, false) }
+
+// ListProducts returns the published buyer catalog.
+func (h *MarketplaceHandler) ListProducts(c *gin.Context) { h.list(c, false, false) }
+
+// ListCreatorProducts returns the current creator's submissions.
 func (h *MarketplaceHandler) ListCreatorProducts(c *gin.Context) { h.list(c, true, false) }
-func (h *MarketplaceHandler) ListAdminProducts(c *gin.Context)   { h.list(c, false, true) }
+
+// ListAdminProducts returns the platform review catalog.
+func (h *MarketplaceHandler) ListAdminProducts(c *gin.Context) { h.list(c, false, true) }
+
+// GetProduct returns one product and its buyer access projection.
 func (h *MarketplaceHandler) GetProduct(c *gin.Context) {
 	p, err := h.service.GetProduct(c.Request.Context(), c.Param("id"))
 	if err != nil {
@@ -64,6 +90,7 @@ func (h *MarketplaceHandler) GetProduct(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, gin.H{"data": p})
 }
+
 func (h *MarketplaceHandler) save(c *gin.Context, id string, admin bool) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64*1024)
 	var input types.MarketplaceProductInput
@@ -78,9 +105,17 @@ func (h *MarketplaceHandler) save(c *gin.Context, id string, admin bool) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": p})
 }
+
+// CreateCreatorProduct creates a draft submission.
 func (h *MarketplaceHandler) CreateCreatorProduct(c *gin.Context) { h.save(c, "", false) }
+
+// UpdateCreatorProduct updates an editable draft owned by the current creator.
 func (h *MarketplaceHandler) UpdateCreatorProduct(c *gin.Context) { h.save(c, c.Param("id"), false) }
-func (h *MarketplaceHandler) UpdateAdminProduct(c *gin.Context)   { h.save(c, c.Param("id"), true) }
+
+// UpdateAdminProduct updates a product through platform administration.
+func (h *MarketplaceHandler) UpdateAdminProduct(c *gin.Context) { h.save(c, c.Param("id"), true) }
+
+// SubmitProduct sends a complete draft for platform review.
 func (h *MarketplaceHandler) SubmitProduct(c *gin.Context) {
 	p, err := h.service.SubmitProduct(c.Request.Context(), c.Param("id"))
 	if err != nil {
@@ -89,6 +124,8 @@ func (h *MarketplaceHandler) SubmitProduct(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": p})
 }
+
+// ReviewProduct applies a system administrator's publication decision.
 func (h *MarketplaceHandler) ReviewProduct(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 32*1024)
 	var input types.MarketplaceReviewInput
@@ -103,6 +140,8 @@ func (h *MarketplaceHandler) ReviewProduct(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": p})
 }
+
+// Orders returns the current buyer's product subscriptions and invoices.
 func (h *MarketplaceHandler) Orders(c *gin.Context) {
 	orders, err := h.service.Orders(c.Request.Context())
 	if err != nil {
@@ -112,6 +151,8 @@ func (h *MarketplaceHandler) Orders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, orders)
 }
+
+// Checkout creates or recovers a server-bound product checkout.
 func (h *MarketplaceHandler) Checkout(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2048)
 	var input struct {
@@ -130,6 +171,8 @@ func (h *MarketplaceHandler) Checkout(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, result)
 }
+
+// Portal mints a management session for a subscription owned by the current buyer.
 func (h *MarketplaceHandler) Portal(c *gin.Context) {
 	result, err := h.service.Portal(c.Request.Context(), c.Param("id"))
 	if err != nil {

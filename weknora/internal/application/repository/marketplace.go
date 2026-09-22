@@ -4,16 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"strings"
-	"time"
 )
 
 type marketplaceRepository struct{ db *gorm.DB }
 
+// NewMarketplaceRepository stores reviewed products and their independent subscriptions.
 func NewMarketplaceRepository(db *gorm.DB) interfaces.MarketplaceRepository {
 	return &marketplaceRepository{db: db}
 }
@@ -25,7 +27,10 @@ func marketplaceDBError(err error) error {
 	return err
 }
 
-func (r *marketplaceRepository) ListProducts(ctx context.Context, q interfaces.MarketplaceCatalogQuery) ([]*types.MarketplaceProduct, int64, error) {
+func (r *marketplaceRepository) ListProducts(
+	ctx context.Context,
+	q interfaces.MarketplaceCatalogQuery,
+) ([]*types.MarketplaceProduct, int64, error) {
 	query := r.db.WithContext(ctx).Model(&types.MarketplaceProduct{})
 	if q.PublishedOnly {
 		query = query.Where("status = ?", "published")
@@ -66,11 +71,18 @@ func (r *marketplaceRepository) GetProduct(ctx context.Context, id string) (*typ
 	return &product, marketplaceDBError(err)
 }
 
-func (r *marketplaceRepository) SaveProduct(ctx context.Context, p *types.MarketplaceProduct, expected time.Time) error {
+func (r *marketplaceRepository) SaveProduct(
+	ctx context.Context,
+	p *types.MarketplaceProduct,
+	expected time.Time,
+) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if p.MonthlyPriceID != "" || p.YearlyPriceID != "" {
 			var count int64
-			if err := tx.Model(&types.MarketplaceProduct{}).Where("id <> ? AND (monthly_price_id IN ? OR yearly_price_id IN ?)", p.ID, []string{p.MonthlyPriceID, p.YearlyPriceID}, []string{p.MonthlyPriceID, p.YearlyPriceID}).Count(&count).Error; err != nil {
+			if err := tx.Model(&types.MarketplaceProduct{}).Where(
+				"id <> ? AND (monthly_price_id IN ? OR yearly_price_id IN ?)", p.ID,
+				[]string{p.MonthlyPriceID, p.YearlyPriceID}, []string{p.MonthlyPriceID, p.YearlyPriceID},
+			).Count(&count).Error; err != nil {
 				return err
 			}
 			if count > 0 {
@@ -80,7 +92,11 @@ func (r *marketplaceRepository) SaveProduct(ctx context.Context, p *types.Market
 		if expected.IsZero() {
 			return tx.Create(p).Error
 		}
-		result := tx.Model(&types.MarketplaceProduct{}).Where("id = ? AND updated_at = ?", p.ID, expected).Select("*").Omit("created_at", "access").Updates(p)
+		result := tx.Model(&types.MarketplaceProduct{}).
+			Where("id = ? AND updated_at = ?", p.ID, expected).
+			Select("*").
+			Omit("created_at", "access").
+			Updates(p)
 		if result.Error != nil {
 			return result.Error
 		}
@@ -92,14 +108,18 @@ func (r *marketplaceRepository) SaveProduct(ctx context.Context, p *types.Market
 }
 
 func sameMarketplaceCheckout(a, b *types.MarketplaceSubscription) bool {
-	return a.TenantID == b.TenantID && a.ProductID == b.ProductID && a.BillingPeriod == b.BillingPeriod && a.PriceID == b.PriceID
+	return a.TenantID == b.TenantID && a.ProductID == b.ProductID && a.BillingPeriod == b.BillingPeriod &&
+		a.PriceID == b.PriceID
 }
 
 // Lock the same durable user row as account erasure's Fence. Both allocating
 // an operation and starting its provider write must happen before that fence.
 func lockMarketplaceCheckoutUser(tx *gorm.DB, userID string) error {
 	var user types.User
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id", "is_active", "deletion_requested_at").First(&user, "id = ?", userID).Error
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("id", "is_active", "deletion_requested_at").
+		First(&user, "id = ?", userID).
+		Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return types.ErrMarketplaceForbidden
 	}
@@ -112,7 +132,10 @@ func lockMarketplaceCheckoutUser(tx *gorm.DB, userID string) error {
 	return nil
 }
 
-func (r *marketplaceRepository) ClaimCheckout(ctx context.Context, candidate *types.MarketplaceSubscription) (*types.MarketplaceSubscription, bool, error) {
+func (r *marketplaceRepository) ClaimCheckout(
+	ctx context.Context,
+	candidate *types.MarketplaceSubscription,
+) (*types.MarketplaceSubscription, bool, error) {
 	var result *types.MarketplaceSubscription
 	created := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -120,7 +143,9 @@ func (r *marketplaceRepository) ClaimCheckout(ctx context.Context, candidate *ty
 			return err
 		}
 		var current types.MarketplaceSubscription
-		err := tx.Where("tenant_id = ? AND operation_key = ?", candidate.TenantID, candidate.OperationKey).First(&current).Error
+		err := tx.Where("tenant_id = ? AND operation_key = ?", candidate.TenantID, candidate.OperationKey).
+			First(&current).
+			Error
 		if err == nil {
 			if !sameMarketplaceCheckout(&current, candidate) {
 				return types.ErrMarketplaceConflict
@@ -140,7 +165,9 @@ func (r *marketplaceRepository) ClaimCheckout(ctx context.Context, candidate *ty
 			created = true
 			return nil
 		}
-		err = tx.Where("tenant_id = ? AND operation_key = ?", candidate.TenantID, candidate.OperationKey).First(&current).Error
+		err = tx.Where("tenant_id = ? AND operation_key = ?", candidate.TenantID, candidate.OperationKey).
+			First(&current).
+			Error
 		if err == nil {
 			if !sameMarketplaceCheckout(&current, candidate) {
 				return types.ErrMarketplaceConflict
@@ -151,7 +178,10 @@ func (r *marketplaceRepository) ClaimCheckout(ctx context.Context, candidate *ty
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if err := tx.Where("tenant_id = ? AND product_id = ? AND status NOT IN ?", candidate.TenantID, candidate.ProductID, []string{"canceled", "failed"}).First(&current).Error; err != nil {
+		if err := tx.Where(
+			"tenant_id = ? AND product_id = ? AND status NOT IN ?",
+			candidate.TenantID, candidate.ProductID, []string{"canceled", "failed"},
+		).First(&current).Error; err != nil {
 			return marketplaceDBError(err)
 		}
 		result = &current
@@ -160,19 +190,33 @@ func (r *marketplaceRepository) ClaimCheckout(ctx context.Context, candidate *ty
 	return result, created, err
 }
 
-func (r *marketplaceRepository) GetSubscription(ctx context.Context, id string) (*types.MarketplaceSubscription, error) {
+func (r *marketplaceRepository) GetSubscription(
+	ctx context.Context,
+	id string,
+) (*types.MarketplaceSubscription, error) {
 	var sub types.MarketplaceSubscription
 	err := r.db.WithContext(ctx).First(&sub, "id = ?", id).Error
 	return &sub, marketplaceDBError(err)
 }
 
-func (r *marketplaceRepository) CurrentSubscription(ctx context.Context, tenantID uint64, productID string) (*types.MarketplaceSubscription, error) {
+func (r *marketplaceRepository) CurrentSubscription(
+	ctx context.Context,
+	tenantID uint64,
+	productID string,
+) (*types.MarketplaceSubscription, error) {
 	var sub types.MarketplaceSubscription
-	err := r.db.WithContext(ctx).Where("tenant_id = ? AND product_id = ?", tenantID, productID).Order("created_at DESC, id DESC").First(&sub).Error
+	err := r.db.WithContext(ctx).
+		Where("tenant_id = ? AND product_id = ?", tenantID, productID).
+		Order("created_at DESC, id DESC").
+		First(&sub).
+		Error
 	return &sub, marketplaceDBError(err)
 }
 
-func (r *marketplaceRepository) ResolveSubscription(ctx context.Context, providerID, transactionID string) (*types.MarketplaceSubscription, error) {
+func (r *marketplaceRepository) ResolveSubscription(
+	ctx context.Context,
+	providerID, transactionID string,
+) (*types.MarketplaceSubscription, error) {
 	if providerID == "" && transactionID == "" {
 		return nil, types.ErrMarketplaceNotFound
 	}
@@ -195,7 +239,12 @@ func (r *marketplaceRepository) ResolveSubscription(ctx context.Context, provide
 	return &sub, marketplaceDBError(err)
 }
 
-func (r *marketplaceRepository) UpdateCheckout(ctx context.Context, id string, from []string, status, transactionID, lastError string) (bool, error) {
+func (r *marketplaceRepository) UpdateCheckout(
+	ctx context.Context,
+	id string,
+	from []string,
+	status, transactionID, lastError string,
+) (bool, error) {
 	updates := map[string]any{"status": status, "last_error": lastError, "updated_at": time.Now().UTC()}
 	if transactionID != "" {
 		updates["checkout_transaction_id"] = transactionID
@@ -219,37 +268,56 @@ func (r *marketplaceRepository) UpdateCheckout(ctx context.Context, id string, f
 }
 
 func (r *marketplaceRepository) ListOrders(ctx context.Context, tenantID uint64) (*types.MarketplaceOrders, error) {
-	orders := &types.MarketplaceOrders{Subscriptions: []*types.MarketplaceSubscription{}, Transactions: []*types.MarketplaceTransaction{}, MembershipManagementPath: "/platform/settings?section=usage"}
-	if err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Order("created_at DESC").Limit(200).Find(&orders.Subscriptions).Error; err != nil {
+	orders := &types.MarketplaceOrders{
+		Subscriptions:            []*types.MarketplaceSubscription{},
+		Transactions:             []*types.MarketplaceTransaction{},
+		MembershipManagementPath: "/platform/settings?section=usage",
+	}
+	if err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).
+		Order("created_at DESC").Limit(200).Find(&orders.Subscriptions).Error; err != nil {
 		return nil, err
 	}
-	if err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Order("occurred_at DESC").Limit(200).Find(&orders.Transactions).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).
+		Order("occurred_at DESC").Limit(200).Find(&orders.Transactions).Error; err != nil {
 		return nil, err
 	}
 	return orders, nil
 }
 
-func (r *marketplaceRepository) ListBillingSubscriptions(ctx context.Context, tenantID uint64) ([]*types.MarketplaceSubscription, error) {
+func (r *marketplaceRepository) ListBillingSubscriptions(
+	ctx context.Context,
+	tenantID uint64,
+) ([]*types.MarketplaceSubscription, error) {
 	rows := []*types.MarketplaceSubscription{}
 	err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Order("created_at ASC").Find(&rows).Error
 	return rows, err
 }
 
-func (r *marketplaceRepository) ApplyBillingEvent(ctx context.Context, event types.MarketplaceBillingEvent) (bool, error) {
-	if event.EventID == "" || event.OccurredAt.IsZero() || event.SubscriptionID == "" || event.PaddleSubscriptionID == "" || event.CustomerID == "" {
+func (r *marketplaceRepository) ApplyBillingEvent(
+	ctx context.Context,
+	event types.MarketplaceBillingEvent,
+) (bool, error) {
+	if event.EventID == "" || event.OccurredAt.IsZero() || event.SubscriptionID == "" ||
+		event.PaddleSubscriptionID == "" ||
+		event.CustomerID == "" {
 		return false, types.ErrMarketplaceInvalid
 	}
 	applied := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var sub types.MarketplaceSubscription
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&sub, "id = ?", event.SubscriptionID).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&sub, "id = ?", event.SubscriptionID).Error; err != nil {
 			return marketplaceDBError(err)
 		}
 		erased := sub.TenantID == 0 || sub.UserID == ""
-		if !erased && ((sub.PaddleSubscriptionID != "" && sub.PaddleSubscriptionID != event.PaddleSubscriptionID) || (sub.PaddleCustomerID != "" && sub.PaddleCustomerID != event.CustomerID) || (event.PriceID != "" && event.PriceID != sub.PriceID)) {
+		if !erased &&
+			((sub.PaddleSubscriptionID != "" && sub.PaddleSubscriptionID != event.PaddleSubscriptionID) ||
+				(sub.PaddleCustomerID != "" && sub.PaddleCustomerID != event.CustomerID) ||
+				(event.PriceID != "" && event.PriceID != sub.PriceID)) {
 			return types.ErrMarketplaceForbidden
 		}
-		inserted := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&types.MarketplaceProcessedEvent{EventID: event.EventID, SubscriptionID: sub.ID})
+		inserted := tx.Clauses(clause.OnConflict{DoNothing: true}).
+			Create(&types.MarketplaceProcessedEvent{EventID: event.EventID, SubscriptionID: sub.ID})
 		if inserted.Error != nil {
 			return inserted.Error
 		}
@@ -285,10 +353,18 @@ func (r *marketplaceRepository) ApplyBillingEvent(ctx context.Context, event typ
 			}
 			sub.CancelAtPeriodEnd = event.CancelAtPeriodEnd
 			sub.ScheduledChangeAt = event.ScheduledChangeAt
-			if (event.EventType == "subscription.created" || event.EventType == "subscription.activated") && event.Status == "active" && sub.PaidThrough == nil && event.PeriodEndsAt != nil && event.PeriodEndsAt.After(event.OccurredAt) {
+			if (event.EventType == "subscription.created" || event.EventType == "subscription.activated") &&
+				event.Status == "active" &&
+				sub.PaidThrough == nil &&
+				event.PeriodEndsAt != nil &&
+				event.PeriodEndsAt.After(event.OccurredAt) {
 				sub.PaidThrough = event.PeriodEndsAt
 				// Initial transaction and activation may arrive in either order.
-				if err := tx.Model(&types.MarketplaceTransaction{}).Where("subscription_id = ? AND period_ends_at IS NULL", sub.ID).Updates(map[string]any{"period_starts_at": event.PeriodStartsAt, "period_ends_at": event.PeriodEndsAt}).Error; err != nil {
+				if err := tx.Model(&types.MarketplaceTransaction{}).
+					Where("subscription_id = ? AND period_ends_at IS NULL", sub.ID).
+					Updates(map[string]any{
+						"period_starts_at": event.PeriodStartsAt, "period_ends_at": event.PeriodEndsAt,
+					}).Error; err != nil {
 					return err
 				}
 			}
@@ -310,14 +386,35 @@ func (r *marketplaceRepository) ApplyBillingEvent(ctx context.Context, event typ
 				break
 			}
 			periodEnd := event.PeriodEndsAt
-			if periodEnd == nil && (sub.CheckoutTransactionID == "" || sub.CheckoutTransactionID == event.TransactionID) {
+			if periodEnd == nil &&
+				(sub.CheckoutTransactionID == "" || sub.CheckoutTransactionID == event.TransactionID) {
 				periodEnd = sub.PaidThrough
 			}
-			txn := &types.MarketplaceTransaction{ID: event.TransactionID, TenantID: sub.TenantID, SubscriptionID: sub.ID, ProductID: sub.ProductID, ProductTitle: sub.ProductTitle, Status: "completed", Currency: event.Currency, Amount: event.Amount, BillingPeriod: sub.BillingPeriod, PeriodStartsAt: event.PeriodStartsAt, PeriodEndsAt: periodEnd, OccurredAt: event.OccurredAt, LastEventAt: event.OccurredAt}
-			if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "id"}}, DoUpdates: clause.AssignmentColumns([]string{"status", "currency", "amount", "period_starts_at", "period_ends_at", "last_event_at", "updated_at"})}).Create(txn).Error; err != nil {
+			txn := &types.MarketplaceTransaction{
+				ID:             event.TransactionID,
+				TenantID:       sub.TenantID,
+				SubscriptionID: sub.ID,
+				ProductID:      sub.ProductID,
+				ProductTitle:   sub.ProductTitle,
+				Status:         "completed",
+				Currency:       event.Currency,
+				Amount:         event.Amount,
+				BillingPeriod:  sub.BillingPeriod,
+				PeriodStartsAt: event.PeriodStartsAt,
+				PeriodEndsAt:   periodEnd,
+				OccurredAt:     event.OccurredAt,
+				LastEventAt:    event.OccurredAt,
+			}
+			if err := tx.Clauses(clause.OnConflict{
+				Columns: []clause.Column{{Name: "id"}},
+				DoUpdates: clause.AssignmentColumns([]string{
+					"status", "currency", "amount", "period_starts_at", "period_ends_at", "last_event_at", "updated_at",
+				}),
+			}).Create(txn).Error; err != nil {
 				return err
 			}
-			if periodEnd != nil && periodEnd.After(event.OccurredAt) && (sub.PaidThrough == nil || periodEnd.After(*sub.PaidThrough)) {
+			if periodEnd != nil && periodEnd.After(event.OccurredAt) &&
+				(sub.PaidThrough == nil || periodEnd.After(*sub.PaidThrough)) {
 				sub.PaidThrough = periodEnd
 				if sub.LastEventAt == nil || !event.OccurredAt.Before(*sub.LastEventAt) {
 					sub.Status = "active"
