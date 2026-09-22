@@ -245,8 +245,12 @@ const selectedAgentId = computed({
   set: (agentId: string) => settingsStore.selectAgent(agentId),
 });
 const marketplaceChat = useMarketplaceChatStore();
-watch(() => settingsStore.settings.marketplaceProductId, (id) => {
-  if (id) void marketplaceChat.load(id).catch(() => undefined);
+const marketplaceEntryPending = computed(() => route.name === "globalCreatChat"
+  && typeof route.query.marketplace_product === "string" && Boolean(route.query.marketplace_product));
+watch(() => [settingsStore.settings.marketplaceProductId, marketplaceEntryPending.value] as const, ([id, entry]) => {
+  // An explicit product entry owns selection until CreateChat consumes its query.
+  // Restoring the previous product here would supersede that in-flight request.
+  if (id && !entry) void marketplaceChat.load(id).catch(() => undefined);
 }, { immediate: true });
 
 const selectedAgent = computed(() => {
@@ -2133,6 +2137,10 @@ const createSession = async (val: string) => {
   }
   if (props.isReplying) {
     return MessagePlugin.error(t("input.messages.replying"));
+  }
+  if (marketplaceEntryPending.value) {
+    MessagePlugin.info(t("creatorMarketplace.openingChat"));
+    return;
   }
   // Only block while the file is still uploading (no document ID yet). Once
   // uploaded, sending is allowed even if parsing is still in progress: the

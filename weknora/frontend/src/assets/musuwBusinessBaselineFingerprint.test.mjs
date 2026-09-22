@@ -35,7 +35,7 @@ const CREATOR_MARKETPLACE_CHANGE = 'creator-marketplace-subscriptions'
 
 const LOCKED_BUSINESS_BLOBS = {
   './business-baselines/ChatIndex.pre-view.vue': '49e439ef2fc54b2a5a5403ed6eae15d5a647a9af',
-  './business-baselines/Input-field.pre-view.vue': '57a5ae94ad8fb21b61f57e73d2ae6796670a6d31',
+  './business-baselines/Input-field.pre-view.vue': '11585318d220a5535c7d0ead9aa02a5f2807fbd6',
   './business-baselines/KnowledgeBase.pre-view.vue': '77905990552ca5baa76310c0ea34c0c29df1d638',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
@@ -55,7 +55,7 @@ const INTENTIONAL_BEHAVIOR_EVOLUTION = {
     commit: NATIVE_MULTI_MODEL_RESTORE_COMMIT,
     change: `${NATIVE_AGENT_MCP_EXPOSURE_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}+${CREATOR_MARKETPLACE_CHANGE}`,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/Input-field.pre-view.vue'],
-    authority: 'WeKnora main 81142df native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy; explicit user-requested minimum enabled reasoning defaults with model-scoped saved depth; approved marketplace delivery uses a separate safe agent/KB projection, preserves the homepage draft while consuming its route parameter, and relies on server-authorized product readiness',
+    authority: 'WeKnora main 81142df native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy; explicit user-requested minimum enabled reasoning defaults with model-scoped saved depth; approved marketplace delivery uses a separate safe agent/KB projection, preserves the homepage draft while consuming its route parameter, and relies on server-authorized product readiness; explicit marketplace entry supersedes restored product selection and blocks sends until the current entry resolves',
   },
   chatParent: {
     change: `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}+${CHAT_HISTORY_FEEDBACK_CHANGE}+${CREATOR_MARKETPLACE_CHANGE}`,

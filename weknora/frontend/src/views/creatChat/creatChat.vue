@@ -216,21 +216,34 @@ let marketplaceEntrySequence = 0;
 watch(() => route.query.marketplace_product, async (raw) => {
     if (typeof raw !== 'string' || !raw) return;
     const run = ++marketplaceEntrySequence;
+    const isCurrentEntry = () => run === marketplaceEntrySequence
+        && route.name === 'globalCreatChat' && route.query.marketplace_product === raw;
     marketplaceOpening.value = true;
     try {
         const product = await marketplaceChat.load(raw, true);
-        if (run !== marketplaceEntrySequence || route.query.marketplace_product !== raw) return;
-        if (!product.access?.can_chat) { MessagePlugin.warning(t('creatorMarketplace.noAccess')); return; }
         await nextTick();
+        if (!isCurrentEntry()) return;
+        if (!product.access?.can_chat) {
+            MessagePlugin.warning(t('creatorMarketplace.noAccess'));
+            await router.replace({ path: `/platform/marketplace/${raw}` });
+            return;
+        }
         await settingsStore.selectMarketplaceProduct({ productId: product.id, agentId: product.agent_id, knowledgeBaseIds: product.knowledge_base_ids });
         // Never write to the composer or send a question as a side effect of purchasing.
         suggestedQuestions.value = (product.sample_questions || []).map(question => ({ question, source: 'agent_config' as const }));
-    } catch { if (run === marketplaceEntrySequence) MessagePlugin.error(t('creatorMarketplace.loadFailed')); }
+    } catch {
+        if (isCurrentEntry()) {
+            MessagePlugin.error(t('creatorMarketplace.loadFailed'));
+            await router.replace({ path: `/platform/marketplace/${raw}` });
+        }
+    }
     finally {
-        if (run === marketplaceEntrySequence && route.name === 'globalCreatChat') {
+        if (run === marketplaceEntrySequence) {
             marketplaceOpening.value = false;
-            const query = { ...route.query }; delete query.marketplace_product;
-            await router.replace({ path: route.path, query });
+            if (isCurrentEntry()) {
+                const query = { ...route.query }; delete query.marketplace_product;
+                await router.replace({ path: route.path, query });
+            }
         }
     }
 }, { immediate: true });

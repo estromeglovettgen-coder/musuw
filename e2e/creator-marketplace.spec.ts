@@ -361,6 +361,98 @@ test('an unpublished free product cannot start questions or checkout', async ({ 
   expect(api.requests).toHaveLength(0)
 })
 
+test('an explicit free product replaces a persisted Taylor selection on the first composer mount', async ({ page }) => {
+  const api = await mockMarket(page, { paid: true })
+  const reading = { ...taylor, id: 'reading-free', title: '阅读复盘卡·免费示例', agent_id: 'reading-agent', agent_name: '阅读复盘助手', knowledge_base_ids: ['reading-kb'], knowledge_base_names: ['阅读复盘资料'], sample_questions: ['阅读复盘卡应该记录哪些内容？'], monthly_amount: 0, yearly_amount: 0, checkout_available: false, access: { can_chat: true, status: 'free', portal_available: false, cancel_at_period_end: false } }
+  await page.route('**/api/v1/creator-marketplace/products/reading-free', route => route.fulfill({ json: { data: reading } }))
+  await visit(page, '/platform/marketplace/reading-free')
+  // Existing persisted defaults, without warming the new composer's product cache.
+  await page.evaluate(async () => {
+    const harness = (window as any).__marketplaceHarness
+    await harness.settings.selectMarketplaceProduct({ productId: 'taylor', agentId: 'platform-agent', knowledgeBaseIds: ['platform-kb'] })
+    harness.menu.newChatDraft = 'Keep my unsent question'
+  })
+  await page.getByRole('button', { name: '开始提问', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText(reading.title)
+  await expect(page.locator('.visual-chat-resource')).toContainText('阅读复盘资料')
+  await expect(page.locator('.visual-new-chat-suggestions')).toContainText(reading.sample_questions[0])
+  await expect(page.locator('textarea').first()).toHaveValue('Keep my unsent question')
+  const state = await page.evaluate(() => { const h = (window as any).__marketplaceHarness; return { product: h.settings.settings.marketplaceProductId, agent: h.settings.selectedAgentId, kbs: h.settings.settings.selectedKnowledgeBases, model: h.settings.conversationModels.selectedChatModelId, pendingProduct: h.router.currentRoute.value.query.marketplace_product } })
+  expect(state).toEqual({ product: reading.id, agent: reading.agent_id, kbs: reading.knowledge_base_ids, model: 'builtin-deepseek-v4-flash', pendingProduct: undefined })
+  expect(api.requests).toHaveLength(0)
+  expect(api.counts.chat).toBe(0)
+  expect(api.counts.suggestion).toBe(0)
+})
+
+for (const outcome of ['denied', 'failed'] as const) {
+  test(`a ${outcome} free entry cannot send through warm Taylor and returns to its own detail`, async ({ page }) => {
+    const api = await mockMarket(page, { paid: true })
+    const reading = { ...taylor, id: 'reading-free', title: '阅读复盘卡·免费示例', agent_id: 'reading-agent', knowledge_base_ids: ['reading-kb'], monthly_amount: 0, yearly_amount: 0, checkout_available: false, access: { can_chat: true, status: 'free', portal_available: false, cancel_at_period_end: false } }
+    let reads = 0
+    let entryRequested!: () => void
+    const requested = new Promise<void>(resolve => { entryRequested = resolve })
+    let releaseEntry!: () => void
+    const blocked = new Promise<void>(resolve => { releaseEntry = resolve })
+    await page.route('**/api/v1/creator-marketplace/products/reading-free', async route => {
+      if (++reads === 1) return route.fulfill({ json: { data: reading } })
+      if (reads === 2) { entryRequested(); await blocked }
+      return outcome === 'failed'
+        ? route.fulfill({ status: 503, json: { message: 'Product temporarily unavailable' } })
+        : route.fulfill({ json: { data: { ...reading, status: 'unpublished', access: { ...reading.access, can_chat: false } } } })
+    })
+    await visit(page, '/platform/marketplace/taylor')
+    await page.getByRole('button', { name: '开始提问', exact: true }).click()
+    await expect(page.getByRole('status')).toContainText(taylor.title)
+    await page.locator('textarea').first().fill('Keep this draft while changing products')
+    await page.evaluate(() => (window as any).__marketplaceHarness.router.push('/platform/marketplace/reading-free'))
+    await page.getByRole('button', { name: '开始提问', exact: true }).click()
+    await requested
+    await expect(page.locator('textarea').first()).toHaveValue('Keep this draft while changing products')
+    await page.locator('[data-guide="chat-send"]').click()
+    await expect(page.getByText('正在打开专属服务…', { exact: true })).toBeVisible()
+    await expect.poll(() => api.requests.length).toBe(0)
+    await expect(page.locator('textarea').first()).toHaveValue('Keep this draft while changing products')
+    releaseEntry()
+    await expect.poll(() => page.evaluate(() => (window as any).__marketplaceHarness.router.currentRoute.value.path)).toBe('/platform/marketplace/reading-free')
+    await expect(page.getByRole('status')).toHaveCount(0)
+    await expect(page.locator('main')).toContainText(outcome === 'failed' ? '加载失败' : '该免费服务暂不可用。')
+    await expect.poll(() => page.evaluate(() => (window as any).__marketplaceHarness.menu.newChatDraft)).toBe('Keep this draft while changing products')
+    expect(api.requests).toHaveLength(0)
+    expect(api.counts.chat).toBe(0)
+    expect(api.counts.suggestion).toBe(0)
+  })
+}
+
+test('a late failed entry cannot redirect a newer same-page product selection', async ({ page }) => {
+  const api = await mockMarket(page, { paid: true })
+  let entryRequested!: () => void
+  const requested = new Promise<void>(resolve => { entryRequested = resolve })
+  let releaseEntry!: () => void
+  const blocked = new Promise<void>(resolve => { releaseEntry = resolve })
+  await page.route('**/api/v1/creator-marketplace/products/reading-free', async route => {
+    entryRequested(); await blocked
+    await route.fulfill({ status: 503, json: { message: 'Product temporarily unavailable' } })
+  })
+  const nextProduct = { ...taylor, id: 'next-free', title: '问题拆解练习·免费示例', agent_id: 'next-agent', knowledge_base_ids: ['next-kb'], monthly_amount: 0, yearly_amount: 0, checkout_available: false, access: { can_chat: true, status: 'free', portal_available: false, cancel_at_period_end: false } }
+  await page.route('**/api/v1/creator-marketplace/products/next-free', route => route.fulfill({ json: { data: nextProduct } }))
+  await visit(page, '/platform/marketplace/taylor')
+  await page.getByRole('button', { name: '开始提问', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText(taylor.title)
+  await page.evaluate(() => (window as any).__marketplaceHarness.router.push({ path: '/platform/creatChat', query: { marketplace_product: 'reading-free' } }))
+  await requested
+  await page.evaluate(() => (window as any).__marketplaceHarness.router.push({ path: '/platform/creatChat', query: { marketplace_product: 'next-free' } }))
+  await expect(page.getByRole('status')).toContainText(nextProduct.title)
+  const staleResponse = page.waitForResponse(response => response.url().endsWith('/products/reading-free'))
+  releaseEntry()
+  await staleResponse
+  await page.waitForLoadState('networkidle')
+  await expect(page.getByRole('status')).toContainText(nextProduct.title)
+  expect(await page.evaluate(() => (window as any).__marketplaceHarness.router.currentRoute.value.path)).toBe('/platform/creatChat')
+  expect(await page.evaluate(() => (window as any).__marketplaceHarness.settings.settings.marketplaceProductId)).toBe(nextProduct.id)
+  expect(api.requests).toHaveLength(0)
+  expect(api.counts.chat).toBe(0)
+})
+
 test('Max creator saves and submits a zero-price draft as a free product', async ({ page }) => {
   const api = await mockMarket(page, { max: true, creatorDraft: true })
   await visit(page, '/platform/creator-products')

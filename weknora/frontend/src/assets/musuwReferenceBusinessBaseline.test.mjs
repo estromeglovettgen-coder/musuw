@@ -8,7 +8,7 @@ const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(te
 const scriptOf = (path) => read(path).match(/<script setup(?: lang="ts")?>([\s\S]*?)<\/script>/)?.[1] || ''
 
 const frozen = new Map([
-  ['./business-baselines/Input-field.pre-view.vue', '57a5ae94ad8fb21b61f57e73d2ae6796670a6d31'],
+  ['./business-baselines/Input-field.pre-view.vue', '11585318d220a5535c7d0ead9aa02a5f2807fbd6'],
   ['./business-baselines/KnowledgeBase.pre-view.vue', '77905990552ca5baa76310c0ea34c0c29df1d638'],
   ['./business-baselines/manual-knowledge-editor.pre-view.vue', '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e'],
   // creator-marketplace-subscriptions: approved message-scoped snippets-only drawer and hover behavior.
