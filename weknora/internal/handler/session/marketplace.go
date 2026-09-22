@@ -14,7 +14,10 @@ import (
 // resolveMarketplaceRequest reauthorizes every turn before any uploads, model
 // calls or SSE work. Tenant identity remains the buyer's; only native retrieval
 // receives the reviewed source scope.
-func (h *Handler) resolveMarketplaceRequest(ctx context.Context, req *CreateKnowledgeQARequest) (context.Context, *types.CustomAgent, error) {
+func (h *Handler) resolveMarketplaceRequest(
+	ctx context.Context,
+	req *CreateKnowledgeQARequest,
+) (context.Context, *types.CustomAgent, error) {
 	req.MarketplaceProductID = strings.TrimSpace(req.MarketplaceProductID)
 	if req.MarketplaceProductID == "" {
 		return ctx, nil, nil

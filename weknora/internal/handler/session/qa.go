@@ -185,7 +185,9 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 	if marketplaceAgent != nil {
 		customAgent, sharedAgentReadOnly = marketplaceAgent, true
 	} else {
-		customAgent, effectiveTenantID, sharedAgentReadOnly = h.resolveAgent(ctx, c, request.AgentID, request.AgentSourceTenantID)
+		customAgent, effectiveTenantID, sharedAgentReadOnly = h.resolveAgent(
+			ctx, c, request.AgentID, request.AgentSourceTenantID,
+		)
 	}
 	if request.AgentSourceTenantID != 0 && customAgent == nil {
 		return nil, nil, errors.NewNotFoundError("Shared agent not found")

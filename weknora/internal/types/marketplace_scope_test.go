@@ -13,8 +13,10 @@ func TestMarketplaceScopePreservesBuyerAndRestrictsResources(t *testing.T) {
 	buyer := &Tenant{ID: 41}
 	ctx := context.WithValue(context.Background(), TenantIDContextKey, buyer.ID)
 	ctx = context.WithValue(ctx, TenantInfoContextKey, buyer)
-	access := &MarketplaceAccess{ProductID: "product", SourceTenantID: 99,
-		Agent: &CustomAgent{ID: "agent", TenantID: 99}, KnowledgeBaseIDs: []string{"kb-a"}}
+	access := &MarketplaceAccess{
+		ProductID: "product", SourceTenantID: 99,
+		Agent: &CustomAgent{ID: "agent", TenantID: 99}, KnowledgeBaseIDs: []string{"kb-a"},
+	}
 	ctx = WithMarketplaceScope(ctx, buyer.ID, access)
 	scope, ok := MarketplaceScopeFromContext(ctx)
 	require.True(t, ok)
@@ -35,8 +37,10 @@ func TestMarketplaceScopePreservesBuyerAndRestrictsResources(t *testing.T) {
 
 func TestMarketplaceScopeCannotBeReusedAsAnotherBuyer(t *testing.T) {
 	ctx := context.WithValue(context.Background(), TenantIDContextKey, uint64(41))
-	ctx = WithMarketplaceScope(ctx, 41, &MarketplaceAccess{ProductID: "p", SourceTenantID: 99,
-		Agent: &CustomAgent{ID: "a", TenantID: 99}, KnowledgeBaseIDs: []string{"kb"}})
+	ctx = WithMarketplaceScope(ctx, 41, &MarketplaceAccess{
+		ProductID: "p", SourceTenantID: 99,
+		Agent: &CustomAgent{ID: "a", TenantID: 99}, KnowledgeBaseIDs: []string{"kb"},
+	})
 	_, ok := MarketplaceScopeFromContext(context.WithValue(ctx, TenantIDContextKey, uint64(42)))
 	require.False(t, ok)
 }

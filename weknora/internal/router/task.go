@@ -333,8 +333,14 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 
 	// Paddle HTTP handlers enqueue only the canonical secret-free projection;
 	// this worker performs the existing idempotent entitlement mutation.
-	mux.HandleFunc(types.TypePaddleWebhook, NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle)
-	mux.HandleFunc(types.TypeMarketplaceWebhook, handler.NewMarketplaceWebhookTaskHandler(params.MarketplaceService).Handle)
+	mux.HandleFunc(
+		types.TypePaddleWebhook,
+		NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle,
+	)
+	mux.HandleFunc(
+		types.TypeMarketplaceWebhook,
+		handler.NewMarketplaceWebhookTaskHandler(params.MarketplaceService).Handle,
+	)
 	// Register long-term memory distillation handler
 	mux.HandleFunc(types.TypeMemoryExtract, params.MemoryService.Handle)
 

@@ -13,12 +13,18 @@ import (
 
 func marketplaceQAContext() (context.Context, *types.QARequest) {
 	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(41))
-	agent := &types.CustomAgent{ID: "market-agent", TenantID: 99,
-		Config: types.CustomAgentConfig{KBSelectionMode: "selected", KnowledgeBases: []string{"approved-kb"}}}
-	ctx = types.WithMarketplaceScope(ctx, 41, &types.MarketplaceAccess{ProductID: "product", SourceTenantID: 99,
-		Agent: agent, KnowledgeBaseIDs: []string{"approved-kb"}})
-	return ctx, &types.QARequest{Session: &types.Session{ID: "buyer-session", TenantID: 41},
-		CustomAgent: agent, SharedAgentReadOnly: true, KnowledgeBaseIDs: []string{"approved-kb"}}
+	agent := &types.CustomAgent{
+		ID: "market-agent", TenantID: 99,
+		Config: types.CustomAgentConfig{KBSelectionMode: "selected", KnowledgeBases: []string{"approved-kb"}},
+	}
+	ctx = types.WithMarketplaceScope(ctx, 41, &types.MarketplaceAccess{
+		ProductID: "product", SourceTenantID: 99,
+		Agent: agent, KnowledgeBaseIDs: []string{"approved-kb"},
+	})
+	return ctx, &types.QARequest{
+		Session:     &types.Session{ID: "buyer-session", TenantID: 41},
+		CustomAgent: agent, SharedAgentReadOnly: true, KnowledgeBaseIDs: []string{"approved-kb"},
+	}
 }
 
 func TestMarketplaceQAUsesApprovedRetrievalWithoutChangingBuyer(t *testing.T) {
@@ -67,7 +73,11 @@ type marketplaceEmbeddingKBRepo struct {
 }
 
 func (marketplaceEmbeddingKBRepo) GetKnowledgeBaseByID(_ context.Context, id string) (*types.KnowledgeBase, error) {
-	return &types.KnowledgeBase{ID: id, TenantID: 99, EmbeddingModelID: types.PlatformKnowledgeBaseEmbeddingModelID}, nil
+	return &types.KnowledgeBase{
+		ID:               id,
+		TenantID:         99,
+		EmbeddingModelID: types.PlatformKnowledgeBaseEmbeddingModelID,
+	}, nil
 }
 
 type marketplaceEmbeddingModelSpy struct {
@@ -77,7 +87,11 @@ type marketplaceEmbeddingModelSpy struct {
 	calls                              int
 }
 
-func (s *marketplaceEmbeddingModelSpy) GetEmbeddingModelForTenant(ctx context.Context, _ string, source uint64) (embedding.Embedder, error) {
+func (s *marketplaceEmbeddingModelSpy) GetEmbeddingModelForTenant(
+	ctx context.Context,
+	_ string,
+	source uint64,
+) (embedding.Embedder, error) {
 	s.modelBuyer, s.source = types.MustTenantIDFromContext(ctx), source
 	return s, nil
 }

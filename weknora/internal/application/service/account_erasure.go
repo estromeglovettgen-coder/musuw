@@ -172,7 +172,9 @@ func (s *accountErasureService) Request(ctx context.Context, userID string) erro
 }
 
 func accountErasureBillingReferences(target *types.AccountErasureTarget) []types.AccountErasureBillingReference {
-	refs := append([]types.AccountErasureBillingReference{{PaddleCustomerID: target.PaddleCustomerID, PaddleSubscriptionID: target.PaddleSubscriptionID}}, target.MarketplaceBilling...)
+	refs := append([]types.AccountErasureBillingReference{{
+		PaddleCustomerID: target.PaddleCustomerID, PaddleSubscriptionID: target.PaddleSubscriptionID,
+	}}, target.MarketplaceBilling...)
 	seen := make(map[string]bool)
 	var out []types.AccountErasureBillingReference
 	for _, ref := range refs {
@@ -398,7 +400,9 @@ func (s *accountErasureService) Process(ctx context.Context, task *asynq.Task) e
 			return ErrAccountBillingUnavailable
 		}
 		if s.marketplace != nil {
-			if err := s.billing.PrepareAccountDeletion(ctx, ref.PaddleCustomerID, ref.PaddleSubscriptionID); err != nil {
+			if err := s.billing.PrepareAccountDeletion(
+				ctx, ref.PaddleCustomerID, ref.PaddleSubscriptionID,
+			); err != nil {
 				return err
 			}
 		}

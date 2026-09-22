@@ -8,7 +8,11 @@ import (
 )
 
 func TestMessageMarketplaceProjectionSurvivesStorageWithoutExposingExecutionContext(t *testing.T) {
-	original := MessageExecutionContext{MarketplaceProductID: "paid-product", KnowledgeBaseIDs: []string{"private-source"}, AgentConfigHash: "private-hash"}
+	original := MessageExecutionContext{
+		MarketplaceProductID: "paid-product",
+		KnowledgeBaseIDs:     []string{"private-source"},
+		AgentConfigHash:      "private-hash",
+	}
 	saved, err := original.Value()
 	require.NoError(t, err)
 	var restored MessageExecutionContext

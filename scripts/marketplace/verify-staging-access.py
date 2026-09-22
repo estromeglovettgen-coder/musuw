@@ -251,7 +251,7 @@ def verify_market(api, admin, assets, report):
                 and product["monthly_amount"] == fixture["monthly_amount"]
                 and product["yearly_amount"] == fixture["monthly_amount"] * 10, "published_fixture_mismatch")
         products[fixture["key"]] = product
-    orders = api.call("/api/v1/creator-marketplace/orders")["data"]
+    orders = api.call("/api/v1/creator-marketplace/orders")
     private_projection(orders)
     report["orders"] = {"subscriptions": [{key: s.get(key) for key in
         ("id", "product_id", "status", "billing_period", "paid_through", "can_chat", "cancel_at_period_end")}

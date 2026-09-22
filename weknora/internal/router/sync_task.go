@@ -188,8 +188,14 @@ func RegisterSyncHandlers(params SyncTaskParams) {
 	params.Executor.RegisterHandler(types.TypeDataSourceSync, params.DataSourceService.ProcessSync)
 	params.Executor.RegisterHandler(types.TypeWikiIngest, params.WikiIngest.Handle)
 	params.Executor.RegisterHandler(types.TypeWikiFinalize, params.WikiIngest.Handle)
-	params.Executor.RegisterHandler(types.TypePaddleWebhook, NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle)
-	params.Executor.RegisterHandler(types.TypeMarketplaceWebhook, handler.NewMarketplaceWebhookTaskHandler(params.MarketplaceService).Handle)
+	params.Executor.RegisterHandler(
+		types.TypePaddleWebhook,
+		NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle,
+	)
+	params.Executor.RegisterHandler(
+		types.TypeMarketplaceWebhook,
+		handler.NewMarketplaceWebhookTaskHandler(params.MarketplaceService).Handle,
+	)
 	params.Executor.RegisterHandler(types.TypeMemoryExtract, params.MemoryService.Handle)
 	logger.Infof(context.Background(), "[SyncTask] All task handlers registered (Lite mode, no Redis)")
 }

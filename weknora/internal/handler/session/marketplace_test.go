@@ -28,7 +28,12 @@ func TestMarketplaceRequestReportsVerificationOutageWithoutAskingBuyerToPayAgain
 	require.Equal(t, http.StatusServiceUnavailable, appErr.HTTPCode)
 }
 
-func (s *marketplaceAccessStub) AuthorizeAccess(_ context.Context, tenantID uint64, productID string, _ time.Time) (*types.MarketplaceAccess, error) {
+func (s *marketplaceAccessStub) AuthorizeAccess(
+	_ context.Context,
+	tenantID uint64,
+	productID string,
+	_ time.Time,
+) (*types.MarketplaceAccess, error) {
 	if tenantID != 41 || productID != "product" {
 		return nil, types.ErrMarketplaceForbidden
 	}
@@ -37,10 +42,12 @@ func (s *marketplaceAccessStub) AuthorizeAccess(_ context.Context, tenantID uint
 
 func TestMarketplaceRequestBindsApprovedAgentAndBuyerIdentity(t *testing.T) {
 	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(41))
-	access := &types.MarketplaceAccess{ProductID: "product", SourceTenantID: 99,
+	access := &types.MarketplaceAccess{
+		ProductID: "product", SourceTenantID: 99,
 		Agent: &types.CustomAgent{ID: "approved-agent", TenantID: 99, Config: types.CustomAgentConfig{
 			SystemPrompt: "approved prompt", KBSelectionMode: "all", MCPSelectionMode: "all",
-		}}, KnowledgeBaseIDs: []string{"approved-kb"}, DefaultModelID: types.MarketplaceDefaultModelID}
+		}}, KnowledgeBaseIDs: []string{"approved-kb"}, DefaultModelID: types.MarketplaceDefaultModelID,
+	}
 	h := &Handler{marketplaceService: &marketplaceAccessStub{access: access}}
 	req := &CreateKnowledgeQARequest{MarketplaceProductID: "product"}
 	gotCtx, agent, err := h.resolveMarketplaceRequest(ctx, req)
@@ -63,8 +70,10 @@ func TestMarketplaceRequestDeniesExpiredAndInjectedTargets(t *testing.T) {
 	_, _, err := h.resolveMarketplaceRequest(ctx, &CreateKnowledgeQARequest{MarketplaceProductID: "product"})
 	require.Error(t, err)
 	stub.err = nil
-	stub.access = &types.MarketplaceAccess{ProductID: "product", SourceTenantID: 99,
-		Agent: &types.CustomAgent{ID: "approved-agent", TenantID: 99}, KnowledgeBaseIDs: []string{"approved-kb"}}
+	stub.access = &types.MarketplaceAccess{
+		ProductID: "product", SourceTenantID: 99,
+		Agent: &types.CustomAgent{ID: "approved-agent", TenantID: 99}, KnowledgeBaseIDs: []string{"approved-kb"},
+	}
 	for _, req := range []*CreateKnowledgeQARequest{
 		{MarketplaceProductID: "product", AgentID: "other-agent"},
 		{MarketplaceProductID: "product", KnowledgeBaseIDs: []string{"other-kb"}},

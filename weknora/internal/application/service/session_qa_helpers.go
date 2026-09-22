@@ -340,7 +340,8 @@ func (s *sessionService) resolveRetrievalTenantID(
 ) uint64 {
 	session := req.Session
 	customAgent := req.CustomAgent
-	if scope, ok := types.MarketplaceScopeFromContext(ctx); ok && session != nil && scope.AllowsAgent(customAgent, session.TenantID) {
+	if scope, ok := types.MarketplaceScopeFromContext(ctx); ok && session != nil &&
+		scope.AllowsAgent(customAgent, session.TenantID) {
 		return scope.SourceTenantID()
 	}
 
