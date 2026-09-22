@@ -42,3 +42,11 @@
 - [x] 6.3 Reuse existing Musuw library and Wiki/graph UI with read-only controls, locked states and service go-use.
 - [x] 6.4 Verify contracts, owned-view compatibility, desktop/mobile and one consolidated adversarial review.
 - [x] 6.5 Pass exact-revision CI, deploy staging only and complete real browser/API acceptance with no model use.
+
+
+## 7. Authorized follow-up: reuse the original knowledge UI
+
+- [x] 7.1 Reuse the owned-library grid, card geometry and native knowledge detail shell.
+- [x] 7.2 Remove redundant subscription/billing fields while retaining unavailable-state feedback and read-only controls.
+- [x] 7.3 Verify actual desktop/mobile geometry, scoped reading behavior, native compatibility, type/build and consolidated review.
+- [ ] 7.4 Deploy the exact CI-green revision to staging and inspect the actual rendered library, Wiki and graph.
