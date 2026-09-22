@@ -582,16 +582,21 @@ test('subscribed library handles absent Wiki without fetching native assets', as
 })
 
 test('subscription changes clear the previous Wiki and graph fits mobile', async ({ page }) => {
+  let mainFrameNavigations = 0
+  page.on('framenavigated', frame => { if (frame === page.mainFrame()) mainFrameNavigations++ })
   await page.setViewportSize({ width: 430, height: 932 })
   const api = await mockLibrary(page)
   await visit(page, libraryPath)
   await expect(page.locator('.wiki-content-link').first()).toContainText('泰勒公开页面')
+  const navigationsBeforeInteraction = mainFrameNavigations
   await page.evaluate(() => (window as any).__marketplaceHarness.router.push('/platform/marketplace/other/knowledge-bases/other-kb'))
   await expect(page.locator('.wiki-content-link').first()).toContainText('第二个订阅库正文')
   await expect(page.locator('.wiki-browser')).not.toContainText('泰勒公开页面')
   await page.getByRole('button', { name: '图谱', exact: true }).click()
   await expect.poll(() => api.reads.some(path => path.includes('/other/') && path.endsWith('/graph'))).toBe(true)
   await expect(page.locator('.wiki-graph-search-container')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '第二个订阅库', exact: true })).toBeVisible()
+  expect(mainFrameNavigations).toBe(navigationsBeforeInteraction)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   expect(api.forbidden).toEqual([])
 })

@@ -3,6 +3,9 @@ import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import { createPinia } from 'pinia'
 import TDesign from 'tdesign-vue-next'
 import 'tdesign-vue-next/dist/tdesign.css'
+// Discover the real default graph renderer dependency before interactions.
+// Otherwise Vite's first cold lazy import re-optimizes deps and reloads the harness.
+import 'pixi.js'
 import i18n from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
