@@ -21,7 +21,7 @@
 ## 4. Staging and acceptance
 
 - [x] 4.1 Prepare Sandbox catalog and platform-owned Taylor plus small labeled KB/agent fixtures.
-- [ ] 4.2 Run targeted tests, full affected build/type checks, migration verification and one consolidated adversarial review.
-- [ ] 4.3 Commit/push feature SHA, pass CI, deploy immutable staging-only images and verify health/migration.
-- [ ] 4.4 Run real Sandbox purchase/renewal/cancel/failure/refund/recovery and order/portal/QA acceptance including desktop/mobile.
-- [ ] 4.5 Record evidence, resolve blockers, preserve test fixtures with clear labels, and report exact staging release and limitations.
+- [x] 4.2 Run targeted tests, full affected build/type checks, migration verification and one consolidated adversarial review.
+- [x] 4.3 Commit/push feature SHA, pass CI, deploy immutable staging-only images and verify health/migration.
+- [x] 4.4 Run real Sandbox purchase/renewal/cancel/failure/refund/recovery and order/portal/QA acceptance including desktop/mobile.
+- [x] 4.5 Record evidence, resolve blockers, preserve test fixtures with clear labels, and report exact staging release and limitations.
