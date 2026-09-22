@@ -129,7 +129,7 @@ docs/wiki/核心功能/Agent技能系统.md	-	M	100644	1327ec6564daa8f98e5b1f10e
 docs/wiki/核心功能/知识图谱.md	-	M	100644	5c8bea6bfaf15c6ebe27291f05faacdc8afcfd73	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/docker-entrypoint.sh	M	M	100644	e2fae3e58ad2b1c4e2c0237923c5d072f5703400	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/embed.html	M	-	100644	de977639553792698cc7279fd460b950fe324cd7	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/index.html	M	-	100644	a0a1fda49e3226a5e064bf9599c24b6a8a1356a2	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/index.html	M	-	100644	9f8ec56e2e7f96ae397b6e0882f1d8dab0cce32f	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/nginx.conf	M	-	100644	f78be4c3509a18328f5d85f61fd0d8b49d1ca37f	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/operations.html	A	-	100644	39a0cceaf770893a1d1f58d11656a663a0caafef	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/package-lock.json	M	M	100644	1c19e6f7eb4f7cc8e59bb7f4b8b1a8fd3624faaf	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
@@ -355,7 +355,7 @@ frontend/src/operations/pages/OverviewPage.vue	A	-	100644	040791ff0d777c0dd5406c
 frontend/src/operations/pages/StoragePage.vue	A	-	100644	d9f1bada28de23d198679ca4235732322944598b	adapt-musuw-for-target		Retain the existing read owner and attach the Musuw-only useOperationsReadRecovery helper to failed reads; online/focus/visibility or a five-second retry restores data without polling successful reads, replaying writes, or resetting operator forms; verified by e2e/operations-recovery.spec.ts
 frontend/src/operations/pages/UsersPage.vue	A	-	100644	a3a0cfa21f776a0c1b9d3705378947ee1dd36f18	adapt-musuw-for-target		Retain the existing read owner and attach the Musuw-only useOperationsReadRecovery helper to failed reads; online/focus/visibility or a five-second retry restores data without polling successful reads, replaying writes, or resetting operator forms; verified by e2e/operations-recovery.spec.ts
 frontend/src/operations/types.ts	A	-	100644	67b38e29475fa987fd612d8e6398585fc0beeeaa	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/router/index.test.mjs	A	-	100644	dba554a7468c28e65c23b79c4b20db5378d665db	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/router/index.test.mjs	A	-	100644	26c519c96c76ffd4d679ccb360a58cb7617a3f72	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/router/index.ts	M	M	100644	6e0fa184b72bdb6628fc58db446ea62e5b3bf253	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/stores/auth.ts	M	M	100644	ad7b59a0f0c2d91e935b33474bb24b4a54a9c398	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/stores/chatResources.ts	M	M	100644	8c62782d19b623ec012fb3e0f2aa4823cc5aab28	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner

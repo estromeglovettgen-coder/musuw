@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { listMarketplaceLibrary, type MarketplaceLibraryEntry } from '@/api/creator-marketplace'
 import WikiBrowser from '@/views/knowledge/wiki/WikiBrowser.vue'
+import './marketplace.css'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,9 +63,9 @@ function showGraph(slug: string) {
 </script>
 
 <template>
-  <main class="market-library-reader">
+  <main class="market-page market-library-reader">
     <header class="market-library-reader__header">
-      <RouterLink to="/platform/knowledge-bases">{{ $t('creatorMarketplace.libraryBack') }}</RouterLink>
+      <RouterLink class="market-link" to="/platform/knowledge-bases">{{ $t('creatorMarketplace.libraryBack') }}</RouterLink>
       <div class="market-library-reader__title">
         <h1>{{ entry?.name || $t('creatorMarketplace.libraryTitle') }}</h1>
         <t-tag variant="light">{{ $t('creatorMarketplace.libraryReadOnly') }}</t-tag>
@@ -73,8 +74,8 @@ function showGraph(slug: string) {
       <p v-if="entry?.can_read && !failure && entry.paid_through">{{ $t(entry.cancel_at_period_end ? 'creatorMarketplace.cancelScheduled' : 'creatorMarketplace.availableUntil', { date: new Date(entry.paid_through).toLocaleDateString() }) }}</p>
       <div class="market-library-reader__actions">
         <template v-if="viewer?.entry.wiki_enabled">
-          <t-button :variant="view === 'browser' ? 'base' : 'outline'" @click="view = 'browser'">Wiki</t-button>
-          <t-button :variant="view === 'graph' ? 'base' : 'outline'" @click="view = 'graph'">{{ $t('creatorMarketplace.libraryGraph') }}</t-button>
+          <t-button :theme="view === 'browser' ? 'primary' : 'default'" :variant="view === 'browser' ? 'base' : 'outline'" @click="view = 'browser'">Wiki</t-button>
+          <t-button :theme="view === 'graph' ? 'primary' : 'default'" :variant="view === 'graph' ? 'base' : 'outline'" @click="view = 'graph'">{{ $t('creatorMarketplace.libraryGraph') }}</t-button>
         </template>
         <t-button v-if="entry?.can_read && !failure && !loading" theme="primary" :loading="openingChat" @click="ask">{{ $t('creatorMarketplace.startChat') }}</t-button>
       </div>
@@ -83,8 +84,8 @@ function showGraph(slug: string) {
     <div v-if="loading" role="status"><t-loading /></div>
     <div v-else-if="failure" class="market-library-reader__notice" role="alert">
       <p>{{ $t(failure === 'denied' ? 'creatorMarketplace.libraryDenied' : 'creatorMarketplace.libraryLoadFailed') }}</p>
-      <RouterLink v-if="failure === 'denied'" to="/platform/orders">{{ $t('creatorMarketplace.orders') }}</RouterLink>
-      <t-button v-else variant="outline" @click="load">{{ $t('creatorMarketplace.retry') }}</t-button>
+      <RouterLink v-if="failure === 'denied'" class="market-link" to="/platform/orders">{{ $t('creatorMarketplace.orders') }}</RouterLink>
+      <t-button v-else theme="default" variant="outline" @click="load">{{ $t('creatorMarketplace.retry') }}</t-button>
     </div>
     <WikiBrowser v-else-if="viewer?.entry.wiki_enabled" :key="viewer.key"
       :knowledge-base-id="viewer.entry.knowledge_base_id" :marketplace-product-id="viewer.entry.product_id"
@@ -94,7 +95,7 @@ function showGraph(slug: string) {
 </template>
 
 <style scoped>
-.market-library-reader { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 20px; color: var(--td-text-color-primary); overflow: auto; }
+.market-page.market-library-reader { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 20px; color: var(--td-text-color-primary); overflow: auto; }
 .market-library-reader__header { flex: 0 0 auto; min-width: 0; }
 .market-library-reader__header p { margin: 8px 0; font-size: 12px; color: var(--td-text-color-secondary); overflow-wrap: anywhere; }
 .market-library-reader__title, .market-library-reader__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -102,7 +103,7 @@ function showGraph(slug: string) {
 .market-library-reader__notice { padding: 24px 0; }
 .market-library-reader :deep(.wiki-browser) { flex: 1; min-height: 450px; min-width: 0; }
 @media (max-width: 640px) {
-  .market-library-reader { padding: 12px; }
+  .market-page.market-library-reader { padding: 12px; }
   .market-library-reader :deep(.wiki-browser) { flex-direction: column; min-height: 580px; }
   .market-library-reader :deep(.wiki-sidebar) { width: 100%; min-width: 0; max-height: 230px; flex: 0 0 230px; }
   .market-library-reader :deep(.wiki-reader) { min-height: 320px; }
