@@ -12,6 +12,7 @@
       <p v-if="!agents.length || !knowledgeBases.length" class="market-note">{{ t('creatorMarketplace.noSources') }} <RouterLink class="market-link" to="/platform/agents">{{ t('creatorMarketplace.openAgents') }}</RouterLink> · <RouterLink class="market-link" to="/platform/knowledge-bases">{{ t('creatorMarketplace.openKnowledgeBases') }}</RouterLink></p>
       <div class="market-form-grid"><label>{{ t('creatorMarketplace.monthlyPrice') }}<t-input v-model="monthlyInput" inputmode="decimal" placeholder="19.00" /></label><label>{{ t('creatorMarketplace.yearlyPrice') }}<t-input :value="yearlyPreview" readonly /></label></div>
       <p class="market-note">{{ t('creatorMarketplace.yearlyRule') }} {{ admin ? t('creatorMarketplace.adminPriceNote') : '' }}</p>
+      <p class="market-note">{{ t(p?.reviewed_at ? 'creatorMarketplace.pricingModeLocked' : 'creatorMarketplace.freePriceHint') }}</p>
       <label>{{ t('creatorMarketplace.examplesLabel') }}<t-textarea v-model="examplesInput" :autosize="{ minRows: 3, maxRows: 6 }" /></label>
       <label>{{ t('creatorMarketplace.contact') }}<t-input v-model="form.contact" :maxlength="255" /></label>
       <label>{{ t('creatorMarketplace.authorization') }}<t-textarea v-model="form.authorization" :maxlength="5000" :autosize="{ minRows: 2, maxRows: 6 }" /></label>
@@ -27,15 +28,15 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { listAgents, type CustomAgent } from '@/api/agent'
 import { listKnowledgeBases } from '@/api/knowledge-base'
 import { saveCreatorProduct, saveAdminMarketplaceProduct, type MarketplaceProduct, type MarketplaceProductInput } from '@/api/creator-marketplace'
-import { annualAmountForMonthly, parseMonthlyAmount } from './marketplacePresentation'
+import { annualAmountForMonthly, isFreeMarketProduct, parseMonthlyAmount } from './marketplacePresentation'
 const props = defineProps<{ product?: MarketplaceProduct; admin?: boolean }>()
 const emit = defineEmits<{ close: []; saved: [product: MarketplaceProduct] }>()
 const { t } = useI18n()
 const p = props.product
 const form = reactive<MarketplaceProductInput>({ title: p?.title || '', description: p?.description || '', category: p?.category || '', cover_url: p?.cover_url || '', agent_id: p?.agent_id || '', knowledge_base_ids: [...(p?.knowledge_base_ids || [])], currency: 'USD', monthly_amount: p?.monthly_amount || 0, contact: p?.contact || '', authorization: p?.authorization || '', authorization_confirmed: p?.authorization_confirmed || false })
-const monthlyInput = ref(p?.monthly_amount ? (p.monthly_amount / 100).toFixed(2) : '')
+const monthlyInput = ref(p ? (p.monthly_amount / 100).toFixed(2) : '')
 const examplesInput = ref(p?.sample_questions?.join('\n') || '')
-const yearlyPreview = computed(() => { const amount = parseMonthlyAmount(monthlyInput.value); return amount ? (annualAmountForMonthly(amount) / 100).toFixed(2) : '—' })
+const yearlyPreview = computed(() => { const amount = parseMonthlyAmount(monthlyInput.value); return amount !== null ? (annualAmountForMonthly(amount) / 100).toFixed(2) : '—' })
 const agents = ref<CustomAgent[]>([])
 const knowledgeBases = ref<Array<{ id: string; name: string }>>([])
 const loading = ref(false)
@@ -65,8 +66,11 @@ async function save() {
   if (saving.value) return
   validationError.value = ''
   const amount = parseMonthlyAmount(monthlyInput.value)
-  if (!form.title.trim() || !form.description.trim() || !form.agent_id || !form.knowledge_base_ids.length || !amount || !form.contact.trim() || !form.authorization.trim() || !form.authorization_confirmed) {
+  if (!form.title.trim() || !form.description.trim() || !form.agent_id || !form.knowledge_base_ids.length || amount === null || !form.contact.trim() || !form.authorization.trim() || !form.authorization_confirmed) {
     validationError.value = t('creatorMarketplace.titleRequired'); return
+  }
+  if (p?.reviewed_at && isFreeMarketProduct(p) !== isFreeMarketProduct({ monthly_amount: amount, yearly_amount: annualAmountForMonthly(amount) })) {
+    validationError.value = t('creatorMarketplace.pricingModeLocked'); return
   }
   if (form.cover_url && !/^https:\/\//i.test(form.cover_url.trim())) { validationError.value = t('creatorMarketplace.coverInvalid'); return }
   saving.value = true

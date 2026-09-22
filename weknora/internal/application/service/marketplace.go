@@ -132,8 +132,8 @@ func validateMarketplaceInput(input *types.MarketplaceProductInput) error {
 		len(input.AgentID) > 36 {
 		return types.ErrMarketplaceInvalid
 	}
-	if input.MonthlyAmount <= 0 || input.MonthlyAmount > math.MaxInt64/10 {
-		return fmt.Errorf("%w: monthly price must be a positive minor-unit amount", types.ErrMarketplaceInvalid)
+	if input.MonthlyAmount < 0 || input.MonthlyAmount > math.MaxInt64/10 {
+		return fmt.Errorf("%w: monthly price must be a nonnegative minor-unit amount", types.ErrMarketplaceInvalid)
 	}
 	input.Currency = strings.ToUpper(strings.TrimSpace(input.Currency))
 	if input.Currency == "" {
@@ -207,6 +207,12 @@ func (s *marketplaceService) SaveProduct(
 		}
 		if !asAdmin && p.Status != "draft" && p.Status != "rejected" {
 			return nil, types.ErrMarketplaceConflict
+		}
+		if p.ReviewedAt != nil && (p.MonthlyAmount == 0) != (input.MonthlyAmount == 0) {
+			return nil, fmt.Errorf(
+				"%w: reviewed products cannot switch between free and paid",
+				types.ErrMarketplaceConflict,
+			)
 		}
 	}
 	agent, names, err := s.validateSources(ctx, p.CreatorTenantID, input.AgentID, input.KnowledgeBaseIDs)
@@ -364,11 +370,17 @@ func (s *marketplaceService) ReviewProduct(
 		p.PaddleProductID = strings.TrimSpace(input.PaddleProductID)
 		p.MonthlyPriceID = strings.TrimSpace(input.MonthlyPriceID)
 		p.YearlyPriceID = strings.TrimSpace(input.YearlyPriceID)
-		if s.gateway == nil {
-			return nil, fmt.Errorf("paddle catalog verification is unavailable")
-		}
-		if err := s.gateway.ValidateCatalog(ctx, p); err != nil {
-			return nil, err
+		if p.MonthlyAmount == 0 {
+			if !p.IsFree() {
+				return nil, fmt.Errorf("%w: free products must not have Paddle prices", types.ErrMarketplaceInvalid)
+			}
+		} else {
+			if s.gateway == nil {
+				return nil, fmt.Errorf("paddle catalog verification is unavailable")
+			}
+			if err := s.gateway.ValidateCatalog(ctx, p); err != nil {
+				return nil, err
+			}
 		}
 		cfg, err := marketplaceReviewedConfig(agent, ids)
 		if err != nil {
@@ -438,6 +450,12 @@ func (s *marketplaceService) projectProduct(
 	out.Access = &types.MarketplaceProductAccess{}
 	tenant, ok := types.TenantIDFromContext(ctx)
 	if !ok || tenant == 0 {
+		return &out, nil
+	}
+	if p.IsFree() {
+		out.Access.CanChat = p.Status == "published" && p.PublishedTenantID != 0 &&
+			p.PlatformAgentID != "" && len(p.PlatformKnowledgeBaseIDs) > 0
+		out.Access.Status = "free"
 		return &out, nil
 	}
 	sub, err := s.repo.CurrentSubscription(ctx, tenant, p.ID)
@@ -525,21 +543,33 @@ func (s *marketplaceService) AuthorizeAccess(
 	productID string,
 	at time.Time,
 ) (*types.MarketplaceAccess, error) {
-	if tenantID == 0 {
+	actorTenant, _, err := marketplaceActor(ctx)
+	if err != nil || actorTenant != tenantID {
 		return nil, types.ErrMarketplaceForbidden
 	}
 	p, err := s.repo.GetProduct(ctx, productID)
 	if err != nil {
 		return nil, err
 	}
-	sub, err := s.repo.CurrentSubscription(ctx, tenantID, productID)
-	if err != nil {
-		if errors.Is(err, types.ErrMarketplaceNotFound) {
+	subscriptionID := ""
+	if p.IsFree() {
+		if p.Status != "published" {
 			return nil, types.ErrMarketplaceForbidden
 		}
-		return nil, err
+	} else {
+		sub, err := s.repo.CurrentSubscription(ctx, tenantID, productID)
+		if err != nil {
+			if errors.Is(err, types.ErrMarketplaceNotFound) {
+				return nil, types.ErrMarketplaceForbidden
+			}
+			return nil, err
+		}
+		if !sub.HasAccess(at) {
+			return nil, types.ErrMarketplaceForbidden
+		}
+		subscriptionID = sub.ID
 	}
-	if !sub.HasAccess(at) || p.PublishedTenantID == 0 || p.PlatformAgentID == "" ||
+	if p.PublishedTenantID == 0 || p.PlatformAgentID == "" ||
 		len(p.PlatformKnowledgeBaseIDs) == 0 {
 		return nil, types.ErrMarketplaceForbidden
 	}
@@ -574,7 +604,7 @@ func (s *marketplaceService) AuthorizeAccess(
 		SourceTenantID:   p.PublishedTenantID,
 		Agent:            agent,
 		KnowledgeBaseIDs: append([]string{}, p.PlatformKnowledgeBaseIDs...),
-		SubscriptionID:   sub.ID,
+		SubscriptionID:   subscriptionID,
 		DefaultModelID:   p.DefaultModelID,
 	}, nil
 }
@@ -619,15 +649,18 @@ func (s *marketplaceService) Checkout(
 	if (period != "monthly" && period != "yearly") || !validMarketplaceOperationKey(key) {
 		return nil, types.ErrMarketplaceInvalid
 	}
-	if s.gateway == nil || !s.gateway.Config().Configured {
-		return nil, fmt.Errorf("paddle checkout is unavailable")
-	}
 	p, err := s.repo.GetProduct(ctx, productID)
 	if err != nil {
 		return nil, err
 	}
 	if p.Status != "published" {
 		return nil, types.ErrMarketplaceNotFound
+	}
+	if p.IsFree() {
+		return nil, fmt.Errorf("%w: free products do not require checkout", types.ErrMarketplaceInvalid)
+	}
+	if s.gateway == nil || !s.gateway.Config().Configured {
+		return nil, fmt.Errorf("paddle checkout is unavailable")
 	}
 	if err := s.gateway.ValidateCatalog(ctx, p); err != nil {
 		return nil, err

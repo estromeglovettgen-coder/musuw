@@ -12,7 +12,7 @@
           <span class="market-badge">{{ t('creatorMarketplace.featured') }}</span>
           <h2>{{ hero.title }}</h2><p>{{ hero.description }}</p>
 
-          <div class="market-actions"><strong class="market-price">{{ price(hero) }}<small>{{ t('creatorMarketplace.perMonth') }}</small></strong><t-button theme="primary" @click="open(hero.id)">{{ t('creatorMarketplace.viewDetails') }}</t-button></div>
+          <div class="market-actions"><strong class="market-price">{{ price(hero) }}<small v-if="!isFreeMarketProduct(hero)">{{ t('creatorMarketplace.perMonth') }}</small></strong><t-button theme="primary" @click="open(hero.id)">{{ t('creatorMarketplace.viewDetails') }}</t-button></div>
         </div>
       </section>
       <section v-for="group in groups" :key="group.id" class="market-section">
@@ -23,11 +23,11 @@
             <img v-if="product.cover_url" class="market-cover" :src="product.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
             <div v-else class="market-cover market-cover--empty"><t-icon name="book-open" /></div>
             <div class="market-card-body">
-              <div class="market-actions"><span v-if="product.fixture" class="market-badge market-badge--test">{{ t('creatorMarketplace.testBadge') }}</span><span v-if="product.access?.can_chat" class="market-badge market-badge--active">{{ t('creatorMarketplace.status.active') }}</span><span v-if="product.category" class="market-badge">{{ product.category }}</span></div>
+              <div class="market-actions"><span v-if="product.fixture" class="market-badge market-badge--test">{{ t('creatorMarketplace.testBadge') }}</span><span v-if="isFreeMarketProduct(product)" class="market-badge">{{ t('creatorMarketplace.free') }}</span><span v-else-if="product.access?.can_chat" class="market-badge market-badge--active">{{ t('creatorMarketplace.status.active') }}</span><span v-if="product.category" class="market-badge">{{ product.category }}</span></div>
               <h3><RouterLink :to="`/platform/marketplace/${product.id}`">{{ product.title }}</RouterLink></h3>
 
               <p class="market-card-description">{{ product.description }}</p>
-              <div class="market-card-footer"><strong class="market-price">{{ price(product) }}<small>{{ t('creatorMarketplace.perMonth') }}</small></strong><t-button size="small" theme="default" @click="open(product.id)">{{ t('creatorMarketplace.viewDetails') }}</t-button></div>
+              <div class="market-card-footer"><strong class="market-price">{{ price(product) }}<small v-if="!isFreeMarketProduct(product)">{{ t('creatorMarketplace.perMonth') }}</small></strong><t-button size="small" theme="default" @click="open(product.id)">{{ t('creatorMarketplace.viewDetails') }}</t-button></div>
             </div>
           </article>
         </div>
@@ -42,7 +42,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { listMarketplaceProducts, type MarketplaceProduct } from '@/api/creator-marketplace'
 import MarketplaceHeader from './MarketplaceHeader.vue'
-import { formatMarketPrice, sortMarketProducts } from './marketplacePresentation'
+import { formatMarketPrice, isFreeMarketProduct, sortMarketProducts } from './marketplacePresentation'
 import './marketplace.css'
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -59,7 +59,7 @@ const groups = computed(() => [
   { id: 'regular', products: filtered.value.filter(p => !p.fixture && p.id !== hero.value?.id) },
   { id: 'test', products: filtered.value.filter(p => p.fixture) },
 ].filter(g => g.products.length))
-const price = (p: MarketplaceProduct) => formatMarketPrice(p.monthly_amount, p.currency, locale.value)
+const price = (p: MarketplaceProduct) => isFreeMarketProduct(p) ? t('creatorMarketplace.free') : formatMarketPrice(p.monthly_amount, p.currency, locale.value)
 const open = (id: string) => router.push(`/platform/marketplace/${encodeURIComponent(id)}`)
 async function load() {
   loading.value = true; failed.value = false

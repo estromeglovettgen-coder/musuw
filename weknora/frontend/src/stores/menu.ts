@@ -31,7 +31,6 @@ export const useMenuStore = defineStore('menuStore', () => {
     },
     { title: '', titleKey: 'menu.knowledgeBase', icon: 'zhishiku', path: 'knowledge-bases' },
     { title: '', titleKey: 'creatorMarketplace.title', icon: 'shop', path: 'marketplace' },
-    { title: '', titleKey: 'creatorMarketplace.orders', icon: 'receipt', path: 'orders' },
     { title: '', titleKey: 'menu.agents', icon: 'agent', path: 'agents', requiredCapability: 'agents' },
     { title: '', titleKey: 'menu.organizations', icon: 'organization', path: 'organizations', requiredCapability: 'organizations' },
     { title: '', titleKey: 'menu.settings', icon: 'setting', path: 'settings' },
@@ -73,7 +72,7 @@ export const useMenuStore = defineStore('menuStore', () => {
   // Musuw Lite is deliberately fail-closed: only product-approved top-level
   // entries are visible. A newly-added upstream menu item must be explicitly
   // reviewed before it can appear in the consumer product.
-  const liteVisiblePaths = new Set(['creatChat', 'knowledge-bases', 'agents', 'marketplace', 'orders'])
+  const liteVisiblePaths = new Set(['creatChat', 'knowledge-bases', 'agents', 'marketplace'])
 
   const visibleMenuArr = computed(() => {
     const authStore = useAuthStore()

@@ -17,16 +17,20 @@
       </section>
       <aside class="market-purchase">
         <span class="market-badge">{{ t('creatorMarketplace.qaOnly') }}</span>
-        <template v-if="product.access?.can_chat">
+        <template v-if="isFreeMarketProduct(product)">
+          <h2>{{ t('creatorMarketplace.free') }}</h2>
+          <p class="market-note">{{ t('creatorMarketplace.freeAccessNote') }}</p>
+          <t-button v-if="product.access?.can_chat" :loading="openingChat" @click="startChat">{{ t('creatorMarketplace.startChat') }}</t-button>
+          <p v-else class="market-note">{{ t('creatorMarketplace.freeUnavailable') }}</p>
+        </template>
+        <template v-else-if="product.access?.can_chat">
           <h2>{{ t('creatorMarketplace.status.active') }}</h2>
           <p class="market-note">{{ accessDate }}</p>
           <t-button :loading="openingChat" @click="startChat">{{ t('creatorMarketplace.startChat') }}</t-button>
-          <t-button v-if="product.access.subscription_id && product.access.portal_available" theme="default" :loading="portalOpening" @click="openPortal">{{ t('creatorMarketplace.manageSubscription') }}</t-button>
         </template>
         <template v-else-if="!product.checkout_available && product.access?.subscription_id && product.access.portal_available">
           <h2>{{ t(marketStatusKey(product.access.status)) }}</h2>
           <p class="market-note">{{ t('creatorMarketplace.existingSubscription') }}</p>
-          <t-button theme="default" :loading="portalOpening" @click="openPortal">{{ t('creatorMarketplace.manageSubscription') }}</t-button>
         </template>
         <template v-else>
           <div class="market-period" role="group" :aria-label="t('creatorMarketplace.period')"><button type="button" :aria-pressed="period === 'monthly'" @click="period = 'monthly'">{{ t('creatorMarketplace.monthly') }}</button><button type="button" :aria-pressed="period === 'yearly'" @click="period = 'yearly'">{{ t('creatorMarketplace.yearly') }}</button></div>
@@ -38,7 +42,7 @@
           <p class="market-note">{{ t('creatorMarketplace.renewalNote') }}</p>
           <p class="market-note">{{ t('creatorMarketplace.checkoutPriceNote') }}</p>
         </template>
-        <hr class="market-divider" /><p class="market-note">{{ t('creatorMarketplace.scopeNote') }}</p><p class="market-note">{{ t('creatorMarketplace.allowanceNote') }}</p>
+        <hr class="market-divider" /><p class="market-note">{{ t('creatorMarketplace.scopeNote') }}</p><p class="market-note">{{ t(isFreeMarketProduct(product) ? 'creatorMarketplace.freeAllowanceNote' : 'creatorMarketplace.allowanceNote') }}</p>
       </aside>
     </div>
     <MarketplaceCheckout v-if="showCheckout && product" :product="product" :period="period" @close="closeCheckout" @activated="afterActivated" />
@@ -48,11 +52,10 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { MessagePlugin } from 'tdesign-vue-next'
-import { getMarketplaceProduct, createMarketplacePortal, type MarketplaceProduct, type MarketplaceBillingPeriod } from '@/api/creator-marketplace'
+import { getMarketplaceProduct, type MarketplaceProduct, type MarketplaceBillingPeriod } from '@/api/creator-marketplace'
 import MarketplaceHeader from './MarketplaceHeader.vue'
 import MarketplaceCheckout from './MarketplaceCheckout.vue'
-import { formatMarketPrice, formatMarketDate, marketStatusKey } from './marketplacePresentation'
+import { formatMarketPrice, formatMarketDate, isFreeMarketProduct, marketStatusKey } from './marketplacePresentation'
 import './marketplace.css'
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -63,7 +66,6 @@ const failed = ref(false)
 const period = ref<MarketplaceBillingPeriod>('monthly')
 const showCheckout = ref(false)
 const openingChat = ref(false)
-const portalOpening = ref(false)
 let requestId = 0
 const displayPrice = computed(() => product.value ? formatMarketPrice(period.value === 'yearly' ? product.value.yearly_amount : product.value.monthly_amount, product.value.currency, locale.value) : '')
 const accessDate = computed(() => t(product.value?.access?.cancel_at_period_end ? 'creatorMarketplace.cancelScheduled' : 'creatorMarketplace.availableUntil', { date: formatMarketDate(product.value?.access?.paid_through, locale.value) }))
@@ -79,14 +81,6 @@ async function startChat() {
   openingChat.value = true
   try { await router.push({ path: '/platform/creatChat', query: { marketplace_product: product.value.id } }) }
   finally { openingChat.value = false }
-}
-async function openPortal() {
-  const id = product.value?.access?.subscription_id
-  if (!id || portalOpening.value) return
-  portalOpening.value = true
-  try { const result = await createMarketplacePortal(id); if (!result.authorization_url) throw new Error('Missing portal URL'); window.location.assign(result.authorization_url) }
-  catch { MessagePlugin.error(t('creatorMarketplace.portalFailed')) }
-  finally { portalOpening.value = false }
 }
 function closeCheckout() { showCheckout.value = false; void load() }
 async function afterActivated() { showCheckout.value = false; await load(); if (product.value?.access?.can_chat) await startChat() }

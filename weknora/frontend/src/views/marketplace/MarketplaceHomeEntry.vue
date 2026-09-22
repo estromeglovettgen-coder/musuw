@@ -1,6 +1,6 @@
 <template>
   <div v-if="product" class="market-home-entry">
-    <div><span>{{ t('creatorMarketplace.featured') }}</span><RouterLink :to="`/platform/marketplace/${product.id}`">{{ product.title }} <t-icon name="arrow-right" /></RouterLink></div>
+    <div><span>{{ t('creatorMarketplace.featured') }}</span><span v-if="isFreeMarketProduct(product)">{{ t('creatorMarketplace.free') }}</span><RouterLink :to="`/platform/marketplace/${product.id}`">{{ product.title }} <t-icon name="arrow-right" /></RouterLink></div>
     <RouterLink class="market-home-all" to="/platform/marketplace">{{ t('creatorMarketplace.browse') }}</RouterLink>
   </div>
 </template>
@@ -8,6 +8,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { listMarketplaceProducts, type MarketplaceProduct } from '@/api/creator-marketplace'
+import { isFreeMarketProduct } from './marketplacePresentation'
 const { t } = useI18n()
 const product = ref<MarketplaceProduct>()
 onMounted(async () => {

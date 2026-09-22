@@ -29,9 +29,9 @@ func (h *Handler) resolveMarketplaceRequest(
 	access, err := h.marketplaceService.AuthorizeAccess(ctx, buyerID, req.MarketplaceProductID, time.Now().UTC())
 	if err != nil {
 		if stderrs.Is(err, types.ErrMarketplaceForbidden) || stderrs.Is(err, types.ErrMarketplaceNotFound) {
-			return ctx, nil, errors.NewForbiddenError("此知识服务尚未订阅或已到期，请在订单管理中查看订阅状态")
+			return ctx, nil, errors.NewForbiddenError("此知识服务当前不可用，请返回知识市场查看使用权限或订阅状态")
 		}
-		return ctx, nil, errors.NewServiceUnavailableError("暂时无法验证订阅，请稍后重试")
+		return ctx, nil, errors.NewServiceUnavailableError("暂时无法验证使用权限，请稍后重试")
 	}
 	if access == nil || access.Agent == nil || access.SourceTenantID == 0 || len(access.KnowledgeBaseIDs) == 0 {
 		return ctx, nil, errors.NewServiceUnavailableError("knowledge service configuration is unavailable")
@@ -43,16 +43,16 @@ func (h *Handler) resolveMarketplaceRequest(
 	}
 	if (req.AgentID != "" && req.AgentID != access.Agent.ID) || req.AgentSourceTenantID != 0 ||
 		len(req.KnowledgeIds) > 0 || len(req.TagIDs) > 0 || len(req.MCPServiceIDs) > 0 || len(req.SkillNames) > 0 {
-		return ctx, nil, errors.NewForbiddenError("request is outside the purchased service")
+		return ctx, nil, errors.NewForbiddenError("request is outside the approved service")
 	}
 	for _, id := range req.KnowledgeBaseIDs {
 		if !scope.AllowsKnowledgeBase(id, access.SourceTenantID) {
-			return ctx, nil, errors.NewForbiddenError("knowledge base is outside the purchased service")
+			return ctx, nil, errors.NewForbiddenError("knowledge base is outside the approved service")
 		}
 	}
 	for _, item := range req.MentionedItems {
 		if item.Type != "kb" || !scope.AllowsKnowledgeBase(item.ID, access.SourceTenantID) {
-			return ctx, nil, errors.NewForbiddenError("mention is outside the purchased service")
+			return ctx, nil, errors.NewForbiddenError("mention is outside the approved service")
 		}
 	}
 	// The saved config is an approved snapshot, not the creator's live draft.

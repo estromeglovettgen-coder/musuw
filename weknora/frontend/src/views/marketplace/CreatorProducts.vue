@@ -8,7 +8,7 @@
     <p v-else-if="!products.length" class="market-empty">{{ t('creatorMarketplace.noCreatorProducts') }}</p>
     <article v-for="product in products" v-else :key="product.id" class="market-panel">
       <div class="market-section-heading"><div><h2>{{ product.title }}</h2><span class="market-badge">{{ t(marketStatusKey(product.status)) }}</span></div><div class="market-actions"><t-button v-if="['draft', 'rejected'].includes(product.status)" theme="default" :disabled="!canCreate" @click="openEditor(product)">{{ t('creatorMarketplace.editProduct') }}</t-button><t-button v-if="['draft', 'rejected'].includes(product.status)" :disabled="!canCreate" :loading="submitting === product.id" @click="submit(product)">{{ t('creatorMarketplace.submitReview') }}</t-button><RouterLink v-if="product.status === 'published'" class="market-link" :to="`/platform/marketplace/${product.id}`">{{ t('creatorMarketplace.viewDetails') }}</RouterLink></div></div>
-      <p class="market-muted">{{ product.description }}</p><p class="market-note">{{ formatMarketPrice(product.monthly_amount, product.currency, locale) }} {{ t('creatorMarketplace.perMonth') }} · {{ formatMarketPrice(product.yearly_amount, product.currency, locale) }} {{ t('creatorMarketplace.perYear') }}</p>
+      <p class="market-muted">{{ product.description }}</p><p v-if="isFreeMarketProduct(product)" class="market-note">{{ t('creatorMarketplace.free') }}</p><p v-else class="market-note">{{ formatMarketPrice(product.monthly_amount, product.currency, locale) }} {{ t('creatorMarketplace.perMonth') }} · {{ formatMarketPrice(product.yearly_amount, product.currency, locale) }} {{ t('creatorMarketplace.perYear') }}</p>
       <p v-if="product.review_note" class="market-review-note"><strong>{{ t('creatorMarketplace.reviewNote') }}</strong><br />{{ product.review_note }}</p>
     </article>
     <ProductEditor v-if="editorOpen" :product="editing" @close="editorOpen = false" @saved="saved" />
@@ -23,7 +23,7 @@ import { listCreatorProducts, submitCreatorProduct, type MarketplaceProduct } fr
 import { useCurrentEntitlementStore } from '@/stores/entitlement'
 import MarketplaceHeader from './MarketplaceHeader.vue'
 import ProductEditor from './ProductEditor.vue'
-import { formatMarketPrice, marketStatusKey } from './marketplacePresentation'
+import { formatMarketPrice, isFreeMarketProduct, marketStatusKey } from './marketplacePresentation'
 import './marketplace.css'
 const { t, locale } = useI18n()
 const router = useRouter()

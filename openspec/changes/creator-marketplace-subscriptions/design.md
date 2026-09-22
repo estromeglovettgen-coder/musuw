@@ -11,7 +11,7 @@ Non-goals: marketplace payouts, creator public profiles, full billing state mirr
 ## Decisions
 
 - Add a distinct marketplace module inside the existing Go app. Persist product/submission, per-product subscriptions, and transactions with paid periods. Reuse Paddle client, verified event intake and queue infrastructure; route market events to market records without touching tenant membership fields.
-- Each product has independent monthly/yearly recurring prices. Annual currency and price must match ten monthly base units, and price/product/environment relationships are server verified. Use existing customer binding where available; never recognize a buyer by email alone.
+- Each paid product has independent monthly/yearly recurring prices. Annual currency and price must match ten monthly base units, and price/product/environment relationships are server verified. Use existing customer binding where available; never recognize a buyer by email alone.
 - Effective Max gates submission; system-admin reviews/publishes. Reviewed platform assets are separate from creator drafts. Initially the operator uses existing import/edit flows to prepare platform KBs/agents; do not invent automatic cross-tenant cloning.
 - Runtime request carries product ID. Server resolves paid access and approved KB/agent, creates a trusted request-scoped access context, and preserves buyer tenant/model billing/session ownership. Only the approved source KB scope participates in native retrieval. Browser-supplied source/KB/agent IDs do not expand access.
 - Buyers receive public presentation metadata, never prompts, creator contacts, source keys or edit capabilities. Source raw downloads/configuration remain denied; necessary citation reads require scoped access.
@@ -35,3 +35,11 @@ Apply additive SQL migrations through existing release. Configure sandbox produc
 ## Open Questions
 
 Resolve operational identifiers from staging/Keychain/provider metadata. Test prices are temporary ($5/month Taylor and small fixtures) and explicitly sandbox-only. No user input is required for these reversible fixtures.
+
+## Authorized follow-up: full content and free examples
+
+- Zero monthly and yearly catalog amounts identify a free service; all Paddle catalog identifiers must be empty. No separate free-grant table, fake order, or complimentary subscription is introduced. The existing product approval validates platform delivery assets and the existing runtime scope preserves buyer billing.
+- A logged-in buyer may use an approved, published free service immediately. Unpublishing a free service stops new questions; historical replies remain history. Paid-service unlisting and lifecycle behavior remain unchanged. Checkout rejects free products before provider writes. Reviewed products cannot switch between free and paid, preventing implicit changes to existing buyer billing contracts.
+- Relax only the product nonnegative-price constraint using additive PostgreSQL/SQLite migrations; subscription amounts remain strictly positive.
+- Product pages display the free price and use action without renewal/expiry/payment controls. Orders retain the sole subscription-management action, including recovery for a refunded but provider-bound paid subscription.
+- Full Taylor migration is a bounded operator data copy, not an automatic creator publication framework. Production remains read-only; target assets are platform-owned. Inventory before copying and compare counts/content hashes, vector/search compatibility, available Wiki/graph data and persona afterward. Preserve existing paid product identity and historical citation usability; keep rollback data outside public artifacts.

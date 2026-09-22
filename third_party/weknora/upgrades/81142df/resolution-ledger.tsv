@@ -292,7 +292,7 @@ frontend/src/components/empty-knowledge.vue	M	-	100644	aaf4cc6f8faaf225de504eb6b
 frontend/src/components/knowledge-processing-timeline.vue	-	M	100644	988748f8f187904d4e7440916824024aa9b9ec10	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/components/manual-knowledge-editor.vue	M	-	100644	a11d04657344c18f09ac940824d786aaae6ead5f	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/components/menu.resource-nav.visual-contract.test.mjs	A	-	100644	c5945ad56f45238f991b478ad049cb516b2de01c	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/src/components/menu.vue	M	M	100644	7178fbf35527cafe90b617454918c91329543704	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+frontend/src/components/menu.vue	M	M	100644	d5066f43910ae9db4313aafd457ecfbd52d763ca	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/components/modelSelectorClearability.test.ts	-	A	100644	b613fdc51dfbafd8c832e8b026e4c38916affa55	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/components/modelSelectorFilter.test.ts	-	A	100644	3397af189a29fe337643b0d975f4ec078feba740	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/components/modelSelectorFilter.ts	-	A	100644	c7f642743b722835e5fca05b023025720cb2e49d	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
@@ -365,7 +365,7 @@ frontend/src/stores/editorResources.ts	-	M	100644	7257015827e4aab8958f3fd7780b5d
 frontend/src/stores/liteChatSettings.test.ts	A	-	100644	219a8c369982cb5023d2313304c6e3bf8f64cd3e	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/stores/localizedResourceCache.test.ts	-	A	100644	341bd5a190397625898292e55b936d5e371187d1	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/stores/localizedResourceCache.ts	-	A	100644	bd16b7178e56e0977f5889926ff60dd025fd3781	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-frontend/src/stores/menu.ts	M	M	100644	4bdbbf56b6340b7a4b2de393c59099dab0d16d57	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+frontend/src/stores/menu.ts	M	M	100644	696a6c6e8d7f848d39870c4645c36ea0ce142f45	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/stores/organization.ts	-	M	100644	ffc8fbd5a510d79b3d55f8f91394dab6b439eec9	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/stores/settings.ts	M	-	100644	69f545c1043368cc2a8fa3f457ae436f30a0c107	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/stores/settingsStorage.test.mjs	M	-	100644	abd576bbb4d4dc83ae9e7b8ee6dbaf4a53865a7f	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
@@ -954,7 +954,7 @@ internal/container/sandbox.go	-	A	100644	ceae1f826ea5b01de618ca69000dd0e914e27b1
 internal/container/sandbox_test.go	-	A	100644	cb9f664e26a810f7cf950dfd8be9541a3f97d32d	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/container/ssrf_test.go	-	A	100644	69173a501b23417d3b6e2bed7b710fa2d78d840f	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/database/migration_sqlite_test.go	-	A	100644	dcaa83e6215c47d679901e491bbba1eb1a573050	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/database/migration_sqlite_versioned_schema_test.go	-	A	100644	93af8986e7fe5d4d429fc0312ddde1836a3f756d	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
+internal/database/migration_sqlite_versioned_schema_test.go	-	A	100644	069940675a4df14829a1b45ede7ded9ed0c9b07f	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/datasource/connector.go	-	M	100644	c7c51baab45ce17262d198c7ee1ed02cc6390322	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/datasource/connector/gitlab/client.go	-	A	100644	710d51f894fbd5130452073328467133461a0d2a	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/datasource/connector/gitlab/client_test.go	-	A	100644	3654bbdd158ae87042ad876293eaa086500c14cd	adopt-upstream-exact		fixed-target upstream-only content is byte-identical

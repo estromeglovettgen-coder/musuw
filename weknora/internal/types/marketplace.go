@@ -68,6 +68,12 @@ type MarketplaceProduct struct {
 	Access             *MarketplaceProductAccess `json:"access,omitempty" gorm:"-"`
 }
 
+// IsFree reports whether the product has no purchase price or payment binding.
+func (p MarketplaceProduct) IsFree() bool {
+	return p.MonthlyAmount == 0 && p.YearlyAmount == 0 && p.PaddleProductID == "" &&
+		p.MonthlyPriceID == "" && p.YearlyPriceID == ""
+}
+
 // MarketplaceProductAccess is the buyer's current access and management projection.
 type MarketplaceProductAccess struct {
 	PortalAvailable   bool       `json:"portal_available"`

@@ -5,7 +5,7 @@
     <div v-if="loading" class="market-empty">{{ t('common.loading') }}</div>
     <div v-else-if="failed" class="market-error" role="alert">{{ t('creatorMarketplace.loadFailed') }}<t-button theme="default" @click="load">{{ t('creatorMarketplace.retry') }}</t-button></div>
     <p v-else-if="!products.length" class="market-empty">{{ t('creatorMarketplace.noAdminProducts') }}</p>
-    <div v-else class="market-table-wrap"><table class="market-table"><thead><tr><th>{{ t('creatorMarketplace.product') }}</th><th>{{ t('creatorMarketplace.statusLabel') }}</th><th>{{ t('creatorMarketplace.amount') }}</th><th>{{ t('creatorMarketplace.review') }}</th></tr></thead><tbody><tr v-for="product in products" :key="product.id"><td>{{ product.title }}<small>{{ product.id }}</small><span v-if="product.fixture" class="market-badge market-badge--test">{{ t('creatorMarketplace.testBadge') }}</span></td><td><span class="market-badge">{{ t(marketStatusKey(product.status)) }}</span></td><td>{{ formatMarketPrice(product.monthly_amount, product.currency, locale) }} {{ t('creatorMarketplace.perMonth') }}<small>{{ formatMarketPrice(product.yearly_amount, product.currency, locale) }} {{ t('creatorMarketplace.perYear') }}</small></td><td><div class="market-actions"><t-button size="small" theme="default" @click="editing = product">{{ t('creatorMarketplace.editProduct') }}</t-button><t-button size="small" @click="openReview(product)">{{ t('creatorMarketplace.review') }}</t-button></div></td></tr></tbody></table></div>
+    <div v-else class="market-table-wrap"><table class="market-table"><thead><tr><th>{{ t('creatorMarketplace.product') }}</th><th>{{ t('creatorMarketplace.statusLabel') }}</th><th>{{ t('creatorMarketplace.amount') }}</th><th>{{ t('creatorMarketplace.review') }}</th></tr></thead><tbody><tr v-for="product in products" :key="product.id"><td>{{ product.title }}<small>{{ product.id }}</small><span v-if="product.fixture" class="market-badge market-badge--test">{{ t('creatorMarketplace.testBadge') }}</span></td><td><span class="market-badge">{{ t(marketStatusKey(product.status)) }}</span></td><td><span v-if="isFreeMarketProduct(product)">{{ t('creatorMarketplace.free') }}</span><template v-else>{{ formatMarketPrice(product.monthly_amount, product.currency, locale) }} {{ t('creatorMarketplace.perMonth') }}<small>{{ formatMarketPrice(product.yearly_amount, product.currency, locale) }} {{ t('creatorMarketplace.perYear') }}</small></template></td><td><div class="market-actions"><t-button size="small" theme="default" @click="editing = product">{{ t('creatorMarketplace.editProduct') }}</t-button><t-button size="small" @click="openReview(product)">{{ t('creatorMarketplace.review') }}</t-button></div></td></tr></tbody></table></div>
     <ProductEditor v-if="editing" :product="editing" admin @close="editing = undefined" @saved="afterEdit" />
     <t-dialog v-if="reviewing" :visible="true" :header="`${t('creatorMarketplace.review')} · ${reviewing.title}`" width="720px" :footer="false" :close-on-overlay-click="false" class="market-dialog" @close="reviewing = undefined">
       <div class="market-form">
@@ -13,9 +13,12 @@
         <p class="market-note">{{ t('creatorMarketplace.platformMappingNote') }}</p>
         <label>{{ t('creatorMarketplace.platformAgent') }}<t-select v-model="reviewForm.platform_agent_id" filterable :options="platformAgentOptions" /></label>
         <label>{{ t('creatorMarketplace.platformKnowledgeBases') }}<t-select v-model="reviewForm.platform_knowledge_base_ids" multiple filterable :options="platformKbOptions" /></label>
-        <label>{{ t('creatorMarketplace.paddleProduct') }}<t-input v-model="reviewForm.paddle_product_id" placeholder="pro_…" /></label>
-        <div class="market-form-grid"><label>{{ t('creatorMarketplace.monthlyPriceId') }}<t-input v-model="reviewForm.monthly_price_id" placeholder="pri_…" /></label><label>{{ t('creatorMarketplace.yearlyPriceId') }}<t-input v-model="reviewForm.yearly_price_id" placeholder="pri_…" /></label></div>
-        <p class="market-note">{{ t('creatorMarketplace.mappingNote') }}</p>
+        <template v-if="!isFreeMarketProduct(reviewing)">
+          <label>{{ t('creatorMarketplace.paddleProduct') }}<t-input v-model="reviewForm.paddle_product_id" placeholder="pro_…" /></label>
+          <div class="market-form-grid"><label>{{ t('creatorMarketplace.monthlyPriceId') }}<t-input v-model="reviewForm.monthly_price_id" placeholder="pri_…" /></label><label>{{ t('creatorMarketplace.yearlyPriceId') }}<t-input v-model="reviewForm.yearly_price_id" placeholder="pri_…" /></label></div>
+          <p class="market-note">{{ t('creatorMarketplace.mappingNote') }}</p>
+        </template>
+        <p v-else class="market-note">{{ t('creatorMarketplace.freeMappingNote') }}</p>
         <div class="market-actions"><t-checkbox v-model="reviewForm.featured">{{ t('creatorMarketplace.featuredLabel') }}</t-checkbox><t-checkbox v-model="reviewForm.fixture">{{ t('creatorMarketplace.testingLabel') }}</t-checkbox></div>
         <label>{{ t('creatorMarketplace.reviewReason') }}<t-textarea v-model="reviewForm.review_note" :autosize="{ minRows: 3, maxRows: 6 }" /></label>
         <p v-if="reviewError" class="market-error" role="alert">{{ reviewError }}</p>
@@ -33,7 +36,7 @@ import { listAgents, type CustomAgent } from '@/api/agent'
 import { listKnowledgeBases } from '@/api/knowledge-base'
 import MarketplaceHeader from './MarketplaceHeader.vue'
 import ProductEditor from './ProductEditor.vue'
-import { formatMarketPrice, marketStatusKey } from './marketplacePresentation'
+import { formatMarketPrice, isFreeMarketProduct, marketStatusKey } from './marketplacePresentation'
 import './marketplace.css'
 const { t, locale } = useI18n()
 const status = ref('pending')
@@ -76,9 +79,12 @@ async function review(action: MarketplaceReviewInput['action']) {
   if (!reviewing.value || reviewAction.value) return
   reviewError.value = ''
   if (action === 'reject' && !reviewForm.review_note.trim()) { reviewError.value = t('creatorMarketplace.reviewRequired'); return }
-  if (action === 'approve' && (!reviewForm.platform_agent_id || !reviewForm.platform_knowledge_base_ids.length || !reviewForm.paddle_product_id || !reviewForm.monthly_price_id || !reviewForm.yearly_price_id)) { reviewError.value = t('creatorMarketplace.mappingRequired'); return }
+  const free = isFreeMarketProduct(reviewing.value)
+  if (action === 'approve' && (!reviewForm.platform_agent_id || !reviewForm.platform_knowledge_base_ids.length)) { reviewError.value = t('creatorMarketplace.platformMappingRequired'); return }
+  if (action === 'approve' && !free && (!reviewForm.paddle_product_id || !reviewForm.monthly_price_id || !reviewForm.yearly_price_id)) { reviewError.value = t('creatorMarketplace.mappingRequired'); return }
   reviewAction.value = action
-  try { await reviewMarketplaceProduct(reviewing.value.id, { ...reviewForm, action }); MessagePlugin.success(t('creatorMarketplace.reviewed')); reviewing.value = undefined; await load() }
+  const mapping = free ? { ...reviewForm, paddle_product_id: '', monthly_price_id: '', yearly_price_id: '' } : reviewForm
+  try { await reviewMarketplaceProduct(reviewing.value.id, { ...mapping, action }); MessagePlugin.success(t('creatorMarketplace.reviewed')); reviewing.value = undefined; await load() }
   catch (error: any) { reviewError.value = error?.message || t('creatorMarketplace.saveFailed') }
   finally { reviewAction.value = '' }
 }

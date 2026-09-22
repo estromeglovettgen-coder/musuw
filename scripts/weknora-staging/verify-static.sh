@@ -39,7 +39,7 @@ grep -Fqx 'MUSUW_PRODUCT_EDITION=lite' "$staging_root/staging.env.example" || fa
 grep -Fq 'MUSUW_PRODUCT_EDITION' "$script_dir/prepare-runtime.sh" || fail 'staging runtime does not carry the Lite product edition'
 grep -Fq 'MUSUW_PADDLE_ENVIRONMENT: sandbox' "$staging_root/compose.yaml" || fail 'staging Paddle selector is not Sandbox'
 grep -Fq 'MUSUW_PADDLE_API_URL: ${MUSUW_PADDLE_API_URL:-https://sandbox-api.paddle.com}' "$staging_root/compose.yaml" || fail 'staging Paddle API URL is not Sandbox'
-grep -Fq 'NEO4J_ENABLE: "false"' "$staging_root/compose.yaml" || fail 'staging unexpectedly enables Neo4j'
+grep -Fq 'NEO4J_ENABLE: "true"' "$staging_root/compose.yaml" || fail 'staging must enable isolated Neo4j'
 grep -Fq 'MUSUW_STAGING_R2_BUCKET' "$staging_root/compose.yaml" || fail 'staging R2 bucket is not explicit'
 grep -Fq '/opt/weknora/staging-runtime/secrets' "$staging_root/compose.yaml" || fail 'staging fixed secret root is missing'
 grep -Fq '/opt/weknora-staging/app-entrypoint.sh' "$staging_root/compose.yaml" || fail 'staging does not mount its Sandbox-only entrypoint'
@@ -92,14 +92,14 @@ grep -Fq 'staging-web' "$staging_root/compose.edge.yaml" || fail 'staging edge a
 grep -Fq 'musnow-production_edge' "$staging_root/compose.edge.yaml" || fail 'staging tunnel network is missing'
 grep -Fq 'HostConfig.Memory' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not assert memory limits'
 grep -Fq 'capacity-preflight.sh' "$script_dir/release-ci.sh" || fail 'staging release helper has no capacity preflight'
-grep -Fq 'searxng-init searxng app frontend' "$script_dir/release-ci.sh" || fail 'staging release helper does not start SearXNG'
+grep -Fq 'searxng-init searxng neo4j app frontend' "$script_dir/release-ci.sh" || fail 'staging release helper does not start SearXNG'
 
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/musuw-staging-static.XXXXXX")"
 trap 'find "$tmp_root" -depth -delete 2>/dev/null || true' EXIT
 runtime_dir="$tmp_root/runtime"
 secret_dir="$runtime_dir/secrets"
 mkdir -m 700 -p "$secret_dir"
-for name in db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key searxng_secret tikhub_api_key; do
+for name in db_password redis_password system_aes_key jwt_secret oidc_client_id oidc_client_secret supabase_service_role_key openrouter_management_api_key paddle_api_key paddle_webhook_secret r2_access_key_id r2_secret_access_key langfuse_public_key langfuse_secret_key searxng_secret tikhub_api_key neo4j_auth; do
     printf '%s\n' 'staging-static-placeholder' > "$secret_dir/$name"
     chmod 600 "$secret_dir/$name"
 done
@@ -133,7 +133,7 @@ STREAM_MANAGER_TYPE=redis
 REDIS_DB=0
 REDIS_PREFIX=stream:
 WEKNORA_REDIS_NAMESPACE=weknora-v072-staging
-NEO4J_ENABLE=false
+NEO4J_ENABLE=true
 STORAGE_TYPE=s3
 LOCAL_STORAGE_BASE_DIR=/data/files
 MAX_FILE_SIZE_MB=50
@@ -249,7 +249,7 @@ jq -e '
 ' "$conflicting_config_json" >/dev/null || fail 'staging Compose accepted inherited OIDC endpoint drift'
 
 jq -e '
-    ([.services | keys[]] | sort) == ["app", "docreader", "frontend", "postgres", "redis", "searxng", "searxng-init"] and
+    ([.services | keys[]] | sort) == ["app", "docreader", "frontend", "neo4j", "postgres", "redis", "searxng", "searxng-init"] and
     ([.services[] | select(has("build"))] | length) == 0 and
     (.services.frontend.image | test("^ghcr\\.io/estromeglovettgen-coder/musuw-frontend@sha256:[0-9a-f]{64}$")) and
     (.services.app.image | test("^ghcr\\.io/estromeglovettgen-coder/musuw-app@sha256:[0-9a-f]{64}$")) and
@@ -264,7 +264,18 @@ jq -e '
     .services.app.environment.LANGFUSE_ENVIRONMENT == "staging" and
     .services.app.environment.OPENROUTER_WORKSPACE_ID == "00000000-0000-4000-8000-000000000001" and
     .services.app.environment.S3_BUCKET_NAME == "musuw-staging" and
-    .services.app.environment.NEO4J_ENABLE == "false" and
+    .services.app.environment.NEO4J_ENABLE == "true" and
+    .services.app.environment.NEO4J_URI == "bolt://neo4j:7687" and
+    .services.app.depends_on.neo4j.condition == "service_healthy" and
+    ([.services.app.secrets[] | select(.source == "neo4j_auth")] | length) == 1 and
+    .services.neo4j.container_name == "weknora-v072-staging-neo4j" and
+    (.services.neo4j.ports | length == 0) and (.services.neo4j.profiles | length == 0) and
+    (.services.neo4j.mem_limit | tonumber) == 805306368 and .services.neo4j.pids_limit == 256 and
+    .services.neo4j.environment.NEO4J_server_memory_heap_max__size == "256m" and
+    .services.neo4j.environment.NEO4J_server_memory_pagecache_size == "128m" and
+    (.services.neo4j.healthcheck.test | join(" ") | contains("7474")) and
+    .volumes["neo4j-data"].name == "weknora-v072-staging-neo4j-data" and
+    .secrets.neo4j_auth.file == "'"$secret_dir"'/neo4j_auth" and
     .services.app.environment.WEKNORA_REDIS_NAMESPACE == "weknora-v072-staging" and
     .services.app.environment.APP_EXTERNAL_URL == "https://staging.musuw.com" and
     .services.app.environment.OIDC_AUTH_AUTHORIZATION_ENDPOINT == "https://achfnnicetupvtoqiwqd.supabase.co/auth/v1/oauth/authorize" and
@@ -275,9 +286,9 @@ jq -e '
     (.services["searxng-init"].image == "busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662") and
     (.services.searxng.ports | length == 0) and
     (.services.searxng.profiles | length == 0) and (.services["searxng-init"].profiles | length == 0) and
-    ([.services[] | select((.cpus // "") != "" and (.mem_limit // "") != "" and (.pids_limit // "") != "")] | length) == 7 and
-    ([.services[].cpus | tonumber] | add) <= 1.5 and
-    ([.services[].mem_limit | tonumber] | add) <= 1932735283 and
+    ([.services[] | select((.cpus // "") != "" and (.mem_limit // "") != "" and (.pids_limit // "") != "")] | length) == 8 and
+    ([.services[].cpus | tonumber] | add) <= 1.75 and
+    ([.services[].mem_limit | tonumber] | add) <= 2717908992 and
     ([.services.app.secrets[] | select(.source == "langfuse_public_key" and .target == "langfuse_public_key")] | length) == 1 and
     ([.services.app.secrets[] | select(.source == "langfuse_secret_key" and .target == "langfuse_secret_key")] | length) == 1
 ' "$config_json" >/dev/null || fail 'staging Compose topology/resource contract failed'
@@ -301,4 +312,4 @@ if grep -Eq '^VITE_' "$runtime_dir/auth-public.env"; then
     fail 'staging auth public env retains build-time VITE aliases'
 fi
 
-printf '%s\n' 'staging static contract green: six-service native stack plus init, SearXNG health/search contract, isolated resources, Sandbox selector, immutable images, edge alias, metadata-only secrets'
+printf '%s\n' 'staging static contract green: seven-service native stack plus init, SearXNG health/search contract, isolated resources, Sandbox selector, immutable images, edge alias, metadata-only secrets'

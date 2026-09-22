@@ -12,7 +12,7 @@ Only effective Max users SHALL submit owned KB/agent references and private cont
 - **THEN** the backend denies the operation without changing publication
 
 ### Requirement: Independent automatic subscriptions
-Each buyer/product SHALL have an independent recurring subscription. Monthly and yearly prices MUST belong to the verified product/environment; default annual base price SHALL be ten monthly base amounts for one year of service. Product purchases MUST NOT modify membership plan, storage, or model credits.
+Each paid buyer/product SHALL have an independent recurring subscription. Monthly and yearly prices MUST belong to the verified product/environment; default annual base price SHALL be ten monthly base amounts for one year of service. Product purchases MUST NOT modify membership plan, storage, or model credits.
 
 #### Scenario: Coexisting products and membership
 - **WHEN** a member buys two different products and cancels renewal for one
@@ -68,3 +68,32 @@ The release SHALL remain staging-only, with Taylor featured and several labeled 
 #### Scenario: Sandbox release
 - **WHEN** the reviewed feature SHA is deployed
 - **THEN** staging uses the matching images/migrations/catalog and no production runtime or live billing configuration changes
+
+### Requirement: Reviewed free services
+Published free products SHALL have zero month/year price and no Paddle catalog identifiers. Authenticated users SHALL use them without checkout, orders or subscription grants, through the same approved resource scope, native chat and buyer model billing. Reviewed products MUST NOT switch between free and paid.
+
+#### Scenario: Free use without payment
+- **WHEN** a logged-in user opens an approved published free service
+- **THEN** they can use its native Flash chat without a payment flow and no billing records are created
+
+#### Scenario: Free scope and publication controls
+- **WHEN** a free service is unlisted, a source is unauthorized, or a caller injects another resource
+- **THEN** new questions are rejected before model use; free pricing does not bypass resource authorization
+
+#### Scenario: Free checkout refusal
+- **WHEN** a caller submits a checkout request for a free service
+- **THEN** the request is rejected without a Paddle transaction or local subscription
+
+### Requirement: Subscription entry consolidation
+Product details SHALL omit subscription-management buttons. The left sidebar SHALL omit its order-management shortcut; the market header SHALL retain the order entry. Orders SHALL retain the authenticated management entry; blocked existing subscriptions SHALL clearly direct the buyer to orders.
+
+#### Scenario: Product and order management
+- **WHEN** a buyer views an active or refunded provider-bound paid product
+- **THEN** the product has no management button and the sidebar has no order shortcut, while the market header still links to orders and the order entry retains management with financial restrictions unchanged
+
+### Requirement: Full Taylor staging delivery
+Taylor staging delivery SHALL contain the complete inventoried production library and persona, including persisted document content, chunks, indexes and available Wiki/graph data, with isolated target ownership and compatible model references. Source production data and billing MUST remain unchanged.
+
+#### Scenario: Verified full migration
+- **WHEN** the bounded full-data copy completes
+- **THEN** source/target manifests reconcile, native retrieval and necessary citations work, the existing paid product remains usable, and the page accurately describes the complete delivered content

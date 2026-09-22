@@ -2,10 +2,10 @@ package types
 
 import "context"
 
-// MarketplaceScopeContextKey carries the server-issued paid-resource grant.
+// MarketplaceScopeContextKey carries the server-issued reviewed-resource grant.
 const MarketplaceScopeContextKey ContextKey = "marketplace_scope"
 
-// MarketplaceScope is a request-local grant issued only after subscription
+// MarketplaceScope is a request-local grant issued only after product access
 // verification. It is not a replacement tenant identity and cannot be supplied
 // in JSON. Native retrieval consumes its exact approved resource set.
 type MarketplaceScope struct {
@@ -43,7 +43,7 @@ func MarketplaceScopeFromContext(ctx context.Context) (*MarketplaceScope, bool) 
 	return scope, ok && scope != nil && buyerID == scope.buyerTenantID
 }
 
-// ProductID identifies the purchased service for this turn.
+// ProductID identifies the reviewed service for this turn.
 func (s *MarketplaceScope) ProductID() string { return s.productID }
 
 // SourceTenantID is used only for approved retrieval, never caller model billing.

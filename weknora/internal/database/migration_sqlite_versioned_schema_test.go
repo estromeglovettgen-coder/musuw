@@ -13,7 +13,7 @@ import (
 // create to stay in sync with the versioned (PostgreSQL) migrations:
 // 000041 task queue, 000053 system settings, 000055 processing spans,
 // 000063 knowledge multi-tags, 000023 sandbox/artifact compatibility,
-// and 000024 creator marketplace billing.
+// 000024 creator marketplace billing, and 000025 free reviewed products.
 var versionedSQLiteTables = []string{
 	"task_pending_ops",
 	"task_dead_letters",
@@ -40,7 +40,7 @@ var versionedSQLiteColumns = map[string][]string{
 	"mcp_oauth_tokens":   {"principal_type", "principal_id"},    // 000064
 }
 
-const expectedSQLiteMigrationVersion = 24
+const expectedSQLiteMigrationVersion = 25
 
 func TestSQLiteMigrationsCreateVersionedSchema(t *testing.T) {
 	repoRoot := sqliteRepoRoot(t)

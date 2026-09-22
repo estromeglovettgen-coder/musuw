@@ -1,18 +1,19 @@
 import { test, expect, type Page } from '@playwright/test'
 
 const taylor = { id: 'taylor', title: '泰勒·测试环境样例', description: 'A curated question-answering service.', category: '知识', agent_id: 'platform-agent', agent_name: '泰勒专属智能体', knowledge_base_ids: ['platform-kb'], knowledge_base_names: ['泰勒知识库'], sample_questions: ['如何理解长期主义？'], default_model_id: 'builtin-deepseek-v4-flash', currency: 'USD', monthly_amount: 1900, yearly_amount: 19000, status: 'published', featured: true, fixture: false, checkout_available: true, created_at: '2026-09-22T00:00:00Z', updated_at: '2026-09-22T00:00:00Z', access: { can_chat: false, cancel_at_period_end: false } }
-async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; pending?: boolean; creatorDraft?: boolean; pendingOrder?: boolean; refundedOrder?: boolean; existingSubscription?: 'refunded' | 'canceled'; checkoutAvailable?: boolean } = {}) {
+async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; pending?: boolean; creatorDraft?: boolean; pendingOrder?: boolean; refundedOrder?: boolean; existingSubscription?: 'refunded' | 'canceled'; checkoutAvailable?: boolean; free?: boolean; unpublished?: boolean; reviewed?: boolean } = {}) {
   let paid = options.paid || false
+  const catalog = { ...taylor, ...(options.free ? { monthly_amount: 0, yearly_amount: 0 } : {}), reviewed_at: options.reviewed ? '2026-09-22T00:00:00Z' : undefined }
   const requests: Array<{ path: string; body: any }> = []
   const counts = { chat: 0, suggestion: 0, details: 0 }
-  let creatorProduct = options.creatorDraft ? { ...taylor, status: 'draft', contact: 'creator@example.test', authorization: 'I own these materials.', authorization_confirmed: true } : null
+  let creatorProduct = options.creatorDraft ? { ...catalog, status: 'draft', contact: 'creator@example.test', authorization: 'I own these materials.', authorization_confirmed: true } : null
   await page.addInitScript(() => {
     let callback: any
     ;(window as any).PaddleBillingV1 = { Environment: { set() {} }, Initialize({ eventCallback }: any) { callback = eventCallback }, Update() {}, Checkout: { open({ transactionId, settings }: any) { const frame = document.createElement('iframe'); frame.title = 'Paddle checkout'; frame.dataset.transactionId = transactionId; document.querySelector(`.${settings.frameTarget}`)?.append(frame) }, close() {} } }
     ;(window as any).__completePaddle = () => callback?.({ name: 'checkout.completed' })
     ;(window as any).__emitPaddleEvent = (name: string) => callback?.({ name })
   })
-  const product = () => ({ ...taylor, checkout_available: options.checkoutAvailable ?? taylor.checkout_available, access: { can_chat: paid, portal_available: paid || Boolean(options.existingSubscription), subscription_id: paid || options.existingSubscription ? 'sub_owned' : undefined, status: options.existingSubscription || (paid ? 'active' : undefined), paid_through: paid || options.existingSubscription ? '2026-10-22T00:00:00Z' : undefined, cancel_at_period_end: false } })
+  const product = () => ({ ...catalog, status: options.unpublished ? 'unpublished' : catalog.status, checkout_available: options.free ? false : options.checkoutAvailable ?? catalog.checkout_available, access: options.free ? { can_chat: !options.unpublished, portal_available: false, status: 'free', cancel_at_period_end: false } : { can_chat: paid, portal_available: paid || Boolean(options.existingSubscription), subscription_id: paid || options.existingSubscription ? 'sub_owned' : undefined, status: options.existingSubscription || (paid ? 'active' : undefined), paid_through: paid || options.existingSubscription ? '2026-10-22T00:00:00Z' : undefined, cancel_at_period_end: false } })
   await page.route('**/api/v1/**', async route => {
     const path = new URL(route.request().url()).pathname
     const method = route.request().method()
@@ -23,9 +24,10 @@ async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; 
     if (path === '/api/v1/sessions/chat-fixture') return route.fulfill({ json: { data: { id: 'chat-fixture', title: 'Marketplace chat' } } })
     if (path.endsWith('/creator-marketplace/products/taylor/checkout')) return route.fulfill({ json: { configured: true, environment: 'sandbox', client_token: 'test_fixture', transaction_id: 'txn_fixture', subscription_id: '' } })
     if (path.endsWith('/creator-marketplace/subscriptions/sub_owned/portal')) return route.fulfill({ json: { authorization_url: `${new URL(route.request().url()).origin}/portal-confirmed` } })
+    if (path.endsWith('/creator-marketplace/orders') && options.free) return route.fulfill({ json: { subscriptions: [], transactions: [], membership_management_path: '/plans' } })
     if (path.endsWith('/creator-marketplace/orders')) return route.fulfill({ json: { subscriptions: [{ id: 'sub_owned', portal_available: !options.pendingOrder, product_id: 'taylor', product_title: taylor.title, billing_period: 'monthly', amount: 1900, currency: 'USD', status: options.refundedOrder ? 'refunded' : options.pendingOrder ? 'creating' : 'active', paid_through: '2026-10-22T00:00:00Z', cancel_at_period_end: true, can_chat: !options.pendingOrder && !options.refundedOrder }], transactions: [{ id: 'txn_paid', product_id: 'taylor', product_title: taylor.title, status: 'completed', currency: 'USD', amount: '1900', billing_period: 'monthly', occurred_at: '2026-09-22T00:00:00Z' }], membership_management_path: '/plans' } })
     if (path.endsWith('/system/creator-marketplace/products/taylor/review')) return route.fulfill({ json: { data: product() } })
-    if (path.endsWith('/system/creator-marketplace/products')) return route.fulfill({ json: { data: [{ ...product(), status: options.pending ? 'pending' : 'published', platform_agent_id: 'platform-agent', platform_knowledge_base_ids: ['platform-kb'], paddle_product_id: 'pro_configured', monthly_price_id: 'pri_monthly', yearly_price_id: 'pri_yearly', contact: 'creator@example.test', authorization: 'Review fixture rights', authorization_confirmed: true }], total: 1 } })
+    if (path.endsWith('/system/creator-marketplace/products')) return route.fulfill({ json: { data: [{ ...product(), status: options.pending ? 'pending' : 'published', platform_agent_id: 'platform-agent', platform_knowledge_base_ids: ['platform-kb'], paddle_product_id: options.free ? '' : 'pro_configured', monthly_price_id: options.free ? '' : 'pri_monthly', yearly_price_id: options.free ? '' : 'pri_yearly', contact: 'creator@example.test', authorization: 'Review fixture rights', authorization_confirmed: true }], total: 1 } })
     if (path.endsWith('/creator-marketplace/creator/products/taylor/submit')) { creatorProduct = { ...creatorProduct!, status: 'pending' }; return route.fulfill({ json: { data: creatorProduct } }) }
     if (path.endsWith('/creator-marketplace/creator/products/taylor') && method === 'PUT') { const input = route.request().postDataJSON(); creatorProduct = { ...creatorProduct!, ...input, yearly_amount: input.monthly_amount * 10 }; return route.fulfill({ json: { data: creatorProduct } }) }
     if (path.endsWith('/creator-marketplace/creator/products')) return route.fulfill({ json: { data: creatorProduct ? [creatorProduct] : [], total: creatorProduct ? 1 : 0 } })
@@ -294,17 +296,24 @@ for (const marketplace of [true, false]) {
   })
 }
 
-test('a provider-bound refunded product offers subscription management instead of another checkout', async ({ page }) => {
-  const api = await mockMarket(page, { existingSubscription: 'refunded', checkoutAvailable: false })
-  await visit(page, '/platform/marketplace/taylor')
-  await expect(page.locator('.market-purchase')).toContainText('已退款')
-  await expect(page.locator('.market-purchase')).toContainText('该商品已有订阅，请先管理现有订阅。')
-  await expect(page.getByRole('button', { name: '订阅使用', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toHaveCount(0)
-  await page.getByRole('button', { name: '管理订阅', exact: true }).click()
-  await expect(page).toHaveURL(/portal-confirmed/)
-  expect(api.requests.map(request => request.path)).toEqual(['/api/v1/creator-marketplace/subscriptions/sub_owned/portal'])
-})
+for (const status of ['active', 'refunded'] as const) {
+  test(`${status} product routes subscription management through orders only`, async ({ page }) => {
+    const refunded = status === 'refunded'
+    const api = await mockMarket(page, { paid: !refunded, existingSubscription: refunded ? 'refunded' : undefined, refundedOrder: refunded, checkoutAvailable: false })
+    await visit(page, '/platform/marketplace/taylor')
+    await expect(page.locator('.market-purchase')).toContainText(refunded ? '已退款' : '使用中')
+    await expect(page.getByRole('button', { name: '管理订阅', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '订阅使用', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '开始提问', exact: true })).toHaveCount(refunded ? 0 : 1)
+    if (refunded) await expect(page.locator('.market-purchase')).toContainText('请前往订单管理查看和管理现有订阅。')
+    expect(api.requests).toHaveLength(0)
+    await page.getByRole('link', { name: '订单管理', exact: true }).click()
+    await expect(page.locator('.subscription-row .market-badge')).toHaveText(refunded ? '已退款' : '使用中')
+    await page.getByRole('button', { name: '管理订阅', exact: true }).click()
+    await expect(page).toHaveURL(/portal-confirmed/)
+    expect(api.requests.map(request => request.path)).toEqual(['/api/v1/creator-marketplace/subscriptions/sub_owned/portal'])
+  })
+}
 
 test('a terminal canceled product can start a new checkout when the server allows it', async ({ page }) => {
   const api = await mockMarket(page, { existingSubscription: 'canceled', checkoutAvailable: true })
@@ -314,3 +323,92 @@ test('a terminal canceled product can start a new checkout when the server allow
   await expect(page.locator('iframe[title="Paddle checkout"]')).toBeAttached()
   expect(api.requests.find(request => request.path.endsWith('/checkout'))?.body.billing_period).toBe('yearly')
 })
+
+test('a free product opens native Flash chat without a checkout, expiry or renewal offer', async ({ page }) => {
+  const api = await mockMarket(page, { free: true })
+  await visit(page, '/platform/creatChat')
+  await expect(page.locator('.market-home-entry')).toContainText('免费')
+  await page.getByRole('button', { name: 'Visit market', exact: true }).click()
+  await expect(page.locator('.market-featured .market-price')).toHaveText('免费')
+  await expect(page.locator('.market-card .market-price')).toHaveText('免费')
+  await page.getByRole('button', { name: '查看详情', exact: true }).first().click()
+  const purchase = page.locator('.market-purchase')
+  await expect(purchase.getByRole('heading', { name: '免费', exact: true })).toBeVisible()
+  await expect(purchase).not.toContainText(/有效至|可使用至|自动续费|税费|月付|年付/)
+  await expect(purchase).toContainText('AI 问答消耗您自己的 Musuw 模型额度。')
+  await expect(page.getByRole('button', { name: '订阅使用', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '管理订阅', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '开始提问', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText(taylor.title)
+  expect(api.requests).toHaveLength(0)
+  expect(api.counts.chat).toBe(0)
+  await page.locator('textarea').first().fill('Explain this free service')
+  await page.locator('[data-guide="chat-send"]').click()
+  await expect.poll(() => api.requests.find(r => r.path.includes('/agent-chat/'))?.body).toMatchObject({ marketplace_product_id: 'taylor', summary_model_id: 'builtin-deepseek-v4-flash' })
+  expect(api.requests.some(r => /\/checkout$|\/portal$/.test(r.path))).toBe(false)
+  await visit(page, '/platform/orders')
+  await expect(page.getByText('您还没有订阅知识商品。')).toBeVisible()
+  await page.getByRole('tab', { name: '付款记录', exact: true }).click()
+  await expect(page.getByText('暂无知识商品付款记录。')).toBeVisible()
+})
+
+test('an unpublished free product cannot start questions or checkout', async ({ page }) => {
+  const api = await mockMarket(page, { free: true, unpublished: true })
+  await visit(page, '/platform/marketplace/taylor')
+  await expect(page.locator('.market-purchase')).toContainText('该免费服务暂不可用。')
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '订阅使用', exact: true })).toHaveCount(0)
+  expect(api.requests).toHaveLength(0)
+})
+
+test('Max creator saves and submits a zero-price draft as a free product', async ({ page }) => {
+  const api = await mockMarket(page, { max: true, creatorDraft: true })
+  await visit(page, '/platform/creator-products')
+  await page.getByRole('button', { name: '编辑商品', exact: true }).click()
+  await page.locator('.market-form label').filter({ hasText: '月费（美元）' }).locator('input').fill('0')
+  await expect(page.locator('.market-form label').filter({ hasText: '年费（美元）' }).locator('input')).toHaveValue('0.00')
+  await page.getByRole('button', { name: '保存修改', exact: true }).click()
+  await expect.poll(() => api.requests.find(r => r.path.endsWith('/creator/products/taylor'))?.body.monthly_amount).toBe(0)
+  await expect(page.locator('article .market-note')).toHaveText('免费')
+  await page.getByRole('button', { name: '提交审核', exact: true }).click()
+  await expect(page.locator('article')).toContainText('待审核')
+})
+
+test('admin publishes a free product using platform resources without Paddle configuration', async ({ page }) => {
+  const api = await mockMarket(page, { free: true, max: true, pending: true })
+  await visit(page, '/platform/marketplace-admin')
+  await page.getByRole('button', { name: '审核商品', exact: true }).click()
+  await expect(page.getByText('免费服务无需配置 Paddle 商品或价格。')).toBeVisible()
+  await expect(page.locator('.market-form label').filter({ hasText: 'Paddle 商品 ID' })).toHaveCount(0)
+  await page.getByRole('button', { name: '通过并上架', exact: true }).click()
+  await expect.poll(() => api.requests.find(r => r.path.endsWith('/review'))?.body).toMatchObject({ action: 'approve', platform_agent_id: 'platform-agent', platform_knowledge_base_ids: ['platform-kb'], paddle_product_id: '', monthly_price_id: '', yearly_price_id: '' })
+  await expect(page.locator('.market-table tbody tr td').nth(2)).toHaveText('免费')
+})
+
+test('the sidebar omits orders in both widths while the marketplace header retains billing access', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await mockMarket(page, { paid: true })
+  await page.goto('/e2e/mobile-harness.html?page=/platform/marketplace/taylor')
+  const sidebar = page.locator('.visual-sidebar')
+  await expect(sidebar.getByRole('button', { name: '知识市场', exact: true })).toBeVisible()
+  await expect(sidebar.getByRole('button', { name: '订单管理', exact: true })).toHaveCount(0)
+  await sidebar.getByRole('button', { name: '收起侧边栏', exact: true }).click()
+  await expect(sidebar).toHaveClass(/is-collapsed/)
+  await expect(sidebar.getByRole('button', { name: '订单管理', exact: true })).toHaveCount(0)
+  await page.locator('.market-header').getByRole('link', { name: '订单管理', exact: true }).click()
+  await expect(page.locator('.subscription-row').getByRole('button', { name: '管理订阅', exact: true })).toBeVisible()
+})
+
+for (const free of [true, false]) {
+  test(`reviewed ${free ? 'free' : 'paid'} products cannot change their pricing mode in the editor`, async ({ page }) => {
+    const api = await mockMarket(page, { free, max: true, reviewed: true })
+    await visit(page, '/platform/marketplace-admin')
+    await page.getByRole('button', { name: '编辑商品', exact: true }).click()
+    const monthly = page.locator('.market-form label').filter({ hasText: '月费（美元）' }).locator('input')
+    await expect(monthly).toHaveValue(free ? '0.00' : '19.00')
+    await monthly.fill(free ? '1' : '0')
+    await page.getByRole('button', { name: '保存修改', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('已审核商品不能在免费与付费之间切换。')
+    expect(api.requests).toHaveLength(0)
+  })
+}

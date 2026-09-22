@@ -525,6 +525,12 @@ func TestMarketplaceApprovalUsesPlatformSnapshotAndHidesSubmissionSecrets(t *tes
 	access, err = svc.AuthorizeAccess(buyer, 8, p.ID, time.Now())
 	require.NoError(t, err)
 	require.Equal(t, "Reviewed private prompt", access.Agent.Config.SystemPrompt)
+	_, err = svc.ReviewProduct(marketplaceIdentity(99, "operator", true), p.ID,
+		types.MarketplaceReviewInput{Action: "unpublish"})
+	require.NoError(t, err)
+	access, err = svc.AuthorizeAccess(buyer, 8, p.ID, time.Now())
+	require.NoError(t, err, "paid buyers retain the purchased term after unlisting")
+	require.Equal(t, "paid", access.SubscriptionID)
 	_, err = svc.AuthorizeAccess(buyer, 8, p.ID, end)
 	require.ErrorIs(t, err, types.ErrMarketplaceForbidden)
 }
