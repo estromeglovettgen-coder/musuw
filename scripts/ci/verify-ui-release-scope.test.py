@@ -9,10 +9,12 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from runpy import run_path
 
 
 SCRIPT = Path(__file__).with_name("verify-ui-release-scope.py")
 SOURCE_ROOT = SCRIPT.resolve().parents[2]
+REVIEWED_UI_CONTENT = run_path(str(SCRIPT))["REVIEWED_UI_CONTENT"]
 
 
 class UiReleaseScopeTest(unittest.TestCase):
@@ -237,14 +239,39 @@ class UiReleaseScopeTest(unittest.TestCase):
             "e2e/mobile-layout.md",
         ):
             with self.subTest(path=path):
-                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                reviewed_content = (SOURCE_ROOT / path).read_text(encoding="utf-8")
+                if path == "weknora/frontend/index.html":
+                    # Reconstruct the historical presentation-only fixture.
+                    # Preserving explicit KB entry is a later behavior change,
+                    # not permission to widen the production UI release gate.
+                    current_guard = "if (path !== '/' && path !== '/platform') return;"
+                    historical_guard = (
+                        "if (path !== '/' && path !== '/platform' "
+                        "&& path !== '/platform/knowledge-bases') return;"
+                    )
+                    self.assertEqual(reviewed_content.count(current_guard), 1)
+                    reviewed_content = reviewed_content.replace(current_guard, historical_guard, 1)
+                    blob = subprocess.run(
+                        ["git", "hash-object", "--stdin"], input=reviewed_content,
+                        text=True, capture_output=True, check=True,
+                    ).stdout.strip()
+                    self.assertIn(blob, REVIEWED_UI_CONTENT[path])
+                self.write(path, reviewed_content)
                 reviewed = self.commit("reviewed mobile presentation")
-                self.assert_scope_passes(self.run_scope(self.base, reviewed))
-                self.write(path, "unreviewed content\n")
-                unreviewed = self.commit("unreviewed change to mobile presentation")
-                self.assert_scope_rejects(self.run_scope(reviewed, unreviewed))
-                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
-                self.commit("restore reviewed mobile presentation")
+                try:
+                    self.assert_scope_passes(self.run_scope(self.base, reviewed))
+                    self.write(path, "unreviewed content\n")
+                    unreviewed = self.commit("unreviewed change to mobile presentation")
+                    self.assert_scope_rejects(self.run_scope(reviewed, unreviewed))
+                finally:
+                    self.write(path, reviewed_content)
+                    self.commit("restore reviewed mobile presentation")
+
+    def test_explicit_knowledge_base_entry_change_requires_more_than_ui_release_acceptance(self) -> None:
+        path = "weknora/frontend/index.html"
+        self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+        candidate = self.commit("preserve explicit knowledge-base entry")
+        self.assert_scope_rejects(self.run_scope(self.base, candidate))
 
     def test_reviewed_path_still_rejects_symlink(self) -> None:
         link = self.repo / "auth/src/AuthShowcase.tsx"
