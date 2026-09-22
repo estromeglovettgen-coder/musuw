@@ -233,7 +233,7 @@ frontend/src/assets/musuwTDesignOverlayBridge.test.mjs	A	-	100644	89862ffd664509
 frontend/src/assets/musuwThemeBootCanvas.test.mjs	A	-	100644	c71aaa2d903fe7ec8d4c0ff3f855c2f93d62ebbe	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwThemeColorContract.test.mjs	A	-	100644	2db29a7e59f3aece01349d22be74b125613f14f8	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwVisualContract.test.mjs	A	-	100644	ca93030f6a1ba0c6c769efa8d7c9a0d86711031b	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-frontend/src/assets/musuwWeKnoraVisibleBehaviorContract.test.mjs	A	-	100644	71f94ef3528cc8041bf9f29146548da11001ad26	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/assets/musuwWeKnoraVisibleBehaviorContract.test.mjs	A	-	100644	953064135e88b03dcc94b058ca5e1e29b768e938	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/theme/theme.css	M	-	100644	baa43d95c89353615fbd3f702d87f790b0c6bdb5	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/components/AgentEmbedChannelPanel.vue	-	M	100644	0ef459de9382520caf75e21075fe36ca69156d29	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/components/AgentListContextualGuideBridge.vue	A	-	100644	b48d75cf5c12e518a872bd70985665457a1b3250	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
@@ -315,7 +315,7 @@ frontend/src/composables/useTheme.ts	M	-	100644	ee24784e912bfc944376d3cb5ada54b2
 frontend/src/config/deploymentCapabilities.test.ts	-	A	100644	09bf8f8f5ec81d37c71a12037a15345ed4c63e0d	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/config/deploymentCapabilities.ts	-	A	100644	e6219eb13b817cdbb5cd5fe24e38512ef653db6f	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/config/integrations.ts	-	M	100644	65166e3343e46d4d20ea1f4c8fe798e931499ced	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
-frontend/src/config/managedExperienceUi.test.mjs	A	-	100644	40e9c8a9ed93ab0725af009c4a5302a0cd852a75	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/config/managedExperienceUi.test.mjs	A	-	100644	58090bb12a8bd06360269eb1a717f64e9abd7499	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/config/settingsAccess.test.ts	M	M	100644	81d2186fd9ae078172fa024277428964f109318d	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/config/settingsAccess.ts	M	M	100644	91288d9b86df7030d9da23c311b0127ae37bdadc	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/config/settingsRoute.test.ts	-	A	100644	680917cf302dee9a5f7172414440671e004584d9	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
