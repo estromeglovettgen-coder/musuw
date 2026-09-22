@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { listMarketplaceLibrary, type MarketplaceLibraryEntry } from '@/api/creator-marketplace'
 import WikiBrowser from '@/views/knowledge/wiki/WikiBrowser.vue'
-import './marketplace.css'
 
 const route = useRoute()
 const router = useRouter()
@@ -63,54 +62,55 @@ function showGraph(slug: string) {
 </script>
 
 <template>
-  <main class="market-page market-library-reader">
-    <header class="market-library-reader__header">
-      <RouterLink class="market-link" to="/platform/knowledge-bases">{{ $t('creatorMarketplace.libraryBack') }}</RouterLink>
-      <div class="market-library-reader__title">
-        <h1>{{ entry?.name || $t('creatorMarketplace.libraryTitle') }}</h1>
-        <t-tag variant="light">{{ $t('creatorMarketplace.libraryReadOnly') }}</t-tag>
+  <main class="visual-knowledge-page market-library-reader" :class="{ 'is-graph-tab': view === 'graph' }">
+    <header class="visual-knowledge-header">
+      <div class="visual-knowledge-header__copy">
+        <nav class="visual-knowledge-breadcrumb" :aria-label="$t('menu.knowledgeBase')">
+          <button type="button" class="visual-knowledge-breadcrumb__back" @click="router.push('/platform/knowledge-bases')">
+            <t-icon name="chevron-left" /><span>{{ $t('menu.knowledgeBase') }}</span>
+          </button>
+          <span class="visual-knowledge-breadcrumb__sep">/</span>
+          <button type="button" class="visual-knowledge-breadcrumb__current" disabled>
+            <span>{{ entry?.name || $t('creatorMarketplace.libraryTitle') }}</span>
+          </button>
+          <template v-if="viewer?.entry.wiki_enabled">
+            <span class="visual-knowledge-breadcrumb__sep">/</span>
+            <span class="visual-knowledge-breadcrumb__section">{{ view === 'browser' ? 'Wiki' : $t('knowledgeEditor.wikiBrowser.tabGraph') }}</span>
+          </template>
+        </nav>
       </div>
-      <p v-if="entry">{{ entry.product_title }}</p>
-      <p v-if="entry?.can_read && !failure && entry.paid_through">{{ $t(entry.cancel_at_period_end ? 'creatorMarketplace.cancelScheduled' : 'creatorMarketplace.availableUntil', { date: new Date(entry.paid_through).toLocaleDateString() }) }}</p>
-      <div class="market-library-reader__actions">
-        <template v-if="viewer?.entry.wiki_enabled">
-          <t-button :theme="view === 'browser' ? 'primary' : 'default'" :variant="view === 'browser' ? 'base' : 'outline'" @click="view = 'browser'">Wiki</t-button>
-          <t-button :theme="view === 'graph' ? 'primary' : 'default'" :variant="view === 'graph' ? 'base' : 'outline'" @click="view = 'graph'">{{ $t('creatorMarketplace.libraryGraph') }}</t-button>
-        </template>
-        <t-button v-if="entry?.can_read && !failure && !loading" theme="primary" :loading="openingChat" @click="ask">{{ $t('creatorMarketplace.startChat') }}</t-button>
+      <div v-if="entry?.can_read && !failure && !loading" class="visual-knowledge-header__actions">
+        <div v-if="viewer?.entry.wiki_enabled" class="visual-knowledge-tabs" role="tablist">
+          <button type="button" :class="{ 'is-active': view === 'browser' }" role="tab" :aria-selected="view === 'browser'" @click="view = 'browser'">
+            <t-icon name="book" /><span>Wiki</span>
+          </button>
+          <button type="button" :class="{ 'is-active': view === 'graph' }" role="tab" :aria-selected="view === 'graph'" @click="view = 'graph'">
+            <t-icon name="chart-bubble" /><span>{{ $t('knowledgeEditor.wikiBrowser.tabGraph') }}</span>
+          </button>
+        </div>
+        <t-button theme="default" variant="outline" size="small" :loading="openingChat" @click="ask">{{ $t('creatorMarketplace.startChat') }}</t-button>
       </div>
-      <p>{{ $t('creatorMarketplace.allowanceNote') }}</p>
     </header>
     <div v-if="loading" role="status"><t-loading /></div>
     <div v-else-if="failure" class="market-library-reader__notice" role="alert">
       <p>{{ $t(failure === 'denied' ? 'creatorMarketplace.libraryDenied' : 'creatorMarketplace.libraryLoadFailed') }}</p>
-      <RouterLink v-if="failure === 'denied'" class="market-link" to="/platform/orders">{{ $t('creatorMarketplace.orders') }}</RouterLink>
+      <t-link v-if="failure === 'denied'" theme="default" href="/platform/orders" @click.prevent="router.push('/platform/orders')">{{ $t('creatorMarketplace.orders') }}</t-link>
       <t-button v-else theme="default" variant="outline" @click="load">{{ $t('creatorMarketplace.retry') }}</t-button>
     </div>
-    <WikiBrowser v-else-if="viewer?.entry.wiki_enabled" :key="viewer.key"
-      :knowledge-base-id="viewer.entry.knowledge_base_id" :marketplace-product-id="viewer.entry.product_id"
-      :can-edit="false" :view="view" @read-error="viewer.onError" @view-graph="showGraph" />
+    <section v-else-if="viewer?.entry.wiki_enabled" class="visual-knowledge-wiki-host">
+      <WikiBrowser :key="viewer.key"
+        :knowledge-base-id="viewer.entry.knowledge_base_id" :marketplace-product-id="viewer.entry.product_id"
+        :can-edit="false" :view="view" @read-error="viewer.onError" @view-graph="showGraph" />
+    </section>
     <p v-else role="status">{{ $t('creatorMarketplace.libraryEmpty') }}</p>
   </main>
 </template>
 
-<style scoped>
-.market-page.market-library-reader { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 20px; color: var(--td-text-color-primary); overflow: auto; }
-.market-library-reader__header { flex: 0 0 auto; min-width: 0; }
-.market-library-reader__header p { margin: 8px 0; font-size: 12px; color: var(--td-text-color-secondary); overflow-wrap: anywhere; }
-.market-library-reader__title, .market-library-reader__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.market-library-reader__title h1 { margin: 12px 0; font-size: 20px; overflow-wrap: anywhere; }
-.market-library-reader__notice { padding: 24px 0; }
-.market-library-reader :deep(.wiki-browser) { flex: 1; min-height: 450px; min-width: 0; }
-@media (max-width: 640px) {
-  .market-page.market-library-reader { padding: 12px; }
-  .market-library-reader :deep(.wiki-browser) { flex-direction: column; min-height: 580px; }
-  .market-library-reader :deep(.wiki-sidebar) { width: 100%; min-width: 0; max-height: 230px; flex: 0 0 230px; }
-  .market-library-reader :deep(.wiki-reader) { min-height: 320px; }
-  .market-library-reader :deep(.wiki-reader-header) { padding: 12px; }
-  .market-library-reader :deep(.wiki-reader-body) { padding: 16px; overflow-wrap: anywhere; }
-  .market-library-reader :deep(.wiki-reader-footer) { padding: 12px; }
-  .market-library-reader :deep(.wiki-graph-search-container) { max-width: calc(100% - 24px); }
-  .market-library-reader :deep(.wiki-graph-legend) { max-width: calc(100% - 24px); }
+<style scoped lang="less">
+@import '../knowledge/components/knowledge-base-layout.less';
+.market-library-reader__notice { padding: 24px 0; color: var(--td-text-color-secondary); }
+@media (max-width: 760px) {
+  .market-library-reader .visual-knowledge-tabs { min-width: 0; flex: 1 1 0; }
+  .market-library-reader .visual-knowledge-header__actions > :deep(.t-button) { flex-shrink: 0; }
 }
 </style>

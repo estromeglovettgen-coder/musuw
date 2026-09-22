@@ -26,7 +26,7 @@ async function load() {
 }
 watch(() => [auth.user?.id, auth.currentTenantId, auth.selectedTenantId], load, { immediate: true })
 onUnmounted(() => { sequence++ })
-const card = (entry: MarketplaceLibraryEntry) => ({ name: entry.name, description: entry.description, type: 'document' })
+const card = (entry: MarketplaceLibraryEntry) => ({ name: entry.name, description: entry.description, type: 'document', indexing_strategy: { wiki_enabled: entry.wiki_enabled } })
 const open = (entry: MarketplaceLibraryEntry) => router.push({ name: 'marketplaceKnowledgeBase', params: { productId: entry.product_id, kbId: entry.knowledge_base_id } })
 </script>
 
@@ -37,18 +37,16 @@ const open = (entry: MarketplaceLibraryEntry) => router.push({ name: 'marketplac
       <p>{{ $t('creatorMarketplace.libraryLoadFailed') }}</p>
       <t-button variant="outline" @click="load">{{ $t('creatorMarketplace.retry') }}</t-button>
     </div>
-    <div v-else class="market-library-cards__grid">
+    <div v-else class="visual-kb-grid">
       <KnowledgeBaseListReferenceCard
         v-for="entry in entries" :key="`${entry.product_id}:${entry.knowledge_base_id}`"
         :kb="card(entry)" shared :can-favorite="false" :can-duplicate="false" :can-manage="false"
+        :show-strategies="entry.wiki_enabled" :show-footer="!entry.can_read"
         role="button" tabindex="0" :aria-label="entry.name" @open="open(entry)"
         @keydown.enter.prevent="open(entry)" @keydown.space.prevent="open(entry)"
       >
-        <template #strategies><span v-if="entry.wiki_enabled">Wiki · {{ $t('creatorMarketplace.libraryGraph') }}</span></template>
         <template #footer>
-          <span class="market-library-cards__status">{{ $t('creatorMarketplace.libraryReadOnly') }}</span>
-          <span v-if="!entry.can_read">{{ $t('creatorMarketplace.libraryUnavailable') }} · {{ $t(`creatorMarketplace.status.${entry.status}`) }}</span>
-          <span v-else-if="entry.paid_through">{{ $t('creatorMarketplace.availableUntil', { date: new Date(entry.paid_through).toLocaleDateString() }) }}</span>
+          <span>{{ $t('creatorMarketplace.libraryUnavailable') }}</span>
         </template>
       </KnowledgeBaseListReferenceCard>
     </div>
@@ -58,7 +56,4 @@ const open = (entry: MarketplaceLibraryEntry) => router.push({ name: 'marketplac
 <style scoped>
 .market-library-cards { min-width: 0; margin-bottom: 24px; }
 .market-library-cards h2 { margin: 0 0 12px; font-size: 15px; }
-.market-library-cards__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 16px; }
-.market-library-cards__status { color: var(--td-text-color-secondary); }
-.market-library-cards :deep(.visual-reference-kb-card__footer) { flex-wrap: wrap; font-size: 12px; gap: 8px; }
 </style>

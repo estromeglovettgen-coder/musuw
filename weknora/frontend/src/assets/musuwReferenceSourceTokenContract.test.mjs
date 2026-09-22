@@ -61,9 +61,11 @@ test('QAPanel.tsx message stream tokens remain mechanically translated', () => {
 })
 
 test('KnowledgeBase.tsx and DocumentListView.tsx tokens remain mechanically translated', () => {
-  expectTokens('../views/knowledge/KnowledgeBase.vue', [
+  expectTokens('../views/knowledge/components/knowledge-base-layout.less', [
     'padding: 20px 28px;', 'gap: 20px;', 'padding-bottom: 16px;',
     'padding: 4px;', 'border-radius: 12px;', 'padding: 6px 14px;', 'font-size: 12px;',
+  ])
+  expectTokens('../views/knowledge/KnowledgeBase.vue', [
     'padding: 10px;', 'border-radius: 16px;', 'padding: 4px 10px;',
   ])
   expectTokens('../views/knowledge/components/KbFolderTree.vue', [

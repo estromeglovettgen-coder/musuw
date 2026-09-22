@@ -38,6 +38,7 @@ const router = createRouter({
     { path: 'knowledge-bases/:kbId', name: 'knowledgeBase', component: () => import('@/views/knowledge/KnowledgeBase.vue') },
     { path: 'agents', name: 'agentList', component: () => import('@/views/agent/AgentList.vue') },
     { path: 'settings', name: 'settings', component: () => import('@/views/settings/Settings.vue') },
+    { path: 'marketplace/:productId/knowledge-bases/:kbId', name: 'marketplaceKnowledgeBase', component: () => import('@/views/marketplace/MarketplaceKnowledgeBase.vue') },
     { path: 'marketplace/:productId', name: 'marketplaceProduct', component: () => import('@/views/marketplace/ProductDetail.vue') },
     { path: 'orders', name: 'marketplaceOrders', component: () => import('@/views/marketplace/Orders.vue') },
   ] }],

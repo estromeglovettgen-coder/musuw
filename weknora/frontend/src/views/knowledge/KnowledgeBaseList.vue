@@ -164,9 +164,9 @@ export default defineComponent({
         </article>
       </section>
 
-      <MarketplaceLibraryCards v-if="authStore.isLiteMode || spaceSelection === 'all'" @count="marketLibraryCount = $event" />
-
       <section class="visual-kb-list__content">
+        <MarketplaceLibraryCards v-if="authStore.isLiteMode || spaceSelection === 'all'" @count="marketLibraryCount = $event" />
+
         <div v-if="loading && kbs.length === 0 && !spaceSelectionOrgId" class="visual-kb-grid" aria-hidden="true">
           <article v-for="n in 6" :key="n" class="visual-kb-list__skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '62%', height: '16px' },{ width: '100%', height: '12px' },{ width: '76%', height: '12px' }]" /></article>
         </div>
@@ -331,7 +331,7 @@ export default defineComponent({
 .visual-kb-upload-status__bar { height: 2px; margin-top: 4px; overflow: hidden; border-radius: 999px; background: #e5e7eb; }
 .visual-kb-upload-status__bar span { display: block; height: 100%; background: #6b7280; transition: width 140ms linear; }
 .visual-kb-list__content { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 24px 4px 12px 2px; scrollbar-width: thin; }
-.visual-kb-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+:deep(.visual-kb-grid) { display: grid; grid-template-columns: 1fr; gap: 18px; }
 .visual-reference-kb-card-host { min-width: 0; }
 .visual-kb-section { grid-column: 1 / -1; min-height: 28px; margin-top: 4px; padding: 4px 2px; border: 0; display: flex; align-items: center; gap: 6px; background: transparent; color: #9ca3af; font: inherit; font-size: 11px; font-weight: 600; text-align: left; cursor: pointer; }
 .visual-kb-section:hover { color: #374151; }
@@ -368,8 +368,8 @@ export default defineComponent({
 .visual-shared-detail-enter-active .visual-shared-detail,.visual-shared-detail-leave-active .visual-shared-detail { transition: transform 180ms ease; }
 .visual-shared-detail-enter-from,.visual-shared-detail-leave-to { opacity: 0; }
 .visual-shared-detail-enter-from .visual-shared-detail,.visual-shared-detail-leave-to .visual-shared-detail { transform: translateX(100%); }
-@media (min-width: 768px) { .visual-kb-list { padding: 32px; } .visual-kb-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-@media (min-width: 1024px) { .visual-kb-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media (min-width: 768px) { .visual-kb-list { padding: 32px; } :deep(.visual-kb-grid) { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (min-width: 1024px) { :deep(.visual-kb-grid) { grid-template-columns: repeat(3,minmax(0,1fr)); } }
 @media (max-width: 760px) { .visual-kb-workspace > :deep(.list-space-sidebar) { display: none; } }
 @media (max-width: 600px) { .visual-kb-list__header { align-items: flex-start; flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { .visual-kb-list__create,.visual-kb-upload-status__bar span,.visual-shared-detail-enter-active,.visual-shared-detail-leave-active,.visual-shared-detail-enter-active .visual-shared-detail,.visual-shared-detail-leave-active .visual-shared-detail { transition: none !important; } }
