@@ -212,7 +212,7 @@ frontend/src/assets/musuwFinalVisualContract.test.mjs	A	-	100644	4d7809a8eb2b1a2
 frontend/src/assets/musuwInputFieldBusinessParity.test.mjs	A	-	100644	af82ac21537d70ce889642cef33fb3b6fb3b2cd7	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuwKBEditorInnerFinal.test.mjs	A	-	100644	c05b49a6126236eca7b0a23906fd001adbdfb1c2	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwKnowledgeBaseBusinessParity.test.mjs	A	-	100644	4d0718341a73728c515fd0b2f940bb07f72ae1c3	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-frontend/src/assets/musuwKnowledgeBaseListBusinessParity.test.mjs	A	-	100644	d1faf1fead013042bd086116786df8e9bbcc262c	preserve-musuw-exact		audited local-only content is byte-identical
+frontend/src/assets/musuwKnowledgeBaseListBusinessParity.test.mjs	A	-	100644	adf30e5b8704e10632f018e7d9e4c116d144161a	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/assets/musuwKnowledgeDarkTheme.test.mjs	A	-	100644	bd253c9ca79f8643e81ddabdf43f73c067cd3de6	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwManualEditorBusinessParity.test.mjs	A	-	100644	b55e0e7b3cc95b3df9d89c8a2dd064a5a18675dd	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/assets/musuwMeasuredVisualContract.test.mjs	A	-	100644	4faf0b6775c4b8414dc90b6f2d9f8acd4fb8d453	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
@@ -514,7 +514,7 @@ frontend/src/views/knowledge/components/UploadConfirmDialog.test.ts	M	-	100644	3
 frontend/src/views/knowledge/components/UrlImportPolicy.test.mjs	A	-	100644	0cba84b372a04d280809e3bc20bc8267b34de28c	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/knowledge/knowledgeDownloadFileName.test.ts	-	A	100644	18dee61dcca980cf1509cdeeafd8f6b32c2700a0	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/knowledge/knowledgeDownloadFileName.ts	-	A	100644	08ceb8ceead50d07e25cfd4fc8780e4cc21e1545	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-frontend/src/views/knowledge/liteFaqVisibility.test.mjs	A	-	100644	f05904b48f883d20b51da35ad1c2ec4534f3651f	preserve-musuw-exact		audited local-only content is byte-identical
+frontend/src/views/knowledge/liteFaqVisibility.test.mjs	A	-	100644	29dc0be0114632a11f507f8886e9547f0e23bc85	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/knowledge/settings/DataSourceEditorDialog.vue	-	M	100644	10d8b6c312a9e17999e5e7f6c645010916b3e056	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/views/knowledge/settings/DataSourceSettings.vue	-	M	100644	d8ed8ed5ae09f6596cb1c3cf45e5793d16cfd943	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/views/knowledge/settings/DataSourceTypeIcon.vue	-	M	100644	a3cf664a6036c78887856bf33bf943435de5e22d	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
