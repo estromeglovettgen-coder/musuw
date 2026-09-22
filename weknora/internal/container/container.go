@@ -372,6 +372,10 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	logger.Debugf(ctx, "[Container] Data source sync framework registered")
 	must(container.Invoke(startAuditLogRetention))
 	logger.Debugf(ctx, "[Container] Audit log retention runner registered")
+	// Account erasure recovery resolves marketplace billing before HTTP handlers
+	// are registered, so its shared Paddle transport must already be provided.
+	must(container.Provide(handler.NewEntitlementHandler))
+	must(container.Provide(handler.NewMarketplacePaymentGateway))
 	must(container.Provide(service.NewHousekeepingService))
 	must(container.Invoke(configureAccountErasureRecovery))
 	must(container.Invoke(startHousekeepingService))
@@ -418,8 +422,6 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(handler.NewMessageHandler))
 	must(container.Provide(handler.NewMessageSuggestionHandler))
 	must(container.Provide(handler.NewModelHandlerWithConsumerResolver))
-	must(container.Provide(handler.NewEntitlementHandler))
-	must(container.Provide(handler.NewMarketplacePaymentGateway))
 	must(container.Provide(handler.NewMarketplaceHandler))
 	must(container.Provide(handler.NewSandboxConfigHandler))
 	must(container.Provide(func(

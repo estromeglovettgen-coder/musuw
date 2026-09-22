@@ -947,7 +947,7 @@ internal/common/tools_test.go	-	M	100644	53ec83d8b6805582777b90b724351196e39c28b
 internal/config/auth_legacy_env_test.go	-	M	100644	fcf6d066238b734e1a7b7b865da439e05295edef	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/config/config.go	-	M	100644	2408a8dcf0c5c521de448555127de32fc4ebed6e	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/config/prompt_branding_test.go	A	-	100644	1f7195a5e229dc3af2296b9ab394a1047e777071	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
-internal/container/container.go	M	M	100644	8cf986ed841ac85345feb8569bbef09b137a2295	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/container/container.go	M	M	100644	35652ea4b5080fad962359b9e03a9069eb248209	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/container/engine_factory.go	-	M	100644	c37f757d5b4e0e76df05b8e6b1e1ad0b8e1d3649	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/container/engine_factory_test.go	-	M	100644	6114df4a5070263bd04cf68cdca919c3e8dc46c4	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/container/sandbox.go	-	A	100644	ceae1f826ea5b01de618ca69000dd0e914e27b12	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
