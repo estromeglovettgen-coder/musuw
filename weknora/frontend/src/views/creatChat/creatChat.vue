@@ -561,7 +561,7 @@ const handleKBEditorSuccess = (kbId: string) => {
 </style>
 
 <style scoped>
-.market-service-selection { display: flex; justify-content: space-between; gap: 18px; width: 100%; padding: 14px 16px; border: 1px solid var(--td-component-stroke); border-radius: 12px; font-size: 13px; color: var(--td-text-color-primary); }
+.market-service-selection { box-sizing: border-box; display: flex; justify-content: space-between; gap: 18px; width: 100%; padding: 14px 16px; border: 1px solid var(--td-component-stroke); border-radius: 12px; font-size: 13px; color: var(--td-text-color-primary); }
 .market-service-selection strong { font-weight: 600; }
 .market-service-selection p { color: var(--td-text-color-secondary); font-size: 12px; line-height: 1.6; margin: 6px 0 0; }
 .market-service-selection button { background: none; color: var(--td-text-color-secondary); border: 0; cursor: pointer; font-size: 12px; flex-shrink: 0; }

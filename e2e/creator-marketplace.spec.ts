@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 
 const taylor = { id: 'taylor', title: '泰勒·测试环境样例', description: 'A curated question-answering service.', category: '知识', agent_id: 'platform-agent', agent_name: '泰勒专属智能体', knowledge_base_ids: ['platform-kb'], knowledge_base_names: ['泰勒知识库'], sample_questions: ['如何理解长期主义？'], default_model_id: 'builtin-deepseek-v4-flash', currency: 'USD', monthly_amount: 1900, yearly_amount: 19000, status: 'published', featured: true, fixture: false, checkout_available: true, created_at: '2026-09-22T00:00:00Z', updated_at: '2026-09-22T00:00:00Z', access: { can_chat: false, cancel_at_period_end: false } }
-async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; pending?: boolean; creatorDraft?: boolean; pendingOrder?: boolean } = {}) {
+async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; pending?: boolean; creatorDraft?: boolean; pendingOrder?: boolean; refundedOrder?: boolean } = {}) {
   let paid = options.paid || false
   const requests: Array<{ path: string; body: any }> = []
   const counts = { chat: 0, suggestion: 0, details: 0 }
@@ -10,6 +10,7 @@ async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; 
     let callback: any
     ;(window as any).PaddleBillingV1 = { Environment: { set() {} }, Initialize({ eventCallback }: any) { callback = eventCallback }, Update() {}, Checkout: { open({ transactionId, settings }: any) { const frame = document.createElement('iframe'); frame.title = 'Paddle checkout'; frame.dataset.transactionId = transactionId; document.querySelector(`.${settings.frameTarget}`)?.append(frame) }, close() {} } }
     ;(window as any).__completePaddle = () => callback?.({ name: 'checkout.completed' })
+    ;(window as any).__emitPaddleEvent = (name: string) => callback?.({ name })
   })
   const product = () => ({ ...taylor, access: { can_chat: paid, portal_available: paid, subscription_id: paid ? 'sub_owned' : undefined, status: paid ? 'active' : undefined, paid_through: paid ? '2026-10-22T00:00:00Z' : undefined, cancel_at_period_end: false } })
   await page.route('**/api/v1/**', async route => {
@@ -22,7 +23,7 @@ async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; 
     if (path === '/api/v1/sessions/chat-fixture') return route.fulfill({ json: { data: { id: 'chat-fixture', title: 'Marketplace chat' } } })
     if (path.endsWith('/creator-marketplace/products/taylor/checkout')) return route.fulfill({ json: { configured: true, environment: 'sandbox', client_token: 'test_fixture', transaction_id: 'txn_fixture', subscription_id: '' } })
     if (path.endsWith('/creator-marketplace/subscriptions/sub_owned/portal')) return route.fulfill({ json: { authorization_url: `${new URL(route.request().url()).origin}/portal-confirmed` } })
-    if (path.endsWith('/creator-marketplace/orders')) return route.fulfill({ json: { subscriptions: [{ id: 'sub_owned', portal_available: !options.pendingOrder, product_id: 'taylor', product_title: taylor.title, billing_period: 'monthly', amount: 1900, currency: 'USD', status: options.pendingOrder ? 'creating' : 'active', paid_through: '2026-10-22T00:00:00Z', cancel_at_period_end: true, can_chat: !options.pendingOrder }], transactions: [{ id: 'txn_paid', product_id: 'taylor', product_title: taylor.title, status: 'completed', currency: 'USD', amount: '1900', billing_period: 'monthly', occurred_at: '2026-09-22T00:00:00Z' }], membership_management_path: '/plans' } })
+    if (path.endsWith('/creator-marketplace/orders')) return route.fulfill({ json: { subscriptions: [{ id: 'sub_owned', portal_available: !options.pendingOrder, product_id: 'taylor', product_title: taylor.title, billing_period: 'monthly', amount: 1900, currency: 'USD', status: options.refundedOrder ? 'refunded' : options.pendingOrder ? 'creating' : 'active', paid_through: '2026-10-22T00:00:00Z', cancel_at_period_end: true, can_chat: !options.pendingOrder && !options.refundedOrder }], transactions: [{ id: 'txn_paid', product_id: 'taylor', product_title: taylor.title, status: 'completed', currency: 'USD', amount: '1900', billing_period: 'monthly', occurred_at: '2026-09-22T00:00:00Z' }], membership_management_path: '/plans' } })
     if (path.endsWith('/system/creator-marketplace/products/taylor/review')) return route.fulfill({ json: { data: product() } })
     if (path.endsWith('/system/creator-marketplace/products')) return route.fulfill({ json: { data: [{ ...product(), status: options.pending ? 'pending' : 'published', platform_agent_id: 'platform-agent', platform_knowledge_base_ids: ['platform-kb'], paddle_product_id: 'pro_configured', monthly_price_id: 'pri_monthly', yearly_price_id: 'pri_yearly', contact: 'creator@example.test', authorization: 'Review fixture rights', authorization_confirmed: true }], total: 1 } })
     if (path.endsWith('/creator-marketplace/creator/products/taylor/submit')) { creatorProduct = { ...creatorProduct!, status: 'pending' }; return route.fulfill({ json: { data: creatorProduct } }) }
@@ -67,7 +68,47 @@ test('yearly checkout waits for server access after Paddle completion', async ({
   expect(api.counts.chat).toBe(0)
 })
 
+test('a declined payment keeps the same checkout available for retry without an opening error', async ({ page }) => {
+  const api = await mockMarket(page)
+  await visit(page, '/platform/marketplace/taylor')
+  await page.getByRole('button', { name: '订阅使用', exact: true }).click()
+  const frame = page.locator('iframe[title="Paddle checkout"]')
+  await expect(frame).toBeAttached()
+  const originalFrame = await frame.elementHandle()
+  const initialDetails = api.counts.details
+  await page.evaluate(() => (window as any).__emitPaddleEvent('checkout.payment.failed'))
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '重试结账', exact: true })).toHaveCount(0)
+  expect(await originalFrame!.evaluate(element => element.isConnected)).toBe(true)
+  await expect(frame).toHaveAttribute('data-transaction-id', 'txn_fixture')
+  expect(api.counts.details).toBe(initialDetails)
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toHaveCount(0)
+  // Paddle retries payment inside this checkout; our integration must not reopen it or create another intent.
+  await page.evaluate(() => (window as any).__emitPaddleEvent('checkout.payment.initiated'))
+  expect(await originalFrame!.evaluate(element => element.isConnected)).toBe(true)
+  await page.evaluate(() => (window as any).__completePaddle())
+  await expect(page.getByRole('heading', { name: '已收到付款结果，正在确认订阅。' })).toBeVisible()
+  api.activate()
+  await expect(page.getByRole('heading', { name: '订阅已生效' })).toBeVisible()
+  expect(api.requests.filter(request => request.path.endsWith('/checkout'))).toHaveLength(1)
+  expect(api.counts.chat).toBe(0)
+})
+
+test('an actual checkout opening error still allows retry using the same transaction', async ({ page }) => {
+  const api = await mockMarket(page)
+  await visit(page, '/platform/marketplace/taylor')
+  await page.getByRole('button', { name: '订阅使用', exact: true }).click()
+  await expect(page.locator('iframe[title="Paddle checkout"]')).toBeAttached()
+  await page.evaluate(() => (window as any).__emitPaddleEvent('checkout.error'))
+  await expect(page.getByRole('alert')).toContainText('结账页打开失败')
+  await page.getByRole('button', { name: '重试结账', exact: true }).click()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(page.locator('iframe[title="Paddle checkout"]').last()).toHaveAttribute('data-transaction-id', 'txn_fixture')
+  expect(api.requests.filter(request => request.path.endsWith('/checkout'))).toHaveLength(1)
+})
+
 test('paid product returns to the existing composer with draft, agent, KB and Flash, without generating a question', async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 932 })
   const api = await mockMarket(page, { paid: true })
   await visit(page, '/platform/creatChat')
   const textarea = page.locator('textarea').first()
@@ -79,6 +120,15 @@ test('paid product returns to the existing composer with draft, agent, KB and Fl
   const priorSuggestions = api.counts.suggestion
   await page.getByRole('button', { name: '开始提问', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('泰勒·测试环境样例')
+  const serviceBounds = await page.locator('.market-service-selection').evaluate(element => {
+    const notice = element.getBoundingClientRect()
+    const exit = element.querySelector('button')!.getBoundingClientRect()
+    return { noticeLeft: notice.left, noticeRight: notice.right, exitLeft: exit.left, exitRight: exit.right, viewport: window.innerWidth }
+  })
+  expect(serviceBounds.noticeLeft).toBeGreaterThanOrEqual(0)
+  expect(serviceBounds.noticeRight).toBeLessThanOrEqual(serviceBounds.viewport)
+  expect(serviceBounds.exitLeft).toBeGreaterThanOrEqual(serviceBounds.noticeLeft)
+  expect(serviceBounds.exitRight).toBeLessThanOrEqual(Math.min(serviceBounds.noticeRight, serviceBounds.viewport))
   await expect(page.locator('textarea').first()).toHaveValue('This is my unsent draft')
   const state = await page.evaluate(() => { const h = (window as any).__marketplaceHarness; return { product: h.settings.settings.marketplaceProductId, agent: h.settings.selectedAgentId, kbs: h.settings.settings.selectedKnowledgeBases, model: h.settings.conversationModels.selectedChatModelId } })
   expect(state.product).toBe('taylor'); expect(state.agent).toBe('platform-agent'); expect(state.kbs).toEqual(['platform-kb'])
@@ -92,6 +142,8 @@ test('orders consume the top-level API and open the selected subscription portal
   const api = await mockMarket(page, { paid: true })
   await visit(page, '/platform/orders')
   await expect(page.locator('.subscription-row')).toContainText('已取消续费')
+  await expect(page.locator('.subscription-row')).toContainText(/可使用至.*2026/)
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toBeVisible()
   await page.getByRole('tab', { name: '付款记录' }).click()
   await expect(page.locator('.market-table')).toContainText('txn_paid')
   await expect(page.locator('.market-table')).toContainText('19.00')
@@ -170,5 +222,14 @@ test('an unbound checkout order shows its status without an unusable portal acti
   await mockMarket(page, { pendingOrder: true })
   await visit(page, '/platform/orders')
   await expect(page.locator('.subscription-row')).toContainText('正在准备结账')
+  await expect(page.locator('.subscription-row')).not.toContainText('可使用至')
   await expect(page.getByRole('button', { name: '管理订阅', exact: true })).toHaveCount(0)
+})
+
+test('a refunded subscription does not promise access through its retained paid-through date', async ({ page }) => {
+  await mockMarket(page, { refundedOrder: true })
+  await visit(page, '/platform/orders')
+  await expect(page.locator('.subscription-row .market-badge')).toHaveText('已退款')
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toHaveCount(0)
+  await expect(page.locator('.subscription-row')).not.toContainText('可使用至')
 })

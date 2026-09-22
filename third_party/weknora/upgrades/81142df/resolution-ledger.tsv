@@ -468,7 +468,7 @@ frontend/src/views/chat/components/tool-results/WriteSandboxFileResult.vue	-	A	1
 frontend/src/views/chat/components/tool-results/tool-results.less	M	-	100644	38e9b77552bef58b26c6755e8528ae4ca7a469a8	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/views/chat/components/usermsg.vue	M	M	100644	fa8b6d4b701f8840703eccbbdaae329d161db8fb	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/views/chat/index.vue	M	M	100644	60f23f227bb445df213994569db6285c5a28eb3e	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-frontend/src/views/creatChat/creatChat.vue	M	-	100644	b8389bb49f003f41bd00ab7037be1282ad8afbcc	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/src/views/creatChat/creatChat.vue	M	-	100644	a14044aea8c109ec0fc52bf9d96624da190a2e54	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/src/views/dev/MarkdownTestPage.vue	-	M	100644	72e565a41e6548617184dfdd27f2feef6d580106	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/views/embed/EmbedChatCore.vue	-	M	100644	9b35394dab0cb71a4113410cbfb274b32f411974	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 frontend/src/views/integrations/ApiIntegrationSettings.vue	M	M	100644	f60c4e8e3c6bab19a056aff8a4aeeb6c002c58cb	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner

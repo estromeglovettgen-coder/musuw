@@ -74,7 +74,8 @@ async function openCheckout() {
       onCompleted: () => { if (!disposed) void confirmAccess() },
       onEvent: event => {
         if (disposed) return
-        if (event.name && [CheckoutEventNames.CHECKOUT_ERROR, CheckoutEventNames.CHECKOUT_FAILED, CheckoutEventNames.CHECKOUT_PAYMENT_FAILED].includes(event.name)) failed.value = true
+        // Paddle owns payment-decline feedback and retry inside the existing checkout.
+        if (event.name === CheckoutEventNames.CHECKOUT_ERROR) failed.value = true
       },
     })
   } catch { if (!disposed) failed.value = true }
