@@ -30,6 +30,8 @@ export const useMenuStore = defineStore('menuStore', () => {
       children: createMenuChildren()
     },
     { title: '', titleKey: 'menu.knowledgeBase', icon: 'zhishiku', path: 'knowledge-bases' },
+    { title: '', titleKey: 'creatorMarketplace.title', icon: 'shop', path: 'marketplace' },
+    { title: '', titleKey: 'creatorMarketplace.orders', icon: 'receipt', path: 'orders' },
     { title: '', titleKey: 'menu.agents', icon: 'agent', path: 'agents', requiredCapability: 'agents' },
     { title: '', titleKey: 'menu.organizations', icon: 'organization', path: 'organizations', requiredCapability: 'organizations' },
     { title: '', titleKey: 'menu.settings', icon: 'setting', path: 'settings' },
@@ -45,6 +47,11 @@ export const useMenuStore = defineStore('menuStore', () => {
   const firstImageFiles = ref<any[]>([])
   const firstAttachmentFiles = ref<any[]>([])
   const prefillQuery = ref('')
+  // Keep an unsent homepage draft when visiting the marketplace and returning.
+  // This stays in memory and is discarded when the account or workspace changes.
+  const newChatDraft = ref('')
+  const draftAuth = useAuthStore()
+  watch(() => `${draftAuth.currentUserId || ''}:${draftAuth.effectiveTenantId || ''}`, () => { newChatDraft.value = '' }, { flush: 'sync' })
 
   const applyMenuTranslations = () => {
     menuArr.forEach(item => {
@@ -66,7 +73,7 @@ export const useMenuStore = defineStore('menuStore', () => {
   // Musuw Lite is deliberately fail-closed: only product-approved top-level
   // entries are visible. A newly-added upstream menu item must be explicitly
   // reviewed before it can appear in the consumer product.
-  const liteVisiblePaths = new Set(['creatChat', 'knowledge-bases', 'agents'])
+  const liteVisiblePaths = new Set(['creatChat', 'knowledge-bases', 'agents', 'marketplace', 'orders'])
 
   const visibleMenuArr = computed(() => {
     const authStore = useAuthStore()
@@ -152,6 +159,7 @@ export const useMenuStore = defineStore('menuStore', () => {
     visibleMenuArr,
     isFirstSession,
     firstQuery,
+    newChatDraft,
     firstMentionedItems,
     firstModelId,
     firstThinking,

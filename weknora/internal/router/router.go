@@ -56,6 +56,7 @@ type RouterParams struct {
 	MessageSuggestionHandler     *handler.MessageSuggestionHandler
 	ModelHandler                 *handler.ModelHandler
 	EntitlementHandler           *handler.EntitlementHandler
+	MarketplaceHandler           *handler.MarketplaceHandler
 	ModelCredentialsHandler      *handler.ModelCredentialsHandler
 	SandboxConfigHandler         *handler.SandboxConfigHandler
 	SandboxSkillHandler          *handler.SandboxSkillHandler
@@ -297,6 +298,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterMessageRoutes(v1, params.MessageHandler, rbacGuards)
 		RegisterModelRoutes(v1, params.ModelHandler, params.ModelCredentialsHandler, rbacGuards)
 		v1.GET("/entitlements/current", params.EntitlementHandler.Current)
+		RegisterMarketplaceRoutes(v1, params.MarketplaceHandler, rbacGuards)
 		v1.POST("/billing/paddle/portal-session", rbacGuards.Admin(), params.EntitlementHandler.PaddlePortalSession)
 		v1.POST("/billing/paddle/checkout-intent", rbacGuards.Admin(), params.EntitlementHandler.PaddleCheckoutIntent)
 		v1.POST("/billing/paddle/subscription-upgrade/preview", rbacGuards.Admin(), params.EntitlementHandler.PaddleSubscriptionUpgradePreview)

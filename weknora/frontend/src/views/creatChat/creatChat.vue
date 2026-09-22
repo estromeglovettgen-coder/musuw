@@ -60,9 +60,15 @@
                 </transition>
             </div>
 
+            <div v-if="settingsStore.settings.marketplaceProductId" class="market-service-selection" role="status">
+              <div><strong>{{ t('creatorMarketplace.selectedService', { title: marketplaceChat.product?.title || t('creatorMarketplace.title') }) }}</strong><p>{{ t(marketplaceChat.product?.access?.can_chat ? 'creatorMarketplace.selectedServiceNote' : 'creatorMarketplace.noAccess') }}</p></div>
+              <button type="button" @click="settingsStore.selectAgent(BUILTIN_SMART_REASONING_ID)">{{ t('creatorMarketplace.clearService') }}</button>
+            </div>
+            <div v-else-if="marketplaceOpening" class="market-service-selection" role="status">{{ t('creatorMarketplace.openingChat') }}</div>
             <div class="visual-new-chat-composer">
                 <InputField ref="inputFieldRef" @send-msg="sendMsg" />
             </div>
+            <MarketplaceHomeEntry v-if="!settingsStore.settings.marketplaceProductId" />
         </section>
     </main>
 
@@ -81,11 +87,11 @@
     />
 </template>
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue';
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import InputField from '@/components/Input-field.vue';
 import ContextualGuide from '@/components/ContextualGuide.vue';
 import { createSessions } from "@/api/chat/index";
-import { getSuggestedQuestions } from "@/api/agent/index";
+import { BUILTIN_SMART_REASONING_ID, getSuggestedQuestions } from "@/api/agent/index";
 import type { SuggestedQuestion } from "@/api/agent/index";
 import { useMenuStore } from '@/stores/menu';
 import { useSettingsStore } from '@/stores/settings';
@@ -96,6 +102,8 @@ import { useI18n } from 'vue-i18n';
 import KnowledgeBaseEditorModal from '@/views/knowledge/KnowledgeBaseEditorModal.vue';
 import { useKnowledgeBaseCreationNavigation } from '@/hooks/useKnowledgeBaseCreationNavigation';
 import { useAuthStore } from '@/stores/auth';
+import { useMarketplaceChatStore } from '@/stores/marketplaceChat';
+import MarketplaceHomeEntry from '@/views/marketplace/MarketplaceHomeEntry.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -103,6 +111,8 @@ const usemenuStore = useMenuStore();
 const settingsStore = useSettingsStore();
 const uiStore = useUIStore();
 const authStore = useAuthStore();
+const marketplaceChat = useMarketplaceChatStore();
+const marketplaceOpening = ref(false);
 const { t } = useI18n();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
 
@@ -159,6 +169,10 @@ const fetchSuggestedQuestions = async () => {
     const fetchId = ++suggestedQuestionsFetchId;
     sqLoading.value = true;
     try {
+        if (marketplaceOpening.value || route.query.marketplace_product || settingsStore.settings.marketplaceProductId) {
+            suggestedQuestions.value = (marketplaceChat.product?.sample_questions || []).map(question => ({ question, source: 'agent_config' as const }));
+            return;
+        }
         const agentId = settingsStore.selectedAgentId;
         if (!agentId) return;
         const res = await getSuggestedQuestions(agentId, settingsStore.getSuggestedQuestionsParams());
@@ -198,6 +212,29 @@ watch(
 );
 
 onMounted(() => { fetchSuggestedQuestions(); });
+let marketplaceEntrySequence = 0;
+watch(() => route.query.marketplace_product, async (raw) => {
+    if (typeof raw !== 'string' || !raw) return;
+    const run = ++marketplaceEntrySequence;
+    marketplaceOpening.value = true;
+    try {
+        const product = await marketplaceChat.load(raw, true);
+        if (run !== marketplaceEntrySequence || route.query.marketplace_product !== raw) return;
+        if (!product.access?.can_chat) { MessagePlugin.warning(t('creatorMarketplace.noAccess')); return; }
+        await nextTick();
+        await settingsStore.selectMarketplaceProduct({ productId: product.id, agentId: product.agent_id, knowledgeBaseIds: product.knowledge_base_ids });
+        // Never write to the composer or send a question as a side effect of purchasing.
+        suggestedQuestions.value = (product.sample_questions || []).map(question => ({ question, source: 'agent_config' as const }));
+    } catch { if (run === marketplaceEntrySequence) MessagePlugin.error(t('creatorMarketplace.loadFailed')); }
+    finally {
+        if (run === marketplaceEntrySequence && route.name === 'globalCreatChat') {
+            marketplaceOpening.value = false;
+            const query = { ...route.query }; delete query.marketplace_product;
+            await router.replace({ path: route.path, query });
+        }
+    }
+}, { immediate: true });
+onUnmounted(() => { marketplaceEntrySequence++; if (debounceTimer) clearTimeout(debounceTimer); });
 
 const inputFieldRef = ref();
 
@@ -521,4 +558,11 @@ const handleKBEditorSuccess = (kbId: string) => {
         transition: none !important;
     }
 }
+</style>
+
+<style scoped>
+.market-service-selection { display: flex; justify-content: space-between; gap: 18px; width: 100%; padding: 14px 16px; border: 1px solid var(--td-component-stroke); border-radius: 12px; font-size: 13px; color: var(--td-text-color-primary); }
+.market-service-selection strong { font-weight: 600; }
+.market-service-selection p { color: var(--td-text-color-secondary); font-size: 12px; line-height: 1.6; margin: 6px 0 0; }
+.market-service-selection button { background: none; color: var(--td-text-color-secondary); border: 0; cursor: pointer; font-size: 12px; flex-shrink: 0; }
 </style>

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Tencent/WeKnora/internal/handler"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -150,6 +151,7 @@ type SyncTaskParams struct {
 	TagService              interfaces.KnowledgeTagService
 	DataSourceService       interfaces.DataSourceService
 	EntitlementService      interfaces.EntitlementService
+	MarketplaceService      interfaces.MarketplaceService
 	PaddleBillingOperations interfaces.PaddleBillingOperationRepository
 	AccountErasure          interfaces.AccountErasureService
 	ChunkExtractor          interfaces.TaskHandler `name:"chunkExtractor"`
@@ -187,6 +189,7 @@ func RegisterSyncHandlers(params SyncTaskParams) {
 	params.Executor.RegisterHandler(types.TypeWikiIngest, params.WikiIngest.Handle)
 	params.Executor.RegisterHandler(types.TypeWikiFinalize, params.WikiIngest.Handle)
 	params.Executor.RegisterHandler(types.TypePaddleWebhook, NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle)
+	params.Executor.RegisterHandler(types.TypeMarketplaceWebhook, handler.NewMarketplaceWebhookTaskHandler(params.MarketplaceService).Handle)
 	params.Executor.RegisterHandler(types.TypeMemoryExtract, params.MemoryService.Handle)
 	logger.Infof(context.Background(), "[SyncTask] All task handlers registered (Lite mode, no Redis)")
 }

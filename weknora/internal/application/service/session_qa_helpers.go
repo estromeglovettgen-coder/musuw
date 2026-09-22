@@ -23,6 +23,22 @@ func effectiveWebSearchEnabled(requested bool) bool {
 // agent before model, KB, tool, or context-overlay consumption closes that
 // lower-level seam without changing Standard's native sharing behavior.
 func rejectLiteForeignAgent(ctx context.Context, req *types.QARequest) error {
+	if ctx.Value(types.MarketplaceScopeContextKey) != nil {
+		scope, ok := types.MarketplaceScopeFromContext(ctx)
+		if !ok || req == nil || req.Session == nil || !scope.AllowsAgent(req.CustomAgent, req.Session.TenantID) ||
+			!req.SharedAgentReadOnly || len(req.KnowledgeIDs) != 0 || len(req.TagScopes) != 0 ||
+			len(req.MCPServiceIDs) != 0 || len(req.SkillNames) != 0 {
+			return apperrors.NewForbiddenError("purchased service scope is invalid")
+		}
+		for _, ids := range [][]string{req.KnowledgeBaseIDs, req.CustomAgent.Config.KnowledgeBases} {
+			for _, id := range ids {
+				if !scope.AllowsKnowledgeBase(id, req.CustomAgent.TenantID) {
+					return apperrors.NewForbiddenError("knowledge base is outside the purchased service")
+				}
+			}
+		}
+		return nil
+	}
 	if !isLiteProductEdition() || req == nil || req.Session == nil {
 		return nil
 	}
@@ -324,6 +340,9 @@ func (s *sessionService) resolveRetrievalTenantID(
 ) uint64 {
 	session := req.Session
 	customAgent := req.CustomAgent
+	if scope, ok := types.MarketplaceScopeFromContext(ctx); ok && session != nil && scope.AllowsAgent(customAgent, session.TenantID) {
+		return scope.SourceTenantID()
+	}
 
 	// Lite is a single-workspace product. A shared/custom agent object may
 	// still be present in a stale internal request, but its source tenant must

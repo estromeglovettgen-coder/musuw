@@ -104,6 +104,10 @@ var accountErasureKnownTables = []string{
 	"user_kb_pins",
 	"tenant_invitations",
 	"paddle_billing_operations",
+	"marketplace_products",
+	"marketplace_subscriptions",
+	"marketplace_transactions",
+	"marketplace_processed_events",
 }
 
 var accountErasureConditionalTables = map[string]struct{}{
@@ -138,9 +142,10 @@ func (r *accountErasureRepository) Preflight(ctx context.Context, userID string)
 }
 
 func (r *accountErasureRepository) preflight(ctx context.Context, db *gorm.DB, userID string) (*types.AccountErasureTarget, error) {
-	if _, err := accountErasureEnsureTables(db, "preflight", []string{
-		"users", "tenants", "tenant_members", "organizations",
-	}); err != nil {
+	present, err := accountErasureEnsureTables(db, "preflight", []string{
+		"users", "tenants", "tenant_members", "organizations", "marketplace_subscriptions",
+	})
+	if err != nil {
 		return nil, err
 	}
 	if err := accountErasureRequireColumns(db, "users", "id", "email", "tenant_id", "is_active", "is_system_admin", "identity_provider", "identity_subject", "deletion_requested_at"); err != nil {
@@ -151,7 +156,7 @@ func (r *accountErasureRepository) preflight(ctx context.Context, db *gorm.DB, u
 	}
 
 	var row accountErasureUserRow
-	err := db.Unscoped().Table("users").
+	err = db.Unscoped().Table("users").
 		Select("id, email, tenant_id, is_active, is_system_admin, identity_provider, identity_subject, deletion_requested_at").
 		Where("id = ?", userID).Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -191,6 +196,15 @@ func (r *accountErasureRepository) preflight(ctx context.Context, db *gorm.DB, u
 		target.PaddleSubscriptionID = tenant.PaddleSubscriptionID.String
 		target.PaddleCustomerID = tenant.PaddleCustomerID.String
 		target.IsTenantDeleted = tenant.DeletedAt.Valid
+	}
+	if target.TenantID != 0 && present["marketplace_subscriptions"] {
+		// Account deletion is complete inventory, never the paginated order UI.
+		if err := db.Table("marketplace_subscriptions").
+			Select("DISTINCT paddle_customer_id, paddle_subscription_id").
+			Where("tenant_id = ? AND (paddle_customer_id <> '' OR paddle_subscription_id <> '')", target.TenantID).
+			Scan(&target.MarketplaceBilling).Error; err != nil {
+			return nil, err
+		}
 	}
 
 	// Ownership/shared-workspace counts deliberately inspect active rows only;
@@ -852,6 +866,36 @@ func accountErasurePurgeRows(tx *gorm.DB, present map[string]bool, target *types
 			sets = append(sets, "paddle_transaction_id = ''")
 		}
 		if err := tx.Exec("UPDATE paddle_billing_operations SET "+strings.Join(sets, ", ")+" WHERE tenant_id = ?", tenantID).Error; err != nil {
+			return err
+		}
+	}
+
+	if present["marketplace_products"] {
+		// Reviewed platform copies belong to the platform. Detach the original
+		// creator and their private submission without deleting purchased access.
+		if err := tx.Model(&types.MarketplaceProduct{}).
+			Where("creator_tenant_id = ? OR creator_user_id = ?", tenantID, userID).
+			Updates(map[string]interface{}{
+				"creator_tenant_id": 0, "creator_user_id": "", "creator_name": "",
+				"contact": "", "authorization": "", "agent_id": "",
+				"knowledge_base_ids": "[]", "knowledge_base_names": "[]", "review_note": "",
+			}).Error; err != nil {
+			return err
+		}
+	}
+	if present["marketplace_transactions"] {
+		if err := tx.Table("marketplace_transactions").Where("tenant_id = ?", tenantID).
+			Update("tenant_id", 0).Error; err != nil {
+			return err
+		}
+	}
+	if present["marketplace_subscriptions"] {
+		if err := tx.Table("marketplace_subscriptions").Where("tenant_id = ? OR user_id = ?", tenantID, userID).
+			Updates(map[string]interface{}{
+				"tenant_id": 0, "user_id": "", "operation_key": gorm.Expr("'redacted-' || id"),
+				"status": "canceled", "paid_through": nil, "cancel_at_period_end": false, "scheduled_change_at": nil,
+				"paddle_customer_id": "", "paddle_subscription_id": "", "checkout_transaction_id": "", "last_error": "",
+			}).Error; err != nil {
 			return err
 		}
 	}

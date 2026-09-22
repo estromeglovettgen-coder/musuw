@@ -133,6 +133,11 @@ function isAllowedLitePath(path: string) {
     path.startsWith('/platform/chat/') ||
     path === '/platform/knowledge-bases' ||
     path.startsWith('/platform/knowledge-bases/') ||
+    path === '/platform/marketplace' ||
+    path.startsWith('/platform/marketplace/') ||
+    path === '/platform/orders' ||
+    path === '/platform/creator-products' ||
+    path === '/platform/marketplace-admin' ||
     path === '/platform/agents' ||
     path === '/platform/settings' ||
     path === '/onboarding/workspace'
@@ -256,6 +261,36 @@ const router = createRouter({
               query: typeof q === 'string' ? { cmdk: q } : { cmdk: '' },
             }
           },
+        },
+        {
+          path: "marketplace",
+          name: "marketplace",
+          component: () => import("../views/marketplace/Marketplace.vue"),
+          meta: { requiresInit: true, requiresAuth: true },
+        },
+        {
+          path: "marketplace/:productId",
+          name: "marketplaceProduct",
+          component: () => import("../views/marketplace/ProductDetail.vue"),
+          meta: { requiresInit: true, requiresAuth: true },
+        },
+        {
+          path: "orders",
+          name: "marketplaceOrders",
+          component: () => import("../views/marketplace/Orders.vue"),
+          meta: { requiresInit: true, requiresAuth: true },
+        },
+        {
+          path: "creator-products",
+          name: "creatorProducts",
+          component: () => import("../views/marketplace/CreatorProducts.vue"),
+          meta: { requiresInit: true, requiresAuth: true },
+        },
+        {
+          path: "marketplace-admin",
+          name: "marketplaceAdmin",
+          component: () => import("../views/marketplace/AdminMarketplace.vue"),
+          meta: { requiresInit: true, requiresAuth: true, requiresSystemAdmin: true },
         },
         {
           path: "agents",

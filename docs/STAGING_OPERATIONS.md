@@ -40,8 +40,10 @@ Compose overlay 在 [`integration/weknora-staging/compose.yaml`](../integration/
 同一个授权的 40 字符 Git SHA 只构建一次 app/frontend。CI 记录两个精确 digest，
 然后执行 staging：
 
-1. `workflow_run` 或手动 `staging-only` 只授权 main 上 CI-green SHA、构建一次、
-   通过 GitHub `staging` Environment 部署并验证 staging；不触碰 production。
+1. `workflow_run` 自动部署 main 上的 CI-green SHA。手动 `staging-only` 也可部署
+   GitHub `staging` Environment 已允许的功能分支：`--ref` 必须是该分支，
+   `immutable_ref` 必须等于该分支当前完整 SHA，且同一 SHA 已通过 CI（功能分支通过 PR 触发）。
+   两者均只构建一次，通过独立 `staging` Environment 部署并验证；不触碰 production。
 2. 远端固定 SSH gate 验证当前 SHA、容器 digest/OCI revision、健康、Sandbox
    public config、隔离 volume/network 和 noindex。GitHub runner 不直接执行
    server-local Docker verifier。

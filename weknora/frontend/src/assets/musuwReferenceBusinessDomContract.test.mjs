@@ -13,7 +13,7 @@ test('audited inline citation controller stays byte-for-byte frozen after the vi
 test('rebuilt answer reference summary preserves grouping, drawer handoff and KB navigation', () => {
   const source = read('../views/chat/components/docInfo.vue')
   for (const token of [
-    "referencesDrawer.open({ references: refs })", "item.chunk_type === 'web_search'",
+    "referencesDrawer.open({ references: refs, messageId: props.session?.id, marketplaceProductId: props.session?.marketplace_product_id })", "item.chunk_type === 'web_search'",
     'knowledgeId: item.knowledge_id', 'knowledgeBaseId: item.knowledge_base_id',
     'if (group.knowledgeId) query.knowledge_id = group.knowledgeId',
     'path: `/platform/knowledge-bases/${group.knowledgeBaseId}`', ':href="getDocumentHref(group)"',

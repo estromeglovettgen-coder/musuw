@@ -4,6 +4,7 @@ import type { KnowledgeReferenceLike, ReferenceHighlightTarget } from '@/utils/r
 export type ChatReferencesDrawerOpenOptions = {
   references: KnowledgeReferenceLike[]
   highlight?: ReferenceHighlightTarget | null
+  marketplaceProductId?: string
   messageId?: string
   sourceKey?: string
 }
@@ -12,6 +13,7 @@ export type ChatReferencesDrawerContext = {
   visible: Ref<boolean>
   references: Ref<KnowledgeReferenceLike[]>
   highlight: Ref<ReferenceHighlightTarget | null>
+  marketplaceProductId: Ref<string>
   messageId: Ref<string>
   sourceKey: Ref<string>
   open: (options: ChatReferencesDrawerOpenOptions) => void
@@ -28,6 +30,7 @@ export function provideChatReferencesDrawer(): ChatReferencesDrawerContext {
   const visible = ref(false)
   const references = ref<KnowledgeReferenceLike[]>([])
   const highlight = ref<ReferenceHighlightTarget | null>(null)
+  const marketplaceProductId = ref('')
   const messageId = ref('')
   const sourceKey = ref('')
 
@@ -43,6 +46,7 @@ export function provideChatReferencesDrawer(): ChatReferencesDrawerContext {
   const open = (options: ChatReferencesDrawerOpenOptions) => {
     references.value = Array.isArray(options.references) ? options.references : []
     highlight.value = options.highlight ?? null
+    marketplaceProductId.value = options.marketplaceProductId || ''
     messageId.value = options.messageId || ''
     sourceKey.value = getFallbackSourceKey(options)
     visible.value = true
@@ -75,6 +79,7 @@ export function provideChatReferencesDrawer(): ChatReferencesDrawerContext {
     visible,
     references,
     highlight,
+    marketplaceProductId,
     messageId,
     sourceKey,
     open,

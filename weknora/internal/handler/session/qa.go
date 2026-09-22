@@ -72,8 +72,9 @@ type qaRequestContext struct {
 	// Snapshot of the request fields needed to persist the input-bar state
 	// for session restoration. Kept verbatim from the request so we record
 	// what the user had selected on the UI (not server-side resolutions).
-	reqAgentEnabled bool
-	reqAgentID      string
+	reqAgentEnabled      bool
+	reqAgentID           string
+	marketplaceProductID string
 	// generateTitle is consumed by platform QA services after scene resolution;
 	// custom-agent title generation remains in setupSSEStream for compatibility.
 	generateTitle bool
@@ -174,7 +175,18 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 	}
 
 	// Get custom agent if agent_id is provided. Backend resolves shared agent from share relation (no client-provided tenant).
-	customAgent, effectiveTenantID, sharedAgentReadOnly := h.resolveAgent(ctx, c, request.AgentID, request.AgentSourceTenantID)
+	ctx, marketplaceAgent, err := h.resolveMarketplaceRequest(ctx, &request)
+	if err != nil {
+		return nil, nil, err
+	}
+	var customAgent *types.CustomAgent
+	var effectiveTenantID uint64
+	var sharedAgentReadOnly bool
+	if marketplaceAgent != nil {
+		customAgent, sharedAgentReadOnly = marketplaceAgent, true
+	} else {
+		customAgent, effectiveTenantID, sharedAgentReadOnly = h.resolveAgent(ctx, c, request.AgentID, request.AgentSourceTenantID)
+	}
 	if request.AgentSourceTenantID != 0 && customAgent == nil {
 		return nil, nil, errors.NewNotFoundError("Shared agent not found")
 	}
@@ -360,6 +372,7 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		secutils.SanitizeForLogArray(skillNames),
 		request.WebSearchEnabled,
 	)
+	executionContext.MarketplaceProductID = request.MarketplaceProductID
 
 	// Build request context
 	reqCtx := &qaRequestContext{
@@ -403,6 +416,7 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		suggestionAttribution: request.SuggestionAttribution,
 		reqAgentEnabled:       request.AgentEnabled,
 		reqAgentID:            request.AgentID,
+		marketplaceProductID:  request.MarketplaceProductID,
 		resourceRewriter:      resourceRewriter,
 	}
 
@@ -1461,18 +1475,19 @@ func (h *Handler) persistLastRequestState(parentCtx context.Context, reqCtx *qaR
 	}
 
 	state := &types.SessionLastRequestState{
-		AgentID:          reqCtx.reqAgentID,
-		AgentEnabled:     agentEnabled,
-		ModelID:          reqCtx.summaryModelID,
-		Thinking:         reqCtx.thinking,
-		ReasoningEffort:  reqCtx.reasoningEffort,
-		KnowledgeBaseIDs: reqCtx.knowledgeBaseIDs,
-		KnowledgeIDs:     reqCtx.knowledgeIDs,
-		TagIDs:           reqCtx.tagIDs,
-		MCPServiceIDs:    reqCtx.mcpServiceIDs,
-		SkillNames:       reqCtx.skillNames,
-		MentionedItems:   reqCtx.mentionedItems,
-		WebSearchEnabled: reqCtx.webSearchEnabled,
+		MarketplaceProductID: reqCtx.marketplaceProductID,
+		AgentID:              reqCtx.reqAgentID,
+		AgentEnabled:         agentEnabled,
+		ModelID:              reqCtx.summaryModelID,
+		Thinking:             reqCtx.thinking,
+		ReasoningEffort:      reqCtx.reasoningEffort,
+		KnowledgeBaseIDs:     reqCtx.knowledgeBaseIDs,
+		KnowledgeIDs:         reqCtx.knowledgeIDs,
+		TagIDs:               reqCtx.tagIDs,
+		MCPServiceIDs:        reqCtx.mcpServiceIDs,
+		SkillNames:           reqCtx.skillNames,
+		MentionedItems:       reqCtx.mentionedItems,
+		WebSearchEnabled:     reqCtx.webSearchEnabled,
 	}
 
 	if err := h.sessionService.UpdateSessionLastRequestState(ctx, reqCtx.sessionID, state); err != nil {

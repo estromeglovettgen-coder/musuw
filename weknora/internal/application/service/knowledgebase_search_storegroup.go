@@ -200,6 +200,18 @@ func (s *knowledgeBaseService) authorizeKBAccess(
 	kbs []*types.KnowledgeBase,
 	requestTenantID uint64,
 ) error {
+	if ctx.Value(types.MarketplaceScopeContextKey) != nil {
+		scope, ok := types.MarketplaceScopeFromContext(ctx)
+		if !ok || types.MustTenantIDFromContext(ctx) != requestTenantID {
+			return apperrors.NewNotFoundError("knowledge base not found")
+		}
+		for _, kb := range kbs {
+			if kb == nil || !scope.AllowsKnowledgeBase(kb.ID, kb.TenantID) {
+				return apperrors.NewNotFoundError("knowledge base not found")
+			}
+		}
+		return nil
+	}
 	if len(kbs) == 0 {
 		return nil
 	}

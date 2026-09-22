@@ -147,6 +147,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	logger.Debugf(ctx, "[Container] Registering repositories...")
 	must(container.Provide(repository.NewTenantRepository))
 	must(container.Provide(repository.NewEntitlementRepository))
+	must(container.Provide(repository.NewMarketplaceRepository))
 	must(container.Provide(repository.NewTenantAPIKeyRepository))
 	must(container.Provide(repository.NewTenantMemberRepository))
 	must(container.Provide(repository.NewTenantInvitationRepository))
@@ -206,6 +207,7 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	logger.Debugf(ctx, "[Container] Registering business services...")
 	must(container.Provide(service.NewTenantService))
 	must(container.Provide(service.NewEntitlementService))
+	must(container.Provide(service.NewMarketplaceService))
 	must(container.Provide(service.NewTenantAPIKeyService))
 	must(container.Provide(service.NewTenantMemberService))
 	must(container.Provide(service.NewTenantInvitationService))
@@ -417,6 +419,8 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(handler.NewMessageSuggestionHandler))
 	must(container.Provide(handler.NewModelHandlerWithConsumerResolver))
 	must(container.Provide(handler.NewEntitlementHandler))
+	must(container.Provide(handler.NewMarketplacePaymentGateway))
+	must(container.Provide(handler.NewMarketplaceHandler))
 	must(container.Provide(handler.NewSandboxConfigHandler))
 	must(container.Provide(func(
 		s *service.TenantSkillService, streams interfaces.StreamManager,

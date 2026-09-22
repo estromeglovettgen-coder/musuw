@@ -259,7 +259,7 @@ export default defineComponent({
             <span v-if="item.org_name" class="visual-chat-resource__org" aria-hidden="true"><img :src="getOrganizationBadgeSrc(item.type)" alt="" /></span>
           </span>
           <span class="visual-chat-resource__name" :title="item.name">{{ item.name }}</span>
-          <button type="button" class="visual-chat-resource__remove" :aria-label="$t('common.remove')" @click.stop="removeSelectedItem(item)"><t-icon name="close" /></button>
+          <button v-if="!settingsStore.settings.marketplaceProductId" type="button" class="visual-chat-resource__remove" :aria-label="$t('common.remove')" @click.stop="removeSelectedItem(item)"><t-icon name="close" /></button>
         </span>
       </div>
 
@@ -297,7 +297,8 @@ export default defineComponent({
 
           <t-tooltip placement="top" theme="light">
             <template #content>
-              <span v-if="isMentionDisabled && isKnowledgeBaseDisabledByAgent" class="visual-chat-composer__disabled-hint">
+              <span v-if="settingsStore.settings.marketplaceProductId">{{ $t('creatorMarketplace.boundResources') }}</span>
+              <span v-else-if="isMentionDisabled && isKnowledgeBaseDisabledByAgent" class="visual-chat-composer__disabled-hint">
                 <span>{{ $t('input.kbDisabledByAgent') }}</span>
                 <button v-if="!authStore.isLiteMode" type="button" @click.stop.prevent="handleGoToAgentSettings('knowledge')">{{ $t('input.goToAgentSettings') }}</button>
               </span>

@@ -71,6 +71,7 @@
     </div>
 
     <p v-else class="usage-billing__notice">{{ $t('entitlement.usageUnavailable') }}</p>
+    <div class="usage-billing__row usage-billing__row--split"><strong class="usage-billing__quota-title">{{ $t('creatorMarketplace.orders') }}</strong><button type="button" class="usage-billing__secondary" @click="router.push('/platform/orders')">{{ $t('creatorMarketplace.orders') }}</button></div>
   </section>
 </template>
 

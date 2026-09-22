@@ -326,6 +326,7 @@ type Message struct {
 // MessageExecutionContext is a message-level snapshot of the non-secret
 // request state used by derived experiences such as follow-up suggestions.
 type MessageExecutionContext struct {
+	MarketplaceProductID  string                    `json:"marketplace_product_id,omitempty"`
 	AgentConfigHash       string                    `json:"agent_config_hash,omitempty"`
 	QuestionSuggestions   *QuestionSuggestionConfig `json:"question_suggestions,omitempty"`
 	KnowledgeBaseIDs      []string                  `json:"knowledge_base_ids,omitempty"`
@@ -337,6 +338,17 @@ type MessageExecutionContext struct {
 	WebSearchEnabled      bool                      `json:"web_search_enabled"`
 	Locale                string                    `json:"locale,omitempty"`
 	SuggestionAttribution *SuggestionAttribution    `json:"suggestion_attribution,omitempty"`
+}
+
+// MarshalJSON exposes only the stable product identifier from the internal
+// execution snapshot. Citation controls must follow the original message even
+// after the user selects a different agent for the next turn.
+func (m Message) MarshalJSON() ([]byte, error) {
+	type messageJSON Message
+	return json.Marshal(struct {
+		messageJSON
+		MarketplaceProductID string `json:"marketplace_product_id,omitempty"`
+	}{messageJSON: messageJSON(m), MarketplaceProductID: m.ExecutionContext.MarketplaceProductID})
 }
 
 func (c MessageExecutionContext) Value() (driver.Value, error) {

@@ -43,11 +43,11 @@ test('Standard WeKnora routes remain in source while Lite route exposure is fail
   assert.match(router, /await ensureProductEdition\(authStore\)/)
 })
 
-test('sidebar keeps Standard definitions while Lite exposes chat, knowledge bases, and native Agents', () => {
+test('sidebar keeps Standard definitions while Lite exposes chat, knowledge bases, native Agents, marketplace, and orders', () => {
   const store = read('../stores/menu.ts')
   const sidebar = read('../components/menu.vue')
 
-  assert.match(store, /liteVisiblePaths\s*=\s*new Set\(\['creatChat',\s*'knowledge-bases',\s*'agents'\]\)/)
+  assert.match(store, /liteVisiblePaths\s*=\s*new Set\(\['creatChat',\s*'knowledge-bases',\s*'agents',\s*'marketplace',\s*'orders'\]\)/)
   assert.match(store, /authStore\.isLiteMode && !liteVisiblePaths\.has\(item\.path\)/)
   for (const path of ['agents', 'organizations', 'settings', 'logout']) {
     assert.ok(store.includes(`path: '${path}'`), `Standard menu source lost ${path}`)
