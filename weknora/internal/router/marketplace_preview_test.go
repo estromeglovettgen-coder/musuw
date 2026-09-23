@@ -21,10 +21,19 @@ import (
 func TestMarketplacePreviewRouteReturnsOnlyReviewedCatalogMetadata(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&types.MarketplaceProduct{}, &types.KnowledgeBase{}, &types.WikiPage{}, &types.WikiFolder{}))
+	require.NoError(t, db.AutoMigrate(
+		&types.MarketplaceProduct{}, &types.KnowledgeBase{}, &types.WikiPage{}, &types.WikiFolder{},
+	))
 	require.NoError(t, db.Create(&types.KnowledgeBase{ID: "kb", TenantID: 8, Name: "Library"}).Error)
-	require.NoError(t, db.Create(&types.WikiPage{ID: "page", KnowledgeBaseID: "kb", TenantID: 8, Slug: "concept/one", Title: "Public title", PageType: "concept", Status: "published", Content: "PRIVATE_BODY"}).Error)
-	require.NoError(t, db.Create(&types.MarketplaceProduct{ID: "product", Title: "Product", Status: "published", PublishedTenantID: 8, PlatformKnowledgeBaseIDs: types.StringArray{"kb"}, MonthlyAmount: 100, SampleConversations: []types.MarketplaceExample{{Question: "Question", Answer: "Reviewed final answer"}}}).Error)
+	require.NoError(t, db.Create(&types.WikiPage{
+		ID: "page", KnowledgeBaseID: "kb", TenantID: 8, Slug: "concept/one", Title: "Public title",
+		PageType: "concept", Status: "published", Content: "PRIVATE_BODY",
+	}).Error)
+	require.NoError(t, db.Create(&types.MarketplaceProduct{
+		ID: "product", Title: "Product", Status: "published", PublishedTenantID: 8,
+		PlatformKnowledgeBaseIDs: types.StringArray{"kb"}, MonthlyAmount: 100,
+		SampleConversations: []types.MarketplaceExample{{Question: "Question", Answer: "Reviewed final answer"}},
+	}).Error)
 	svc := service.NewMarketplaceService(repository.NewMarketplaceRepository(db), nil, nil, nil, nil)
 	h := handler.NewMarketplaceHandler(svc, nil, nil)
 	enabled := true
@@ -53,9 +62,13 @@ func TestMarketplacePreviewRouteReturnsOnlyReviewedCatalogMetadata(t *testing.T)
 	response := request(true, http.MethodGet, path)
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 	require.Equal(t, "no-store", response.Header().Get("Cache-Control"))
-	require.JSONEq(t, `{"data":{"directory":[{"id":"page","title":"Public title","path":["Library"],"page_type":"concept"}],"examples":[{"question":"Question","answer":"Reviewed final answer"}]}}`, response.Body.String())
+	require.JSONEq(t, `{"data":{
+		"directory":[{"id":"page","title":"Public title","path":["Library"],"page_type":"concept"}],
+		"examples":[{"question":"Question","answer":"Reviewed final answer"}]
+	}}`, response.Body.String())
 	require.Equal(t, http.StatusForbidden, request(false, http.MethodGet, path).Code)
 	require.Equal(t, http.StatusNotFound, request(true, http.MethodPost, path).Code)
-	require.NoError(t, db.Model(&types.MarketplaceProduct{}).Where("id = ?", "product").Update("status", "unpublished").Error)
+	require.NoError(t, db.Model(&types.MarketplaceProduct{}).
+		Where("id = ?", "product").Update("status", "unpublished").Error)
 	require.Equal(t, http.StatusNotFound, request(true, http.MethodGet, path).Code)
 }

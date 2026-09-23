@@ -11,13 +11,17 @@ import (
 // PreviewDirectory projects only published titles and the real folder hierarchy.
 // Tenant, reviewed KB binding, soft deletion and publication filters apply at
 // the database seam; no caller-supplied source resource IDs are accepted by HTTP.
-func (r *marketplaceRepository) PreviewDirectory(ctx context.Context, tenant uint64, kbIDs []string) ([]types.MarketplaceDirectoryEntry, error) {
+func (r *marketplaceRepository) PreviewDirectory(
+	ctx context.Context, tenant uint64, kbIDs []string,
+) ([]types.MarketplaceDirectoryEntry, error) {
 	result := []types.MarketplaceDirectoryEntry{}
 	if tenant == 0 || len(kbIDs) == 0 {
 		return result, nil
 	}
 	var kbs []types.KnowledgeBase
-	if err := r.db.WithContext(ctx).Select("id", "name").Where("tenant_id = ? AND id IN ? AND is_temporary = ?", tenant, kbIDs, false).Find(&kbs).Error; err != nil {
+	if err := r.db.WithContext(ctx).Select("id", "name").
+		Where("tenant_id = ? AND id IN ? AND is_temporary = ?", tenant, kbIDs, false).
+		Find(&kbs).Error; err != nil {
 		return nil, err
 	}
 	names := map[string]string{}
@@ -30,7 +34,9 @@ func (r *marketplaceRepository) PreviewDirectory(ctx context.Context, tenant uin
 		return result, nil
 	}
 	var folders []types.WikiFolder
-	if err := r.db.WithContext(ctx).Select("id", "knowledge_base_id", "parent_id", "name").Where("tenant_id = ? AND knowledge_base_id IN ?", tenant, validIDs).Find(&folders).Error; err != nil {
+	if err := r.db.WithContext(ctx).Select("id", "knowledge_base_id", "parent_id", "name").
+		Where("tenant_id = ? AND knowledge_base_id IN ?", tenant, validIDs).
+		Find(&folders).Error; err != nil {
 		return nil, err
 	}
 	byID := map[string]types.WikiFolder{}
@@ -38,7 +44,10 @@ func (r *marketplaceRepository) PreviewDirectory(ctx context.Context, tenant uin
 		byID[folder.ID] = folder
 	}
 	var pages []types.WikiPage
-	if err := r.db.WithContext(ctx).Select("id", "knowledge_base_id", "title", "page_type", "folder_id").Where("tenant_id = ? AND knowledge_base_id IN ? AND status = ? AND page_type <> ?", tenant, validIDs, types.WikiPageStatusPublished, "index").Order("title ASC, id ASC").Find(&pages).Error; err != nil {
+	if err := r.db.WithContext(ctx).Select("id", "knowledge_base_id", "title", "page_type", "folder_id").
+		Where("tenant_id = ? AND knowledge_base_id IN ? AND status = ? AND page_type <> ?",
+			tenant, validIDs, types.WikiPageStatusPublished, "index").
+		Order("title ASC, id ASC").Find(&pages).Error; err != nil {
 		return nil, err
 	}
 	for _, page := range pages {
@@ -57,7 +66,9 @@ func (r *marketplaceRepository) PreviewDirectory(ctx context.Context, tenant uin
 			path[i], path[j] = path[j], path[i]
 		}
 		path = append([]string{names[page.KnowledgeBaseID]}, path...)
-		result = append(result, types.MarketplaceDirectoryEntry{ID: page.ID, Title: page.Title, Path: path, PageType: page.PageType})
+		result = append(result, types.MarketplaceDirectoryEntry{
+			ID: page.ID, Title: page.Title, Path: path, PageType: page.PageType,
+		})
 	}
 	sort.SliceStable(result, func(i, j int) bool {
 		a, b := strings.Join(result[i].Path, "\x00"), strings.Join(result[j].Path, "\x00")

@@ -67,6 +67,7 @@ type MarketplaceProduct struct {
 	UpdatedAt          time.Time                 `json:"updated_at"`
 	Access             *MarketplaceProductAccess `json:"access,omitempty" gorm:"-"`
 
+	//nolint:lll // Keep the complete JSON and GORM column contract together.
 	SampleConversations []MarketplaceExample `json:"sample_conversations,omitempty" gorm:"serializer:json;type:json;not null;default:'[]'"`
 }
 
@@ -138,6 +139,7 @@ type MarketplaceDirectoryEntry struct {
 	PageType string   `json:"page_type"`
 }
 
+// MarketplacePreview exposes the reviewed directory and curated final answers.
 type MarketplacePreview struct {
 	Directory []MarketplaceDirectoryEntry `json:"directory"`
 	Examples  []MarketplaceExample        `json:"examples"`

@@ -25,7 +25,10 @@ func (s *marketplaceService) Preview(ctx context.Context, id string) (*types.Mar
 	if err != nil {
 		return nil, err
 	}
-	return &types.MarketplacePreview{Directory: directory, Examples: append([]types.MarketplaceExample{}, p.SampleConversations...)}, nil
+	return &types.MarketplacePreview{
+		Directory: directory,
+		Examples:  append([]types.MarketplaceExample{}, p.SampleConversations...),
+	}, nil
 }
 
 func validateMarketplaceExamples(input *[]types.MarketplaceExample) error {
@@ -39,7 +42,8 @@ func validateMarketplaceExamples(input *[]types.MarketplaceExample) error {
 		example := &(*input)[i]
 		example.Question = strings.TrimSpace(example.Question)
 		example.Answer = strings.TrimSpace(example.Answer)
-		if example.Question == "" || example.Answer == "" || utf8.RuneCountInString(example.Question) > 500 || utf8.RuneCountInString(example.Answer) > 16000 {
+		if example.Question == "" || example.Answer == "" ||
+			utf8.RuneCountInString(example.Question) > 500 || utf8.RuneCountInString(example.Answer) > 16000 {
 			return types.ErrMarketplaceInvalid
 		}
 	}
