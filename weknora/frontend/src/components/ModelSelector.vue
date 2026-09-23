@@ -410,12 +410,14 @@ import { useAuthStore } from '@/stores/auth'
 import { useConsumerUpgradePrompt } from '@/hooks/useConsumerUpgradePrompt'
 import { type CustomAgent, BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from '@/api/agent'
 import type { SharedAgentInfo } from '@/api/organization'
+import type { MarketplaceLibraryEntry } from '@/api/creator-marketplace'
 
 type ModelSelectorModel = ModelConfig & Partial<Pick<ConsumerSceneOption, 'selectable' | 'locked' | 'required_plan' | 'model_type'>>
 type ChatAgentOption = {
   key: string
   agent: CustomAgent
   sourceTenantId?: string
+  marketplaceProductId?: string
 }
 
 interface Props {
@@ -441,6 +443,8 @@ interface Props {
   reasoningEffort?: string
   agents?: CustomAgent[]
   sharedAgents?: SharedAgentInfo[]
+  subscribedAgents?: MarketplaceLibraryEntry[]
+  selectedMarketplaceProductId?: string
   selectedAgentId?: string
   selectedAgentSourceTenantId?: string
   selectedAgentDisplayName?: string
@@ -464,6 +468,8 @@ const props = withDefaults(defineProps<Props>(), {
   reasoningEffort: 'none',
   agents: () => [],
   sharedAgents: () => [],
+  subscribedAgents: () => [],
+  selectedMarketplaceProductId: '',
   selectedAgentId: '',
   selectedAgentSourceTenantId: '',
   selectedAgentDisplayName: '',
@@ -476,6 +482,7 @@ const emit = defineEmits<{
   'select-model': [value: string]
   'select-reasoning': [value: string]
   'select-agent': [agent: CustomAgent, sourceTenantId?: string]
+  'select-marketplace-agent': [productId: string]
   'update:view': [value: 'overview' | 'models' | 'reasoning']
   close: []
 }>()
@@ -682,13 +689,20 @@ const chatAgentOptions = computed<ChatAgentOption[]>(() => {
       const agent: CustomAgent = { is_builtin: false, config: {}, ...sharedAgent.agent }
       return { key: `shared-${sourceTenantId}-${agent.id}`, agent, sourceTenantId }
     })
-  return [...own, ...shared]
+  const subscribed = [...new Map(props.subscribedAgents.filter(entry => entry.can_chat)
+    .map(entry => [entry.product_id, entry])).values()].map(entry => ({
+      key: `marketplace-${entry.product_id}`,
+      marketplaceProductId: entry.product_id,
+      agent: { id: entry.agent_id, name: entry.agent_name || entry.product_title, is_builtin: false, config: {} } as CustomAgent,
+    }))
+  return [...own, ...shared, ...subscribed]
 })
 const agentOptionId = (key: string) => `${agentListId}-option-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 const modelOptionId = (id: string) => `${modelListId}-option-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 const reasoningOptionId = (value: string) => `${modelListId}-reasoning-${value.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 const isAgentOptionSelected = (option: ChatAgentOption) =>
-  option.agent.id === props.selectedAgentId
+  (option.marketplaceProductId || '') === props.selectedMarketplaceProductId
+  && option.agent.id === props.selectedAgentId
   && (option.sourceTenantId || '') === (props.selectedAgentSourceTenantId || '')
 const activeAgentId = computed(() => {
   const option = chatAgentOptions.value[activeAgentIndex.value]
@@ -748,6 +762,10 @@ const openView = (nextView: 'overview' | 'models' | 'reasoning') => {
   })
 }
 const selectChatAgent = (option: ChatAgentOption) => {
+  if (option.marketplaceProductId) {
+    emit('select-marketplace-agent', option.marketplaceProductId)
+    return
+  }
   emit('select-agent', option.agent, option.sourceTenantId)
 }
 const selectChatModel = (value: string) => {
@@ -863,7 +881,7 @@ watch(() => props.view, (view) => {
   }
 }, { immediate: true })
 watch(
-  [chatAgentOptions, () => props.selectedAgentId, () => props.selectedAgentSourceTenantId],
+  [chatAgentOptions, () => props.selectedAgentId, () => props.selectedAgentSourceTenantId, () => props.selectedMarketplaceProductId],
   () => {
     activeAgentIndex.value = Math.max(0, chatAgentOptions.value.findIndex(isAgentOptionSelected))
   },

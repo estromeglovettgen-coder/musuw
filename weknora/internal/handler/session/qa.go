@@ -930,14 +930,14 @@ const (
 	qaModeAgent                // Agent engine with tool calling
 )
 
-// platformTitleResolvedInService reports whether title generation must wait
-// for the platform consumer resolver. Custom agents, including agents whose
-// IDs resemble the builtins, retain the handler's existing early title path.
+// platformTitleResolvedInService waits for the authorized runtime answer model
+// on all Lite HTTP chats and platform answer modes. Standard custom agents
+// retain the handler's existing early title path.
 func platformTitleResolvedInService(mode qaMode, customAgent *types.CustomAgent) bool {
 	if mode != qaModeNormal && mode != qaModeAgent {
 		return false
 	}
-	if customAgent == nil {
+	if customAgent == nil || service.IsLiteProductEdition() {
 		return true
 	}
 	return customAgent.ID == types.BuiltinQuickAnswerID || customAgent.ID == types.BuiltinSmartReasoningID
@@ -949,9 +949,9 @@ func (h *Handler) executeQA(reqCtx *qaRequestContext, mode qaMode, generateTitle
 	ctx := reqCtx.ctx
 	sessionID := reqCtx.sessionID
 	platformTitle := platformTitleResolvedInService(mode, reqCtx.customAgent)
-	// Platform answer modes resolve their model asynchronously inside the
-	// service, so title generation must happen there with the effective ID.
-	// Standard/custom agents retain the existing early title path.
+	// Lite and platform answer modes validate their runtime model inside the
+	// service, so title generation must wait for the effective ID.
+	// Standard custom agents retain the existing early title path.
 	reqCtx.generateTitle = generateTitle && platformTitle
 
 	// Persist the input-bar state used for this request so reopening the

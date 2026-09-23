@@ -18,6 +18,10 @@ func TestMarketplaceLibraryKeepsPaidHistoryLockedWithoutCreatingGrants(t *testin
 	now, past, future := time.Now().UTC(), time.Now().Add(-time.Hour), time.Now().Add(time.Hour)
 	for _, id := range []string{"usable", "expired", "refunded", "unpaid", "foreign", "free"} {
 		amount := int64(100)
+		agentName := ""
+		if id == "usable" {
+			agentName = "Published specialist"
+		}
 		if id == "free" {
 			amount = 0
 		}
@@ -25,6 +29,7 @@ func TestMarketplaceLibraryKeepsPaidHistoryLockedWithoutCreatingGrants(t *testin
 			ID: id, Title: id, Description: "Public description", Status: "unpublished",
 			MonthlyAmount: amount, YearlyAmount: amount * 10, PublishedTenantID: 99,
 			PlatformAgentID: "agent-" + id, PlatformKnowledgeBaseIDs: types.StringArray{"kb-" + id},
+			AgentName:          agentName,
 			KnowledgeBaseNames: types.StringArray{"Published " + id},
 			Contact:            "private contact",
 			AgentSnapshot:      types.CustomAgentConfig{SystemPrompt: "private persona"},
@@ -72,6 +77,17 @@ func TestMarketplaceLibraryKeepsPaidHistoryLockedWithoutCreatingGrants(t *testin
 	require.False(t, byProduct["refunded"].CanRead)
 	encoded, err := json.Marshal(rows)
 	require.NoError(t, err)
+	var projections []map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &projections))
+	for _, projection := range projections {
+		id := projection["product_id"].(string)
+		expectedName := id
+		if id == "usable" {
+			expectedName = "Published specialist"
+		}
+		require.Equal(t, expectedName, projection["agent_name"])
+		require.Equal(t, id == "usable", projection["can_chat"])
+	}
 	for _, secret := range []string{"private contact", "private persona", "tenant_id", "source_tenant", "config"} {
 		require.NotContains(t, string(encoded), secret)
 	}
@@ -87,8 +103,28 @@ func TestMarketplaceLibraryKeepsPaidHistoryLockedWithoutCreatingGrants(t *testin
 	for _, row := range rows {
 		if row.ProductID == "usable" {
 			require.False(t, row.CanRead, "library projection must agree with the paid-only Wiki gate")
+			require.False(t, row.CanChat, "old payments do not pay for the current term")
 		}
 	}
+	// A current payment cannot authorize an asset that is no longer platform-owned.
+	require.NoError(t, db.Model(&types.MarketplaceSubscription{}).
+		Where("id = ?", "sub-usable").Update("last_payment_at", now).Error)
+	require.NoError(t, db.Model(&types.KnowledgeBase{}).
+		Where("id = ?", "kb-usable").Update("tenant_id", 100).Error)
+	rows, err = svc.Library(buyer)
+	require.NoError(t, err)
+	for _, row := range rows {
+		if row.ProductID == "usable" {
+			require.False(t, row.CanRead)
+			require.False(t, row.CanChat)
+		}
+	}
+	// Keep the existing unavailable-source behavior rather than advertising chat
+	// when an approved KB is missing. No partial authorized projection is returned.
+	require.NoError(t, db.Delete(&types.KnowledgeBase{}, "id = ?", "kb-usable").Error)
+	rows, err = svc.Library(buyer)
+	require.ErrorContains(t, err, "published knowledge is temporarily unavailable")
+	require.Nil(t, rows)
 	_, err = svc.Library(context.Background())
 	require.ErrorIs(t, err, types.ErrMarketplaceForbidden)
 }

@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import LegacyKnowledgeBaseListBusiness from '@/assets/business-baselines/KnowledgeBaseList.pre-view.vue'
 import { duplicateKnowledgeBase, getKnowledgeBaseCopyProgress } from '@/api/knowledge-base'
 import { useAuthStore } from '@/stores/auth'
+import { useMarketplaceLibrary } from '@/composables/useMarketplaceLibrary'
 import KnowledgeBaseEditorModal from './KnowledgeBaseEditorModal.vue'
 import ShareKnowledgeBaseDialog from '@/components/ShareKnowledgeBaseDialog.vue'
 import KnowledgeBaseListReferenceCard from './components/KnowledgeBaseListReferenceCard.vue'
@@ -29,7 +30,9 @@ export default defineComponent({
   },
   setup(props: Record<string, unknown>, context: SetupContext) {
     const authStore = useAuthStore()
-    const marketLibraryCount = ref(-1)
+    const libraryFilter = ref<'all' | 'mine' | 'subscribed'>('all')
+    const { entries: marketLibraryEntries, loading: marketLibraryLoading, failed: marketLibraryFailed, load: loadMarketLibrary } = useMarketplaceLibrary()
+    const marketLibraryCount = computed(() => marketLibraryLoading.value ? -1 : marketLibraryEntries.value.length)
     const state = legacySetup?.(props, context)
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
       const legacyState = state as Record<string, any>
@@ -44,6 +47,9 @@ export default defineComponent({
       const baseSpaceSelectionOrgId = legacyState.spaceSelectionOrgId
       const baseShowShareGroupHeaders = legacyState.showShareGroupHeaders
       const baseFilteredKnowledgeBases = legacyState.filteredKnowledgeBases
+      const mineLibraryCount = computed(() =>
+        (readRef(legacyState.sortedMineKbs) || []).filter((kb: any) => kb.type !== 'faq').length,
+      )
 
       legacyState.sharedKbs = computed(() =>
         authStore.isLiteMode ? [] : readRef(baseSharedKbs),
@@ -122,7 +128,7 @@ export default defineComponent({
         await copyById(kb.id)
       }
       state.handleDuplicateById = copyById
-      return { ...state, marketLibraryCount }
+      return { ...state, libraryFilter, mineLibraryCount, marketLibraryCount, marketLibraryEntries, marketLibraryLoading, marketLibraryFailed, loadMarketLibrary }
     }
     return state
   },
@@ -151,6 +157,12 @@ export default defineComponent({
         <button v-if="authStore.hasRole('contributor')" type="button" class="visual-kb-list__create" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" size="16px" aria-hidden="true" /><span>{{ $t('knowledgeList.create') }}</span></button>
       </header>
 
+      <div v-if="authStore.isLiteMode" class="visual-knowledge-tabs" role="tablist" :aria-label="$t('creatorMarketplace.libraryFilterLabel')">
+        <button type="button" role="tab" :class="{ 'is-active': libraryFilter === 'all' }" :aria-selected="libraryFilter === 'all'" @click="libraryFilter = 'all'">{{ $t('creatorMarketplace.libraryFilterAll') }}</button>
+        <button type="button" role="tab" :class="{ 'is-active': libraryFilter === 'mine' }" :aria-selected="libraryFilter === 'mine'" @click="libraryFilter = 'mine'">{{ $t('creatorMarketplace.libraryFilterMine') }}</button>
+        <button type="button" role="tab" :class="{ 'is-active': libraryFilter === 'subscribed' }" :aria-selected="libraryFilter === 'subscribed'" @click="libraryFilter = 'subscribed'">{{ $t('creatorMarketplace.libraryFilterSubscribed') }}</button>
+      </div>
+
       <section v-if="uploadSummaries.length" class="visual-kb-upload-status" aria-live="polite">
         <article v-for="summary in uploadSummaries" :key="summary.kbId">
           <span class="visual-kb-upload-status__icon" :class="{ 'is-done': summary.completed === summary.total }"><t-icon :name="summary.completed === summary.total ? 'check-circle-filled' : 'upload'" /></span>
@@ -165,13 +177,17 @@ export default defineComponent({
       </section>
 
       <section class="visual-kb-list__content">
-        <MarketplaceLibraryCards v-if="authStore.isLiteMode || spaceSelection === 'all'" @count="marketLibraryCount = $event" />
+        <MarketplaceLibraryCards v-if="!authStore.isLiteMode && spaceSelection === 'all'"
+          :entries="marketLibraryEntries" :loading="marketLibraryLoading" :failed="marketLibraryFailed" @retry="loadMarketLibrary" />
+
+        <section v-if="!authStore.isLiteMode || libraryFilter !== 'subscribed'" :class="{ 'visual-kb-source-group': authStore.isLiteMode }" :aria-label="authStore.isLiteMode ? $t('creatorMarketplace.libraryMineTitle') : undefined">
+          <h2 v-if="authStore.isLiteMode">{{ $t('creatorMarketplace.libraryMineTitle') }} <small v-if="!loading">{{ mineLibraryCount }}</small></h2>
 
         <div v-if="loading && kbs.length === 0 && !spaceSelectionOrgId" class="visual-kb-grid" aria-hidden="true">
           <article v-for="n in 6" :key="n" class="visual-kb-list__skeleton"><t-skeleton animation="gradient" :row-col="[{ width: '62%', height: '16px' },{ width: '100%', height: '12px' },{ width: '76%', height: '12px' }]" /></article>
         </div>
 
-        <div v-else-if="(spaceSelection === 'all' || spaceSelection === 'favorites' || spaceSelection === 'recents') && filteredKnowledgeBases.length > 0 && filteredKnowledgeBases.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq')" class="visual-kb-grid">
+        <div v-else-if="!authStore.isLiteMode && (spaceSelection === 'all' || spaceSelection === 'favorites' || spaceSelection === 'recents') && filteredKnowledgeBases.length > 0 && filteredKnowledgeBases.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq')" class="visual-kb-grid">
           <button v-if="!authStore.isLiteMode && filteredKnowledgeBases[0]?.isMine && filteredKnowledgeBases[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ filteredKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
 
           <template v-for="(kb, index) in filteredKnowledgeBases" :key="`${kb.isMine ? 'mine' : 'shared'}-${kb.id}`">
@@ -216,7 +232,7 @@ export default defineComponent({
 
         </div>
 
-        <div v-else-if="spaceSelection === 'mine' && sortedMineKbs.length > 0 && sortedMineKbs.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq')" class="visual-kb-grid">
+        <div v-else-if="(authStore.isLiteMode || spaceSelection === 'mine') && sortedMineKbs.length > 0 && sortedMineKbs.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq')" class="visual-kb-grid">
           <button v-if="!authStore.isLiteMode && sortedMineKbs[0]?.is_pinned" type="button" class="visual-kb-section" @click="toggleKbSection('pinned')"><t-icon name="pin-filled" /><span>{{ $t('knowledgeList.sections.pinned') }}</span><small>{{ mineKbSectionCounts.pinned }}</small><t-icon :name="isKbSectionCollapsed('pinned') ? 'chevron-right' : 'chevron-down'" /></button>
           <template v-for="(kb, index) in sortedMineKbs" :key="kb.id">
             <template v-if="!authStore.isLiteMode || kb.type !== 'faq'">
@@ -265,11 +281,16 @@ export default defineComponent({
           </template>
         </div>
 
+        <p v-else-if="authStore.isLiteMode && !loading" class="visual-kb-source-empty" role="status">{{ $t('creatorMarketplace.libraryEmptyMine') }}</p>
         <section v-else-if="marketLibraryCount === 0 && spaceSelection === 'all' && !filteredKnowledgeBases.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq') && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" class="empty-state-btn" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
         <section v-else-if="spaceSelection === 'favorites' && !filteredKnowledgeBases.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq') && !loading" class="visual-kb-empty"><t-icon name="star" /><strong>{{ $t('knowledgeList.empty.favoritesTitle') }}</strong><p>{{ $t('knowledgeList.empty.favoritesDescription') }}</p></section>
         <section v-else-if="spaceSelection === 'recents' && !filteredKnowledgeBases.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq') && !loading" class="visual-kb-empty"><t-icon name="history" /><strong>{{ $t('knowledgeList.empty.recentsTitle') }}</strong><p>{{ $t('knowledgeList.empty.recentsDescription') }}</p></section>
         <section v-else-if="(!authStore.isLiteMode || marketLibraryCount === 0) && spaceSelection === 'mine' && !sortedMineKbs.some((kb: { type?: string }) => !authStore.isLiteMode || kb.type !== 'faq') && !loading" class="visual-kb-empty"><t-icon name="folder" /><strong>{{ $t('knowledgeList.empty.title') }}</strong><p>{{ $t('knowledgeList.empty.description') }}</p><button v-if="authStore.hasRole('contributor')" type="button" class="empty-state-btn" data-guide="kb-list-create" @click="handleCreateKnowledgeBase"><t-icon name="folder-add" /><span>{{ $t('knowledgeList.create') }}</span></button></section>
         <section v-else-if="spaceSelectionOrgId && !spaceKbsLoading && !spaceKbsList.some((shared: { knowledge_base?: { type?: string } }) => !authStore.isLiteMode || shared.knowledge_base?.type !== 'faq')" class="visual-kb-empty"><t-icon name="usergroup" /><strong>{{ $t('knowledgeList.empty.sharedTitle') }}</strong><p>{{ $t('knowledgeList.empty.sharedDescription') }}</p></section>
+        </section>
+
+        <MarketplaceLibraryCards v-if="authStore.isLiteMode && libraryFilter !== 'mine'" show-empty
+          :entries="marketLibraryEntries" :loading="marketLibraryLoading" :failed="marketLibraryFailed" @retry="loadMarketLibrary" />
       </section>
 
       <t-dialog v-model:visible="deleteVisible" :close-btn="false" :cancel-btn="null" :confirm-btn="null" dialog-class-name="visual-kb-delete-dialog">
@@ -304,9 +325,11 @@ export default defineComponent({
 </template>
 
 <style scoped lang="less">
+@import './components/knowledge-base-layout.less';
 .visual-kb-workspace { width: 100%; height: 100%; min-width: 0; min-height: 0; flex: 1 1 auto; display: flex; overflow: hidden; background: rgb(249 250 251 / 30%); }
 .visual-kb-workspace > :deep(.list-space-sidebar) { flex: 0 0 auto; }
 .visual-kb-list { width: auto; height: 100%; min-width: 0; min-height: 0; flex: 1 1 auto; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; overflow: hidden; background: rgb(249 250 251 / 30%); color: #374151; }
+.visual-kb-list > .visual-knowledge-tabs { align-self: flex-start; }
 .visual-kb-list__header { flex: 0 0 auto; padding-bottom: 20px; border-bottom: 1px solid rgb(229 231 235 / 80%); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .visual-kb-list__heading { min-width: 0; }
 .visual-kb-list__title-row { display: flex; align-items: center; gap: 8px; }
@@ -331,6 +354,9 @@ export default defineComponent({
 .visual-kb-upload-status__bar { height: 2px; margin-top: 4px; overflow: hidden; border-radius: 999px; background: #e5e7eb; }
 .visual-kb-upload-status__bar span { display: block; height: 100%; background: #6b7280; transition: width 140ms linear; }
 .visual-kb-list__content { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 24px 4px 12px 2px; scrollbar-width: thin; }
+:deep(.visual-kb-source-group) { min-width: 0; margin-bottom: 24px; }
+:deep(.visual-kb-source-group > h2) { margin: 0 0 12px; font-size: 15px; }
+:deep(.visual-kb-source-empty) { margin: 0; padding: 12px 0; color: #6b7280; font-size: 12px; }
 :deep(.visual-kb-grid) { display: grid; grid-template-columns: 1fr; gap: 18px; }
 .visual-reference-kb-card-host { min-width: 0; }
 .visual-kb-section { grid-column: 1 / -1; min-height: 28px; margin-top: 4px; padding: 4px 2px; border: 0; display: flex; align-items: center; gap: 6px; background: transparent; color: #9ca3af; font: inherit; font-size: 11px; font-weight: 600; text-align: left; cursor: pointer; }

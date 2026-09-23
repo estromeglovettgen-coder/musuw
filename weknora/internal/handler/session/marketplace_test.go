@@ -63,6 +63,54 @@ func TestMarketplaceRequestBindsApprovedAgentAndBuyerIdentity(t *testing.T) {
 	require.Equal(t, "all", access.Agent.Config.KBSelectionMode, "runtime must not mutate saved configuration")
 }
 
+func TestMarketplaceRequestPreservesBuyerModelAndThinkingOverrides(t *testing.T) {
+	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(41))
+	sourceThinking := true
+	access := &types.MarketplaceAccess{
+		ProductID: "product", SourceTenantID: 99,
+		Agent: &types.CustomAgent{ID: "approved-agent", TenantID: 99, Config: types.CustomAgentConfig{
+			SystemPrompt: "approved prompt", ModelID: types.MarketplaceDefaultModelID,
+			QueryUnderstandModelID: types.MarketplaceDefaultModelID, Thinking: &sourceThinking,
+		}}, KnowledgeBaseIDs: []string{"approved-kb"},
+	}
+	h := &Handler{marketplaceService: &marketplaceAccessStub{access: access}}
+	for _, tc := range []struct {
+		name, requestedModel, expectedModel, effort string
+		thinking                                    bool
+	}{
+		{"default Flash", "", types.MarketplaceDefaultModelID, "low", false},
+		{"buyer selected model", "builtin-deepseek-v4-pro", "builtin-deepseek-v4-pro", "high", true},
+		{"explicit thinking off", "builtin-deepseek-v4-pro", "builtin-deepseek-v4-pro", "low", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := &CreateKnowledgeQARequest{
+				MarketplaceProductID: "product", SummaryModelID: tc.requestedModel,
+				Thinking: &tc.thinking, ReasoningEffort: tc.effort,
+			}
+			gotCtx, agent, err := h.resolveMarketplaceRequest(ctx, req)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedModel, req.SummaryModelID)
+			require.Equal(t, tc.expectedModel, agent.Config.ModelID)
+			require.Equal(t, tc.expectedModel, agent.Config.QueryUnderstandModelID)
+			require.Equal(t, uint64(41), types.MustTenantIDFromContext(gotCtx))
+			require.Equal(t, "approved prompt", agent.Config.SystemPrompt)
+			require.Equal(t, []string{"approved-kb"}, agent.Config.KnowledgeBases)
+			runtime := &qaRequestContext{
+				ctx: gotCtx, customAgent: agent, summaryModelID: req.SummaryModelID,
+				thinking: req.Thinking, reasoningEffort: req.ReasoningEffort,
+				assistantMessage: &types.Message{},
+			}
+			qa := runtime.buildQARequest()
+			require.Equal(t, tc.thinking, *qa.Thinking)
+			require.Equal(t, tc.effort, qa.ReasoningEffort)
+			require.Equal(t, tc.expectedModel, titleModelIDForRequest(runtime))
+			require.Equal(t, types.MarketplaceDefaultModelID, access.Agent.Config.ModelID)
+			require.Equal(t, types.MarketplaceDefaultModelID, access.Agent.Config.QueryUnderstandModelID)
+			require.True(t, *access.Agent.Config.Thinking, "request must not mutate the approved persona")
+		})
+	}
+}
+
 func TestMarketplaceRequestDeniesExpiredAndInjectedTargets(t *testing.T) {
 	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(41))
 	stub := &marketplaceAccessStub{err: types.ErrMarketplaceForbidden}

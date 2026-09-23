@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { listMarketplaceLibrary, type MarketplaceLibraryEntry } from '@/api/creator-marketplace'
 import WikiBrowser from '@/views/knowledge/wiki/WikiBrowser.vue'
+import MarketplaceAccessStatus from './MarketplaceAccessStatus.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,6 +79,10 @@ function showGraph(slug: string) {
             <span class="visual-knowledge-breadcrumb__section">{{ view === 'browser' ? 'Wiki' : $t('knowledgeEditor.wikiBrowser.tabGraph') }}</span>
           </template>
         </nav>
+        <div v-if="entry" class="market-library-reader__metadata">
+          <MarketplaceAccessStatus :can-use="entry.can_read" :status="entry.status" :paid-through="entry.paid_through" :cancel-at-period-end="entry.cancel_at_period_end" />
+          <span v-if="entry.agent_name" class="market-library-reader__agent"><t-icon name="user" />{{ entry.agent_name }}</span>
+        </div>
       </div>
       <div v-if="entry?.can_read && !failure && !loading" class="visual-knowledge-header__actions">
         <div v-if="viewer?.entry.wiki_enabled" class="visual-knowledge-tabs" role="tablist">
@@ -109,6 +114,8 @@ function showGraph(slug: string) {
 <style scoped lang="less">
 @import '../knowledge/components/knowledge-base-layout.less';
 .market-library-reader__notice { padding: 24px 0; color: var(--td-text-color-secondary); }
+.market-library-reader__metadata { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; }
+.market-library-reader__agent { display: inline-flex; align-items: center; gap: 6px; color: var(--td-text-color-secondary); font-size: 12px; }
 @media (max-width: 760px) {
   .market-library-reader .visual-knowledge-tabs { min-width: 0; flex: 1 1 0; }
   .market-library-reader .visual-knowledge-header__actions > :deep(.t-button) { flex-shrink: 0; }

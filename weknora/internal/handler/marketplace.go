@@ -91,8 +91,23 @@ func (h *MarketplaceHandler) GetProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": p})
 }
 
+// Preview returns public directory metadata and curated final answers only.
+func (h *MarketplaceHandler) Preview(c *gin.Context) {
+	p, err := h.service.Preview(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		marketplaceHTTPError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"data": p})
+}
+
 func (h *MarketplaceHandler) save(c *gin.Context, id string, admin bool) {
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64*1024)
+	limit := int64(64 * 1024)
+	if admin {
+		limit = 384 * 1024
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
 	var input types.MarketplaceProductInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		marketplaceHTTPError(c, types.ErrMarketplaceInvalid)

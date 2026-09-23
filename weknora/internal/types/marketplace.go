@@ -66,6 +66,8 @@ type MarketplaceProduct struct {
 	CreatedAt          time.Time                 `json:"created_at"`
 	UpdatedAt          time.Time                 `json:"updated_at"`
 	Access             *MarketplaceProductAccess `json:"access,omitempty" gorm:"-"`
+
+	SampleConversations []MarketplaceExample `json:"sample_conversations,omitempty" gorm:"serializer:json;type:json;not null;default:'[]'"`
 }
 
 // IsFree reports whether the product has no purchase price or payment binding.
@@ -84,17 +86,19 @@ type MarketplaceProductAccess struct {
 	CancelAtPeriodEnd bool       `json:"cancel_at_period_end"`
 }
 
-// MarketplaceLibraryEntry exposes a purchased knowledge base without source
-// configuration. Expired purchases remain visible; CanRead is authoritative.
+// MarketplaceLibraryEntry exposes a purchased knowledge base and agent without
+// source configuration. CanChat authorizes the product; CanRead also requires the KB.
 type MarketplaceLibraryEntry struct {
 	ProductID         string     `json:"product_id"`
 	ProductTitle      string     `json:"product_title"`
 	AgentID           string     `json:"agent_id"`
+	AgentName         string     `json:"agent_name"`
 	KnowledgeBaseID   string     `json:"knowledge_base_id"`
 	Name              string     `json:"name"`
 	Description       string     `json:"description"`
 	WikiEnabled       bool       `json:"wiki_enabled"`
 	CanRead           bool       `json:"can_read"`
+	CanChat           bool       `json:"can_chat"`
 	Status            string     `json:"status"`
 	PaidThrough       *time.Time `json:"paid_through,omitempty"`
 	CancelAtPeriodEnd bool       `json:"cancel_at_period_end"`
@@ -115,6 +119,28 @@ type MarketplaceProductInput struct {
 	Contact                string   `json:"contact"`
 	Authorization          string   `json:"authorization"`
 	AuthorizationConfirmed bool     `json:"authorization_confirmed"`
+
+	// Nil preserves the curated examples; only platform administrators may replace them.
+	SampleConversations *[]MarketplaceExample `json:"sample_conversations,omitempty"`
+}
+
+// MarketplaceExample is an explicitly curated public copy, never a live chat reference.
+type MarketplaceExample struct {
+	Question string `json:"question"`
+	Answer   string `json:"answer"`
+}
+
+// MarketplaceDirectoryEntry deliberately contains no Wiki body, summary or source references.
+type MarketplaceDirectoryEntry struct {
+	ID       string   `json:"id"`
+	Title    string   `json:"title"`
+	Path     []string `json:"path"`
+	PageType string   `json:"page_type"`
+}
+
+type MarketplacePreview struct {
+	Directory []MarketplaceDirectoryEntry `json:"directory"`
+	Examples  []MarketplaceExample        `json:"examples"`
 }
 
 // MarketplaceCheckoutConfig exposes checkout settings and internal portal readiness.

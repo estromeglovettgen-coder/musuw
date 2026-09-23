@@ -115,3 +115,51 @@ Final native UI release: `a068e7d0b6de8ad9ed4ab040fd82bd7b6cda912f`. [CI 3577312
 Fresh Chrome acceptance inspected the actual four subscribed cards alongside the buyer's owned library: the grid uses three columns and every card has the same 383.33px column width. Card height remains the native automatic height determined by description/strategy content; it is not a new fixed-height design. The actual Taylor reader shows the native breadcrumb and Wiki/graph tabs, with no cancellation date, read-only badge, duplicate title or billing explanation. At 430×932, the chat button ends at x=418, document width is 430, and the graph renders 500 of 2,318 pages. Desktop viewport was restored and the corrected Wiki left open.
 
 Safe evidence: `final-ci-a068e7d0.json`, `staging-release-a068e7d0.json`, `staging-runtime-proof-a068e7d0.txt`, and `root-browser-a068e7d0-final.json` under the local 20260922 artifact directory. This acceptance-record follow-up does not alter the deployed application source.
+
+
+## 2026-09-22 — source hierarchy and subscribed agents (local only)
+
+Latest user instruction superseded staging delivery for this follow-up: show the local preview and do not upload to a server. No commit, push or deployment was performed for this follow-up.
+
+- Consumer source tabs are All / Mine / Subscribed; All separates owned and subscribed groups. Native Standard organization scope is retained.
+- The existing purchased Library projection now exposes public agent name and authoritative can_chat; the Agent directory deduplicates by product and opens existing scoped go-use without sending a question.
+- Cards and reader show paid-through/cancellation/locked state. A denied active subscription whose term has elapsed displays expired; this is presentation only.
+- Backend projection and real Wiki route tests passed, differential Go lint reported 0 issues. Frontend suite: 1,257 passed, type checking and production build passed. Browser suite: 47 passed, including actual workspace shells at 1440/430 widths. The final expiry-label correction additionally passed all 5 actual-component cases (initial RED recorded).
+- Consolidated review found only that expiry-label gap, now corrected. Actual composable validation covered late responses, account change, retry, logout and unmount. No model or payment provider request was made.
+- Local preview uses the real workspace components, isolated fictional records and read-only API fixtures. Chrome visibly verified both directories, useful expiry statuses, and exactly three source filters. Preview: http://127.0.0.1:4193/e2e/mobile-harness.html?page=/platform/knowledge-bases and /platform/agents. Its process/config/log live under ignored .runtime/creator-marketplace/local-ui-preview.*.
+- Evidence: artifacts/creator-marketplace-20260922/source-agent-final.log, source-agent-final-build.log, source-agent-unit.log, access-status-green.log, library-agent-projection-verification.json, library-source-filters-verification.json.
+- Existing local Vite dependency-scan warnings do not prevent the verified preview. Fresh browser entry loaded the components successfully; the production build also passed.
+
+
+### 2026-09-22 local composer correction
+
+- Removed subscribed-agent letter avatars. Real Chrome screenshot/DOM verified zero added avatars and 18px header-to-filter gap; desktop and phone directory geometry passed.
+- Corrected two independent causes: local fixture models omitted provider/reasoning/scene metadata; actual custom-agent composer skipped the membership scene catalog and omitted subscribed agents. The preview remains isolated, rejects all write requests, and never calls models or payment providers.
+- Native selector now includes valid subscribed agents, fresh-authorizes product entry, supports membership-approved model/reasoning choice, and preserves drafts. Same-product reselect retains model/effort. Ordinary owned-to-owned switches stay in the current conversation; crossing immutable marketplace scope opens a new conversation.
+- Runtime QA uses explicit authorized model IDs for subscribed and Lite owned agents; Flash is only the initial/default value. Buyer membership/model lookup, billing identity, persona and KB isolation remain native. Removed/unauthorized old own-agent model configuration no longer blocks valid overrides; invalid explicit overrides fail rather than silently falling back. Lite title generation reuses the effective model after native validation.
+- Targeted frontend runtime/selector/readiness/navigation/fingerprint suite: 67 passed; final navigation correction suite: 6 passed (includes new Lite in-session preservation case); status/card component suite: 9 passed. RED evidence was captured before model, readiness, picker, Standard-boundary and ordinary-history corrections.
+- Browser suite: 51/52 initially passed; the reader case was intercepted by the first-run guide in a slow full-suite run. The test fixture now explicitly represents an existing user with completed onboarding. Its rerun plus all affected composer/history cases passed 7/7, including one newly added ordinary-history case (53 distinct scenarios verified across the runs). These tests use routed API fixtures and inspect actual outgoing model/effort/product payloads.
+- Final build-with-types passed after the last runtime delta. Existing chunk-size warnings remain; the test Vite server emitted font symlink allow-list warnings, while the live 4193 preview explicitly allows that path and rendered the real fonts.
+- Go request/model/membership/title/scope regression suites passed; changed-package golangci-lint reported 0 issues. Evidence: artifacts/creator-marketplace-20260922/local-marketplace-model-choice-verification.json. One consolidated adversarial review identified the owned-model validation mismatch, which was corrected and delta-reviewed. No remaining current blocker.
+- Local browser confirmed Taylor → Pro → maximum reasoning and final directory spacing. Preview server PID is recorded in .runtime/creator-marketplace/local-ui-preview.pid. No push, server deployment, production mutation, real model call or payment request was performed.
+
+
+## 2026-09-22 — genuine directory and curated answers (local only)
+
+- The owner-authorized production extraction was read-only. Taylor has 2,318 published Wiki pages; the directory displays 2,317 entries after excluding the index page, preserving actual folder parent/name relationships. The four selected question/final-answer pairs come from completed conversations in the requested kuster account. Only internal citation tags were removed; answers were not rewritten or summarized.
+- The local response was compared with the extracted source: exact directory ID set and four selected answers match. Browser output contains only directory metadata and question/answer text. Private source evidence remains in ignored local runtime files and is not exposed to the browser.
+- The authenticated product preview reads only published metadata inside the reviewed tenant and bound libraries. Administrator-curated examples use the existing product review workflow; catalog responses omit them. Existing full-Wiki entitlement checks remain unchanged.
+- Directory uses existing tree, input and pagination components. Examples reuse the typewriter and Markdown rendering capabilities, with no reasoning, tool calls or round details. Loading is lazy, product-switch responses are isolated, and failed requests can be retried.
+- Backend marketplace tests passed in service, repository, router and handler packages. SQLite forward/reverse migration and repository persistence were exercised. PostgreSQL migration 108 is supplied but was not executed on a live database; it must run with a future release.
+- Twenty distinct detail/preview browser scenarios passed across the full run and affected reruns. Three final example-component scenarios passed, including typing/switching, reduced motion, mobile layout and removal of remote/private loading elements. The consolidated review identified and fixed the Markdown image/link loading issue; no current blocker remains.
+- Fresh build-with-types passed after the final sanitizer/mobile changes (40.21 seconds; existing chunk-size warning only). Desktop and 430-pixel mobile layouts were visually inspected. Temporary browser sizing was reset for delivery.
+- No real model invocation, payment request, production mutation, commit, push or deployment was performed. Local preview: http://127.0.0.1:4193/e2e/mobile-harness.html?page=/platform/marketplace/taylor .
+- Evidence logs: /tmp/market-preview-final.log, /tmp/marketplace-content-preview-green.log, /tmp/marketplace-content-preview-delta.log, /tmp/market-real-preview-final-build.log. Local curated source/projection and provenance evidence remain under ignored .runtime/creator-marketplace/selected-taylor-preview*.json.
+
+### Local tab indicator correction
+
+Removed the marketplace tab item margin/padding overrides and restored native TDesign spacing. The native indicator sums item widths and did not include the added 28px margins; the third item was measured 56px left of its actual position before the fix. Browser measurements for all three selections now show zero position/width difference at 430px and 1280px. Both layouts were visually checked. This CSS-only correction remains local.
+
+### Staging release preparation
+
+The owner now authorizes publishing the accumulated local marketplace work to staging. Overview no longer repeats sample questions; the examples tab remains. Fresh marketplace browser suite: 83/83 passed, including native tab indicator geometry at desktop/mobile widths. Targeted Go tests passed in five packages; frontend build-with-types and locale audit passed. Staging release and data synchronization acceptance are recorded below only after actual completion.

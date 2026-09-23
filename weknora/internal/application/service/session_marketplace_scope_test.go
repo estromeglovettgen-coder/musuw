@@ -59,6 +59,68 @@ func TestMarketplaceQARejectsForeignAgentAndInjectedSourceResources(t *testing.T
 	require.Error(t, err)
 }
 
+type marketplaceModelRepo struct {
+	consumerSceneModelRepo
+	lookupTenant uint64
+}
+
+func (r *marketplaceModelRepo) GetByID(ctx context.Context, tenantID uint64, id string) (*types.Model, error) {
+	r.lookupTenant = tenantID
+	return r.consumerSceneModelRepo.GetByID(ctx, tenantID, id)
+}
+
+func TestMarketplaceSelectedChatModelKeepsBuyerMembershipGate(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	flash := consumerSceneModel(types.MarketplaceDefaultModelID, "Flash")
+	pro := consumerSceneModel("builtin-deepseek-v4-pro", "Pro")
+	rerank := consumerSceneModel("rerank-only", "Rerank")
+	rerank.Type = types.ModelTypeRerank
+	private := consumerSceneModel("source-private-model", "Private")
+	private.IsBuiltin = false
+	for _, tc := range []struct {
+		name, model string
+		plan        types.ConsumerPlan
+		allowed     bool
+	}{
+		{"Free default", flash.ID, types.ConsumerPlanFree, true},
+		{"Free cannot buy model access through a persona", pro.ID, types.ConsumerPlanFree, false},
+		{"Plus may choose Pro", pro.ID, types.ConsumerPlanPlus, true},
+		{"Max may choose Pro", pro.ID, types.ConsumerPlanMax, true},
+		{"private source model is forbidden", private.ID, types.ConsumerPlanMax, false},
+		{"missing model does not fall back to Flash", "missing", types.ConsumerPlanMax, false},
+		{"non-chat model is forbidden", rerank.ID, types.ConsumerPlanMax, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, req := marketplaceQAContext()
+			ctx = context.WithValue(ctx, types.TenantInfoContextKey, &types.Tenant{
+				ID: 41, Plan: tc.plan, PlanStatus: "active",
+			})
+			req.SummaryModelID = tc.model
+			req.CustomAgent.Config.ModelID = tc.model
+			req.CustomAgent.Config.QueryUnderstandModelID = tc.model
+			repo := &marketplaceModelRepo{consumerSceneModelRepo: consumerSceneModelRepo{
+				models: []*types.Model{flash, pro, rerank, private},
+			}}
+			svc := &sessionService{modelService: NewModelServiceWithEntitlement(
+				repo, nil, nil, nil, nil, nil,
+				&consumerSceneResolverEntitlement{plan: types.ConsumerPlanMax},
+			)}
+			require.NoError(t, rejectLiteForeignAgent(ctx, req))
+			modelID, err := svc.resolveConsumerChatModel(ctx, req, types.ConsumerSceneRAG, req.KnowledgeBaseIDs, nil)
+			if tc.allowed {
+				require.NoError(t, err)
+				require.Equal(t, tc.model, modelID)
+			} else {
+				require.Error(t, err)
+				require.Empty(t, modelID)
+			}
+			require.Equal(t, uint64(41), repo.lookupTenant, "model lookup never borrows the publishing tenant")
+			require.Equal(t, uint64(41), types.MustTenantIDFromContext(ctx))
+			require.Equal(t, []string{"approved-kb"}, req.CustomAgent.Config.KnowledgeBases)
+		})
+	}
+}
+
 func TestMarketplaceHybridSearchAuthorizationUsesOnlyApprovedKB(t *testing.T) {
 	ctx, _ := marketplaceQAContext()
 	svc := &knowledgeBaseService{kbShareService: &fakeKBShareForAuth{}}

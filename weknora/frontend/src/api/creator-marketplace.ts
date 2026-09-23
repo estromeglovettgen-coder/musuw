@@ -23,6 +23,7 @@ export interface MarketplaceProductInput {
   currency?: 'USD'
   monthly_amount: number
   sample_questions?: string[]
+  sample_conversations?: MarketplaceExampleConversation[]
   contact: string
   authorization: string
   authorization_confirmed: boolean
@@ -52,6 +53,13 @@ export interface MarketplaceProduct extends Omit<MarketplaceProductInput, 'conta
   created_at: string
   updated_at: string
   access?: MarketplaceAccess
+}
+
+export interface MarketplaceExampleConversation { question: string; answer: string }
+export interface MarketplaceDirectoryEntry { id: string; title: string; path: string[]; page_type: string }
+export interface MarketplaceProductPreview {
+  directory: MarketplaceDirectoryEntry[]
+  examples: MarketplaceExampleConversation[]
 }
 
 export interface MarketplaceReviewInput {
@@ -129,6 +137,10 @@ export async function getMarketplaceProduct(id: string): Promise<MarketplaceProd
   const response = await get<{ data: MarketplaceProduct }>(`${base}/products/${idPath(id)}`)
   return response.data
 }
+export async function getMarketplaceProductPreview(id: string): Promise<MarketplaceProductPreview> {
+  const response = await get<{ data: MarketplaceProductPreview }>(`${base}/products/${idPath(id)}/preview`)
+  return response.data
+}
 export function listCreatorProducts(query: MarketplaceListQuery = {}): Promise<MarketplaceListResponse> {
   return get(`${base}/creator/products`, { params: query })
 }
@@ -162,16 +174,18 @@ export async function reviewMarketplaceProduct(id: string, input: MarketplaceRev
 }
 
 
-/** A purchased knowledge base projection; never an editable source resource. */
+/** Purchased knowledge base and agent projection; never editable source resources. */
 export interface MarketplaceLibraryEntry {
   product_id: string
   product_title: string
   agent_id: string
+  agent_name: string
   knowledge_base_id: string
   name: string
   description: string
   wiki_enabled: boolean
   can_read: boolean
+  can_chat: boolean
   status: string
   paid_through?: string
   cancel_at_period_end: boolean

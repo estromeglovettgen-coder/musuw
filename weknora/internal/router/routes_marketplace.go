@@ -11,6 +11,7 @@ func RegisterMarketplaceRoutes(r *gin.RouterGroup, h *handler.MarketplaceHandler
 	market := r.Group("/creator-marketplace")
 	market.GET("/products", g.Viewer(), h.ListProducts)
 	market.GET("/products/:id", g.Viewer(), h.GetProduct)
+	market.GET("/products/:id/preview", g.Viewer(), h.Preview)
 	market.GET("/orders", g.Admin(), h.Orders)
 	market.POST("/products/:id/checkout", g.Admin(), h.Checkout)
 	market.POST("/subscriptions/:id/portal", g.Admin(), h.Portal)

@@ -143,6 +143,9 @@ const sceneModelsFor = (scene: ConsumerScene): ModelConfig[] => {
   });
 };
 const sceneManagedByConsumerResolver = computed(() => {
+  // Consumer model access follows the buyer's plan, including owned and
+  // purchased agents; source-agent defaults do not replace this catalog.
+  if (authStore.isLiteMode || settingsStore.settings.marketplaceProductId) return true;
   if (isCustomAgent.value) return false;
   const agentId = settingsStore.selectedAgentId;
   return !agentId || agentId === BUILTIN_QUICK_ANSWER_ID || agentId === BUILTIN_SMART_REASONING_ID;
@@ -2297,7 +2300,9 @@ const handleSelectAgent = async (agent: CustomAgent, sourceTenantId?: string) =>
   // 同步模型（选中的对话模型随智能体切换，含共享智能体）。
   // 网络搜索已由 selectAgent 重置为关闭，智能体配置只控制该开关是否可用。
   const agentModel = agent.config?.model_id;
-  if (agentModel && agentModel.trim() !== "") {
+  if (authStore.isLiteMode) {
+    ensureModelSelection();
+  } else if (agentModel && agentModel.trim() !== "") {
     selectedModelId.value = agentModel;
   } else {
     const lastPick = readLastChatModelID();
@@ -2489,10 +2494,12 @@ const collectAgentNotReadyReasons = (
     !isSharedAgent &&
     agent.is_builtin &&
     (agent.id === BUILTIN_QUICK_ANSWER_ID || agent.id === BUILTIN_SMART_REASONING_ID);
-  const keys = getAgentNotReadyReasonKeys(agent.config, allModels.value, {
+  const useRuntimeChatModel = isPlatformAnswerMode || (authStore.isLiteMode && !isSharedAgent);
+  const readinessModels = useRuntimeChatModel ? [...allModels.value, ...availableModels.value] : allModels.value;
+  const keys = getAgentNotReadyReasonKeys(agent.config, readinessModels, {
     isAgentMode,
     isSharedAgent,
-    runtimeChatModelID: isPlatformAnswerMode ? selectedModelId.value : undefined,
+    runtimeChatModelID: useRuntimeChatModel ? selectedModelId.value : undefined,
   });
   return {
     keys,

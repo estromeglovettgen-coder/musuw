@@ -45,6 +45,11 @@ func (s *marketplaceService) Library(ctx context.Context) ([]*types.MarketplaceL
 			!errors.Is(accessErr, types.ErrMarketplaceNotFound) {
 			return nil, accessErr
 		}
+		canChat := accessErr == nil && current.LastPaymentAt != nil
+		agentName := product.AgentName
+		if agentName == "" {
+			agentName = product.Title
+		}
 		for i, kbID := range product.PlatformKnowledgeBaseIDs {
 			name := product.Title
 			if i < len(product.KnowledgeBaseNames) {
@@ -54,9 +59,10 @@ func (s *marketplaceService) Library(ctx context.Context) ([]*types.MarketplaceL
 			owned := err == nil && kb != nil && kb.TenantID == product.PublishedTenantID
 			rows = append(rows, &types.MarketplaceLibraryEntry{
 				ProductID: product.ID, ProductTitle: product.Title, AgentID: product.PlatformAgentID,
+				AgentName: agentName, CanChat: canChat,
 				KnowledgeBaseID: kbID, Name: name, Description: product.Description,
 				WikiEnabled:       owned && kb.IsWikiEnabled(),
-				CanRead:           accessErr == nil && owned && current.LastPaymentAt != nil,
+				CanRead:           canChat && owned,
 				Status:            current.Status,
 				PaidThrough:       current.PaidThrough,
 				CancelAtPeriodEnd: current.CancelAtPeriodEnd,

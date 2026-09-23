@@ -183,6 +183,12 @@ func (s *marketplaceService) SaveProduct(
 	} else if err := s.requireCreator(ctx); err != nil {
 		return nil, err
 	}
+	if input.SampleConversations != nil && (!asAdmin || !types.IsSystemAdminFromContext(ctx)) {
+		return nil, types.ErrMarketplaceForbidden
+	}
+	if err := validateMarketplaceExamples(input.SampleConversations); err != nil {
+		return nil, err
+	}
 	if err := validateMarketplaceInput(&input); err != nil {
 		return nil, err
 	}
@@ -228,6 +234,9 @@ func (s *marketplaceService) SaveProduct(
 	p.KnowledgeBaseIDs = types.StringArray(input.KnowledgeBaseIDs)
 	p.KnowledgeBaseNames = types.StringArray(names)
 	p.SampleQuestions = types.StringArray(input.SampleQuestions)
+	if input.SampleConversations != nil {
+		p.SampleConversations = append([]types.MarketplaceExample{}, (*input.SampleConversations)...)
+	}
 	if p.SampleQuestions == nil {
 		p.SampleQuestions = types.StringArray{}
 	}
@@ -431,6 +440,8 @@ func (s *marketplaceService) projectProduct(
 	manage bool,
 ) (*types.MarketplaceProduct, error) {
 	out := *p
+	// Curated answers belong to the lazy preview response, never catalog cards.
+	out.SampleConversations = nil
 	out.CheckoutAvailable = s.gateway != nil && s.gateway.Config().Configured && p.Status == "published" &&
 		p.MonthlyPriceID != "" &&
 		p.YearlyPriceID != ""
@@ -533,6 +544,9 @@ func (s *marketplaceService) GetProduct(ctx context.Context, id string) (*types.
 	}
 	if p.Status != "published" && !manage && (projected.Access == nil || !projected.Access.CanChat) {
 		return nil, types.ErrMarketplaceNotFound
+	}
+	if types.IsSystemAdminFromContext(ctx) {
+		projected.SampleConversations = append([]types.MarketplaceExample{}, p.SampleConversations...)
 	}
 	return projected, nil
 }

@@ -61,7 +61,7 @@ func (r *marketplaceRepository) ListProducts(
 		q.Offset = 0
 	}
 	products := []*types.MarketplaceProduct{}
-	err := query.Order("featured DESC, created_at DESC, id ASC").Limit(q.Limit).Offset(q.Offset).Find(&products).Error
+	err := query.Omit("sample_conversations").Order("featured DESC, created_at DESC, id ASC").Limit(q.Limit).Offset(q.Offset).Find(&products).Error
 	return products, count, err
 }
 

@@ -8,6 +8,7 @@ import (
 )
 
 func TestPlatformTitleResolvedInServiceOnlyForPlatformModes(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "standard")
 	tests := []struct {
 		name  string
 		mode  qaMode
@@ -24,5 +25,14 @@ func TestPlatformTitleResolvedInServiceOnlyForPlatformModes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, platformTitleResolvedInService(tt.mode, tt.agent))
 		})
+	}
+}
+
+func TestLiteCustomAgentTitleWaitsForAuthorizedAnswerModel(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	agent := &types.CustomAgent{ID: "custom-agent", Config: types.CustomAgentConfig{ModelID: "stale-model"}}
+	for _, mode := range []qaMode{qaModeNormal, qaModeAgent} {
+		require.True(t, platformTitleResolvedInService(mode, agent),
+			"title must wait for the buyer's runtime model validation, not use the stale agent default")
 	}
 }

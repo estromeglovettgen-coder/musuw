@@ -251,6 +251,9 @@ func TestMarketplaceSQLiteMigrationSupportsActualRepositoryRoundTrip(t *testing.
 	migration, err := os.ReadFile("../../../migrations/sqlite/000024_creator_marketplace.up.sql")
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(string(migration)).Error)
+	previewMigration, err := os.ReadFile("../../../migrations/sqlite/000026_marketplace_preview_examples.up.sql")
+	require.NoError(t, err)
+	require.NoError(t, db.Exec(string(previewMigration)).Error)
 	repo := NewMarketplaceRepository(db)
 	product := &types.MarketplaceProduct{
 		ID:                       "product",
@@ -262,6 +265,7 @@ func TestMarketplaceSQLiteMigrationSupportsActualRepositoryRoundTrip(t *testing.
 		KnowledgeBaseNames:       types.StringArray{"Knowledge"},
 		PlatformKnowledgeBaseIDs: types.StringArray{},
 		SampleQuestions:          types.StringArray{"Question?"},
+		SampleConversations:      []types.MarketplaceExample{{Question: "Real question", Answer: "Curated answer"}},
 		DefaultModelID:           types.CheapestChatModelID,
 		Currency:                 "USD",
 		MonthlyAmount:            100,
@@ -273,6 +277,7 @@ func TestMarketplaceSQLiteMigrationSupportsActualRepositoryRoundTrip(t *testing.
 	require.NoError(t, err)
 	require.Equal(t, types.StringArray{"kb"}, loaded.KnowledgeBaseIDs)
 	require.Equal(t, types.StringArray{"Question?"}, loaded.SampleQuestions)
+	require.Equal(t, product.SampleConversations, loaded.SampleConversations)
 	downgrade, err := os.ReadFile("../../../migrations/sqlite/000024_creator_marketplace.down.sql")
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(string(downgrade)).Error)

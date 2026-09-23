@@ -9,6 +9,7 @@ import (
 func TestLiteMarketplaceRoutesExposeOnlyCatalogAndReviewSurface(t *testing.T) {
 	for _, item := range []struct{ method, path string }{
 		{"GET", "/api/v1/creator-marketplace/products"},
+		{"GET", "/api/v1/creator-marketplace/products/product/preview"},
 		{"POST", "/api/v1/creator-marketplace/products/product/checkout"},
 		{"GET", "/api/v1/creator-marketplace/orders"},
 		{"GET", "/api/v1/system/creator-marketplace/products"},

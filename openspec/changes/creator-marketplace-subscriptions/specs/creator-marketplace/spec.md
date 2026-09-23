@@ -123,3 +123,57 @@ Authorized buyers SHALL read published Wiki pages, folders, search results, link
 #### Scenario: Owned-library compatibility
 - **WHEN** the buyer opens a knowledge base they own
 - **THEN** the existing authorized editing and Wiki/graph behavior remain available, and the subscribed read-only mode does not affect it
+
+
+### Requirement: Distinguishable owned and subscribed resources
+The consumer knowledge-base and agent directories SHALL use the existing Musuw card and tab styles with exactly All, Mine and Subscribed source filters. All SHALL show owned and subscribed resources in separately titled groups. Active and locked subscriptions SHALL show their actual paid-through date and applicable renewal/access status. Consumer shared resources SHALL be labeled subscribed rather than introducing a fourth source category. Native Standard organization sharing and permissions SHALL remain unchanged.
+
+#### Scenario: Locate resources by source
+- **WHEN** a buyer selects Mine or Subscribed
+- **THEN** only that source appears, with a source-specific empty or recoverable error state, while All separates both groups
+
+#### Scenario: Find and use a subscribed agent
+- **WHEN** a buyer opens the agent directory
+- **THEN** each purchased service appears once with its public agent name and current status, and an authorized click opens the existing scoped chat without sending a question or exposing private configuration/editing controls
+
+#### Scenario: Retained canceled or revoked access
+- **WHEN** renewal is canceled with paid time remaining, or access is revoked
+- **THEN** the former remains usable through the paid term and the latter stays visible with accurate locked status, with no client-side permission grant
+
+
+### Requirement: Composer agent and member model choice
+All native chat composers SHALL expose owned agents and currently usable subscribed agents. DeepSeek Flash SHALL be an initial default, not a service model restriction. Users SHALL choose models allowed by their own membership and the selected model's supported reasoning effort; the request-scoped service agent SHALL use that chosen model without altering the published persona.
+
+#### Scenario: Choose an agent and model from the composer
+- **WHEN** a buyer selects a subscribed agent, then another permitted model and reasoning effort
+- **THEN** the submitted request uses the selected model and effort, preserves the approved knowledge scope, and is authorized and billed to the buyer
+- **AND** reselecting the same agent does not reset those choices
+
+#### Scenario: Switch an existing conversation to another service
+- **WHEN** a user switches into a subscribed service or out of a subscribed conversation
+- **THEN** the app starts a native new conversation with the unsent draft, leaving the previous session's immutable product scope intact; ordinary owned-to-owned switches retain native in-session behavior
+- **AND** old subscription knowledge selections do not leak into the new agent selection
+
+#### Scenario: Invalid access or model
+- **WHEN** an agent subscription has expired or a model is unavailable to the member
+- **THEN** it cannot be used, and server authorization remains authoritative without silently substituting a different model
+
+
+### Requirement: Real catalog preview and selected final-answer examples
+The product detail preview SHALL expose a metadata-only outline of published Wiki pages from the exact reviewed platform knowledge bases, preserving real folder ancestry. It SHALL NOT infer a directory from marketing Markdown or reveal page bodies, references, prompts, source downloads, tenant data, or conversation identifiers. A separate read-only product preview interface SHALL avoid loading full outlines on catalog listings.
+
+#### Scenario: Browse a real outline
+- **WHEN** a catalog reader selects Content directory
+- **THEN** actual published page titles and folder paths are searchable and paginated, unavailable/draft/foreign resources are excluded, and temporary failures can be retried
+
+#### Scenario: Curated historical examples
+- **WHEN** an administrator supplies selected authorized question/final-answer pairs
+- **THEN** only those product snapshots are published; sample playback never accesses private session history or invokes a model, and creator edits cannot silently publish additional historical content
+
+#### Scenario: Read examples
+- **WHEN** a reader selects Sample Q&A or switches questions
+- **THEN** the existing typewriter and Markdown behavior displays only the question and final answer, cancels prior playback on switch/unmount, honors reduced motion, and omits reasoning, tools, and rounds
+
+#### Scenario: Local Taylor preview
+- **WHEN** the local Taylor preview is opened
+- **THEN** its catalog outline and four selected final answers come from a read-only production snapshot authorized by the owner; source evidence remains outside browser responses and production remains unchanged

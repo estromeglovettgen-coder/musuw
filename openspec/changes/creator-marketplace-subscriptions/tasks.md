@@ -50,3 +50,38 @@
 - [x] 7.2 Remove redundant subscription/billing fields while retaining unavailable-state feedback and read-only controls.
 - [x] 7.3 Verify actual desktop/mobile geometry, scoped reading behavior, native compatibility, type/build and consolidated review.
 - [x] 7.4 Deploy the exact CI-green revision to staging and inspect the actual rendered library, Wiki and graph.
+
+
+## 8. Authorized follow-up: source hierarchy, expiry and subscribed agents
+
+- [x] 8.1 Confirm consumer terminology: All / Mine / Subscribed, no separate Shared category; retain native Standard organization permissions.
+- [x] 8.2 Reuse native cards and source tabs, separate owned/subscribed groups, restore accurate term/status information in cards and reader.
+- [x] 8.3 Project only public subscribed agent names and authoritative chat eligibility; deduplicate per product and reuse scoped go-use.
+- [x] 8.4 Verify normal/locked/empty/error states, source filtering, account isolation, owned behavior, desktop/mobile and consolidated review.
+- [x] 8.5 Follow the latest user override: provide a local browser preview only, using isolated example data; do not push or deploy this follow-up to any server.
+
+
+## 9. Authorized local follow-up: usable composer choices
+
+- [x] 9.1 Remove the added subscribed-card avatars and reduce the agent directory's empty header gap.
+- [x] 9.2 Reuse the membership model/reasoning selector for consumer agents and project valid subscribed agents into the native composer.
+- [x] 9.3 Preserve draft and immutable history scope on agent switches; treat Flash as default only.
+- [x] 9.4 Validate outgoing request parameters, membership denial, agent scope, desktop/mobile presentation and consolidated review without model calls.
+- [x] 9.5 Refresh isolated local preview only; do not push or deploy.
+
+
+## 10. Authorized local follow-up: genuine product previews
+
+- [x] 10.1 Inventory the real Taylor outline and owner-authorized final answers using production reads only.
+- [x] 10.2 Add narrowly projected preview metadata and administrator-curated answer snapshots with permission tests and reversible schema change.
+- [x] 10.3 Replace description-derived outline with native directory controls; replay final answers using existing typewriter/Markdown capabilities.
+- [x] 10.4 Verify directory search/pagination, preview failures/races, answer switching/reduced motion, desktop/mobile, and bounded review.
+- [x] 10.5 Refresh and show local preview only; do not push or deploy.
+
+
+## 11. Authorized staging follow-up
+
+- [x] 11.1 Remove duplicate sample questions from Overview, retaining the dedicated examples tab.
+- [ ] 11.2 Verify the accumulated local marketplace changes and publish the exact CI-green revision to staging only.
+- [ ] 11.3 Sync the reviewed Taylor introduction and four curated final-answer snapshots through the existing staging admin review workflow.
+- [ ] 11.4 Verify actual staging UI, real directory/examples, migration and release identity; retain production unchanged.

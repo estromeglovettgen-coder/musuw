@@ -1,6 +1,7 @@
 <script lang="ts">
 import { computed, defineComponent, nextTick, ref, watch, type SetupContext } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import LegacyInputFieldBusiness from '@/assets/business-baselines/Input-field.pre-view.vue'
 import AttachmentUpload from './AttachmentUpload.vue'
 import KnowledgeBaseSelector from './KnowledgeBaseSelector.vue'
@@ -9,6 +10,7 @@ import ModelSelector from './ModelSelector.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrganizationStore } from '@/stores/organization'
 import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from '@/api/agent'
+import { useMarketplaceLibrary } from '@/composables/useMarketplaceLibrary'
 
 const legacy = LegacyInputFieldBusiness as any
 const legacySetup = legacy.setup
@@ -49,6 +51,9 @@ export default defineComponent({
     const state = legacySetup?.(props, legacyContext)
     const authStore = useAuthStore()
     const orgStore = useOrganizationStore()
+    const route = useRoute()
+    const router = useRouter()
+    const { entries: subscribedAgents, load: loadSubscribedAgents } = useMarketplaceLibrary()
     const { t } = useI18n()
     if (state && typeof state === 'object' && typeof state.then !== 'function') {
       const legacyCreateSession = (state as any).createSession as ((value: string) => Promise<unknown>) | undefined
@@ -177,6 +182,7 @@ export default defineComponent({
       }
       const openModelPicker = () => {
         modelPickerView.value = 'overview'
+        void loadSubscribedAgents()
         ;(state as any).toggleModelSelector?.()
       }
       const restoreModelPickerFocus = () => {
@@ -195,7 +201,34 @@ export default defineComponent({
         ;(state as any).closeModelSelector?.()
         restoreModelPickerFocus()
       }
-      const selectAgentFromPicker = async (agent: unknown, sourceTenantId?: string) => {
+      const preserveDraftForNewChat = () => {
+        const draft = readStateValue<string>((state as any).query)
+        if (draft) (state as any).menuStore.newChatDraft = draft
+      }
+      const selectMarketplaceAgentFromPicker = async (productId: string) => {
+        if (!subscribedAgents.value.some(entry => entry.product_id === productId && entry.can_chat)) return
+        closeModelPicker()
+        if ((state as any).settingsStore.settings.marketplaceProductId === productId && !route.query.marketplace_product) return
+        if (route.name !== 'globalCreatChat') preserveDraftForNewChat()
+        // The existing entry rechecks current purchase access before selecting
+        // any resources. Historical conversations retain their original scope.
+        await router.push({ path: '/platform/creatChat', query: { marketplace_product: productId } })
+      }
+      const selectAgentFromPicker = async (agent: any, sourceTenantId?: string) => {
+        const settings = (state as any).settingsStore
+        if (!settings.settings.marketplaceProductId && agent.id === settings.selectedAgentId
+          && (sourceTenantId || '') === (settings.selectedAgentSourceTenantId || '') && !route.query.marketplace_product) {
+          closeModelPicker()
+          return
+        }
+        if (route.name !== 'globalCreatChat' && settings.settings.marketplaceProductId) {
+          preserveDraftForNewChat()
+          await router.push({ path: '/platform/creatChat' })
+          if (route.name !== 'globalCreatChat') return
+        } else if (route.query.marketplace_product) {
+          const query = { ...route.query }; delete query.marketplace_product
+          await router.replace({ path: route.path, query })
+        }
         await (state as any).handleSelectAgent?.(agent, sourceTenantId)
         closeModelPicker()
       }
@@ -207,6 +240,7 @@ export default defineComponent({
         ...state,
         authStore,
         orgStore,
+        subscribedAgents,
         createSession,
         modelPickerView,
         selectedAgentDisplayName,
@@ -214,6 +248,7 @@ export default defineComponent({
         inputPlaceholder,
         visualModelDropdownStyle,
         selectAgentFromPicker,
+        selectMarketplaceAgentFromPicker,
         openModelPicker,
         closeModelPicker,
         selectModelFromPicker,
@@ -374,11 +409,14 @@ export default defineComponent({
                 :reasoning-effort="reasoningEffort"
                 :agents="enabledAgents"
                 :shared-agents="orgStore.sharedAgents"
+                :subscribed-agents="subscribedAgents"
+                :selected-marketplace-product-id="settingsStore.settings.marketplaceProductId"
                 :selected-agent-id="selectedAgentId"
                 :selected-agent-source-tenant-id="settingsStore.selectedAgentSourceTenantId || undefined"
                 :selected-agent-display-name="selectedAgentDisplayName"
                 :view="modelPickerView"
                 @select-agent="selectAgentFromPicker"
+                @select-marketplace-agent="selectMarketplaceAgentFromPicker"
                 @select-model="selectModelFromPicker"
                 @select-reasoning="selectReasoningFromPicker"
                 @update:view="modelPickerView = $event"

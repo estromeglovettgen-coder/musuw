@@ -96,11 +96,17 @@ test('select overlays paint one scene-model panel instead of nested surfaces', (
   assert.match(outer, /background:\s*transparent\s*!important;/)
   assert.match(outer, /box-shadow:\s*none\s*!important;/)
 
-  const content = css.match(
-    /body \.t-select__dropdown:not\([^\{]+\)\s*>\s*\.t-popup__content\s*\{([\s\S]*?)\n\}/,
-  )?.[1] || ''
+  const contentRules = [...css.matchAll(
+    /(body \.t-select__dropdown:not\([^\{]+\)\s*>\s*\.t-popup__content)\s*\{([\s\S]*?)\n\}/g,
+  )]
+  // Marketplace filters match their trigger width, while sharing the same
+  // inset and painted surface as ordinary fixed-width scene selectors.
+  const content = contentRules.find((match) => !match[1].includes('.market-filter-popup'))?.[2] || ''
+  const fixedWidth = contentRules.find((match) => match[1].includes(':not(.market-filter-popup)'))?.[2] || ''
   assert.match(content, /padding:\s*6px\s*!important;/)
-  assert.match(content, /width:\s*288px\s*!important;/)
+  assert.match(fixedWidth, /width:\s*288px\s*!important;/)
+  assert.match(fixedWidth, /max-width:\s*min\(288px, calc\(100vw - 32px\)\)\s*!important;/)
+  assert.doesNotMatch(content, /(?:^|[;\n])\s*(?:min-|max-)?width\s*:/)
   assert.match(content, /max-height:\s*256px\s*!important;/)
   assert.match(content, /border:\s*1px solid #e5e7eb\s*!important;/)
   assert.match(content, /border-radius:\s*16px\s*!important;/)

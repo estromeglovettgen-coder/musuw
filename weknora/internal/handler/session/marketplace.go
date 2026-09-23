@@ -76,11 +76,15 @@ func (h *Handler) resolveMarketplaceRequest(
 	disabled := false
 	agent.Config.MemoryEnabled = &disabled
 	agent.Config.QuestionSuggestions = nil
-	agent.Config.ModelID = types.MarketplaceDefaultModelID
-	agent.Config.QueryUnderstandModelID = types.MarketplaceDefaultModelID
-	if strings.TrimSpace(req.SummaryModelID) == "" {
+	req.SummaryModelID = strings.TrimSpace(req.SummaryModelID)
+	if req.SummaryModelID == "" {
 		req.SummaryModelID = types.MarketplaceDefaultModelID
 	}
+	// Flash is a default, not a model lock. Keep the request-local answer,
+	// query-understanding and title bindings aligned; native ModelService still
+	// validates the selected model against the buyer's membership and catalog.
+	agent.Config.ModelID = req.SummaryModelID
+	agent.Config.QueryUnderstandModelID = req.SummaryModelID
 	req.AgentID = agent.ID
 	req.AgentEnabled = agent.IsAgentMode()
 	req.KnowledgeBaseIDs = append([]string(nil), access.KnowledgeBaseIDs...)

@@ -1,6 +1,12 @@
 import { test, expect, type Page } from '@playwright/test'
 
 const taylor = { id: 'taylor', title: '泰勒·测试环境样例', description: 'A curated question-answering service.', category: '知识', agent_id: 'platform-agent', agent_name: '泰勒专属智能体', knowledge_base_ids: ['platform-kb'], knowledge_base_names: ['泰勒知识库'], sample_questions: ['如何理解长期主义？'], default_model_id: 'builtin-deepseek-v4-flash', currency: 'USD', monthly_amount: 1900, yearly_amount: 19000, status: 'published', featured: true, fixture: false, checkout_available: true, created_at: '2026-09-22T00:00:00Z', updated_at: '2026-09-22T00:00:00Z', access: { can_chat: false, cancel_at_period_end: false } }
+async function expectSelectedService(page: Page, productId: string) {
+  await expect.poll(() => page.evaluate(() => (window as any).__marketplaceHarness.settings.settings.marketplaceProductId)).toBe(productId)
+  await expect(page.locator('.visual-chat-composer__combined-picker')).toBeVisible()
+  await expect(page.locator('.market-service-selection')).toHaveCount(0)
+}
+
 async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; pending?: boolean; creatorDraft?: boolean; pendingOrder?: boolean; refundedOrder?: boolean; existingSubscription?: 'refunded' | 'canceled'; checkoutAvailable?: boolean; free?: boolean; unpublished?: boolean; reviewed?: boolean } = {}) {
   let paid = options.paid || false
   const catalog = { ...taylor, ...(options.free ? { monthly_amount: 0, yearly_amount: 0 } : {}), reviewed_at: options.reviewed ? '2026-09-22T00:00:00Z' : undefined }
@@ -8,6 +14,8 @@ async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; 
   const counts = { chat: 0, suggestion: 0, details: 0 }
   let creatorProduct = options.creatorDraft ? { ...catalog, status: 'draft', contact: 'creator@example.test', authorization: 'I own these materials.', authorization_confirmed: true } : null
   await page.addInitScript(() => {
+    // These workspace scenarios exercise an existing user, not the first-run tour.
+    localStorage.setItem('WeKnora_mobile-user_musuw:new-user-guide-done:v2', '1')
     let callback: any
     ;(window as any).PaddleBillingV1 = { Environment: { set() {} }, Initialize({ eventCallback }: any) { callback = eventCallback }, Update() {}, Checkout: { open({ transactionId, settings }: any) { const frame = document.createElement('iframe'); frame.title = 'Paddle checkout'; frame.dataset.transactionId = transactionId; document.querySelector(`.${settings.frameTarget}`)?.append(frame) }, close() {} } }
     ;(window as any).__completePaddle = () => callback?.({ name: 'checkout.completed' })
@@ -36,18 +44,20 @@ async function mockMarket(page: Page, options: { paid?: boolean; max?: boolean; 
     if (path.endsWith('/entitlements/current')) return route.fulfill({ json: { data: { plan: options.max ? 'max' : 'free', plan_status: options.max ? 'complimentary' : 'free', plan_source: 'complimentary', storage_bytes: 100000000, storage_used: 0 }, billing: { configured: false } } })
     if (path.endsWith('/agents')) return route.fulfill({ json: { data: [{ id: 'platform-agent', name: 'Platform delivery agent', is_builtin: false, config: { agent_mode: 'smart-reasoning', knowledge_bases: ['platform-kb'] } }] } })
     if (path.endsWith('/knowledge-bases')) return route.fulfill({ json: { data: [{ id: 'platform-kb', name: 'Platform delivery knowledge', type: 'document' }] } })
-    if (path.endsWith('/models')) return route.fulfill({ json: { success: true, data: [{ id: 'builtin-deepseek-v4-flash', name: 'DeepSeek V4 Flash', type: 'KnowledgeQA', is_builtin: true, parameters: {} }] } })
+    if (path.includes('/models/scene-options/')) return route.fulfill({ json: { success: true, data: { scene: path.split('/').at(-1), effective_model_id: 'builtin-deepseek-v4-flash', options: [{ model_id: 'builtin-deepseek-v4-flash', display_name: 'DeepSeek V4 Flash', model_type: 'KnowledgeQA', selectable: true, locked: false, is_scene_default: true, is_effective: true }] } } })
+    if (path.endsWith('/models')) return route.fulfill({ json: { success: true, data: [{ id: 'builtin-deepseek-v4-flash', name: 'DeepSeek V4 Flash', type: 'KnowledgeQA', status: 'active', is_builtin: true, parameters: { provider: 'openrouter' } }] } })
     return route.fulfill({ json: { success: true, data: [] } })
   })
   return { requests, counts, activate: () => { paid = true } }
 }
 const visit = (page: Page, path = '/platform/marketplace') => page.goto(`/e2e/marketplace-harness.html?path=${encodeURIComponent(path)}`)
 
-test('featured product is above test collection and public cards have no author metadata', async ({ page }) => {
+test('public marketplace hides test products and private author metadata', async ({ page }) => {
   await mockMarket(page)
   await visit(page)
   await expect(page.locator('.market-featured')).toContainText(taylor.title)
-  await expect(page.getByRole('heading', { name: '测试商品', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '测试商品', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '测试商品一', exact: true })).toHaveCount(0)
   await expect(page.getByRole('link', { name: '市场管理', exact: true })).toBeVisible()
   await expect(page.locator('main')).not.toContainText('creator@example.test')
 })
@@ -117,20 +127,12 @@ test('paid product returns to the existing composer with draft, agent, KB and Fl
   await textarea.fill('This is my unsent draft')
   await expect.poll(() => page.evaluate(() => (window as any).__marketplaceHarness.menu.newChatDraft)).toBe('This is my unsent draft')
   await page.getByRole('button', { name: 'Visit market', exact: true }).click()
-  await page.getByRole('button', { name: '查看详情', exact: true }).first().click()
+  await page.locator('.market-featured').click()
   expect(await page.evaluate(() => (window as any).__marketplaceHarness.menu.newChatDraft)).toBe('This is my unsent draft')
   const priorSuggestions = api.counts.suggestion
   await page.getByRole('button', { name: '开始提问', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText('泰勒·测试环境样例')
-  const serviceBounds = await page.locator('.market-service-selection').evaluate(element => {
-    const notice = element.getBoundingClientRect()
-    const exit = element.querySelector('button')!.getBoundingClientRect()
-    return { noticeLeft: notice.left, noticeRight: notice.right, exitLeft: exit.left, exitRight: exit.right, viewport: window.innerWidth }
-  })
-  expect(serviceBounds.noticeLeft).toBeGreaterThanOrEqual(0)
-  expect(serviceBounds.noticeRight).toBeLessThanOrEqual(serviceBounds.viewport)
-  expect(serviceBounds.exitLeft).toBeGreaterThanOrEqual(serviceBounds.noticeLeft)
-  expect(serviceBounds.exitRight).toBeLessThanOrEqual(Math.min(serviceBounds.noticeRight, serviceBounds.viewport))
+  await expectSelectedService(page, taylor.id)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await expect(page.locator('textarea').first()).toHaveValue('This is my unsent draft')
   const state = await page.evaluate(() => { const h = (window as any).__marketplaceHarness; return { product: h.settings.settings.marketplaceProductId, agent: h.settings.selectedAgentId, kbs: h.settings.settings.selectedKnowledgeBases, model: h.settings.conversationModels.selectedChatModelId } })
   expect(state.product).toBe('taylor'); expect(state.agent).toBe('platform-agent'); expect(state.kbs).toEqual(['platform-kb'])
@@ -185,7 +187,7 @@ test('explicit sending from the paid product reaches the existing chat transport
   const api = await mockMarket(page, { paid: true })
   await visit(page, '/platform/marketplace/taylor')
   await page.getByRole('button', { name: '开始提问', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText(taylor.title)
+  await expectSelectedService(page, taylor.id)
   await page.locator('textarea').first().fill('Explain this method')
   await page.locator('[data-guide="chat-send"]').click()
   await expect.poll(() => api.requests.find(r => r.path.includes('/agent-chat/'))?.body).toMatchObject({ marketplace_product_id: 'taylor', agent_id: 'platform-agent', query: 'Explain this method', summary_model_id: 'builtin-deepseek-v4-flash' })
@@ -213,7 +215,7 @@ test('market and product pricing fit a narrow viewport', async ({ page }) => {
   await visit(page)
   await expect(page.locator('.market-featured')).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await page.getByRole('button', { name: '查看详情', exact: true }).first().click()
+  await page.locator('.market-featured').click()
   await expect(page.getByRole('button', { name: '订阅使用', exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: 'artifacts/creator-marketplace-mobile.png', fullPage: true })
@@ -255,7 +257,7 @@ test('mobile market pages own their scrolling and keep payment status labels on 
   await outlet.evaluate(element => { element.scrollTop = 32 })
   await page.locator('.market-table').getByRole('link', { name: taylor.title, exact: true }).click()
   await expect(page.locator('.market-detail-copy h1')).toHaveText(taylor.title)
-  const headingBounds = await page.locator('.market-header h1').boundingBox()
+  const headingBounds = await page.locator('.market-detail-copy h1').boundingBox()
   const headerBounds = await page.locator('.visual-mobile-header').boundingBox()
   expect(headingBounds!.y).toBeGreaterThanOrEqual(headerBounds!.y + headerBounds!.height)
   expect(await outlet.evaluate(element => element.scrollTop)).toBe(0)
@@ -331,7 +333,7 @@ test('a free product opens native Flash chat without a checkout, expiry or renew
   await page.getByRole('button', { name: 'Visit market', exact: true }).click()
   await expect(page.locator('.market-featured .market-price')).toHaveText('免费')
   await expect(page.locator('.market-card .market-price')).toHaveText('免费')
-  await page.getByRole('button', { name: '查看详情', exact: true }).first().click()
+  await page.locator('.market-featured').click()
   const purchase = page.locator('.market-purchase')
   await expect(purchase.getByRole('heading', { name: '免费', exact: true })).toBeVisible()
   await expect(purchase).not.toContainText(/有效至|可使用至|自动续费|税费|月付|年付/)
@@ -339,7 +341,7 @@ test('a free product opens native Flash chat without a checkout, expiry or renew
   await expect(page.getByRole('button', { name: '订阅使用', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '管理订阅', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: '开始提问', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText(taylor.title)
+  await expectSelectedService(page, taylor.id)
   expect(api.requests).toHaveLength(0)
   expect(api.counts.chat).toBe(0)
   await page.locator('textarea').first().fill('Explain this free service')
@@ -373,7 +375,7 @@ test('an explicit free product replaces a persisted Taylor selection on the firs
     harness.menu.newChatDraft = 'Keep my unsent question'
   })
   await page.getByRole('button', { name: '开始提问', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText(reading.title)
+  await expectSelectedService(page, reading.id)
   await expect(page.locator('.visual-chat-resource')).toContainText('阅读复盘资料')
   await expect(page.locator('.visual-new-chat-suggestions')).toContainText(reading.sample_questions[0])
   await expect(page.locator('textarea').first()).toHaveValue('Keep my unsent question')
@@ -402,14 +404,14 @@ for (const outcome of ['denied', 'failed'] as const) {
     })
     await visit(page, '/platform/marketplace/taylor')
     await page.getByRole('button', { name: '开始提问', exact: true }).click()
-    await expect(page.getByRole('status')).toContainText(taylor.title)
+    await expectSelectedService(page, taylor.id)
     await page.locator('textarea').first().fill('Keep this draft while changing products')
     await page.evaluate(() => (window as any).__marketplaceHarness.router.push('/platform/marketplace/reading-free'))
     await page.getByRole('button', { name: '开始提问', exact: true }).click()
     await requested
     await expect(page.locator('textarea').first()).toHaveValue('Keep this draft while changing products')
     await page.locator('[data-guide="chat-send"]').click()
-    await expect(page.getByText('正在打开专属服务…', { exact: true })).toBeVisible()
+    await expect(page.getByRole('status')).toHaveText('正在打开专属服务…')
     await expect.poll(() => api.requests.length).toBe(0)
     await expect(page.locator('textarea').first()).toHaveValue('Keep this draft while changing products')
     releaseEntry()
@@ -437,16 +439,16 @@ test('a late failed entry cannot redirect a newer same-page product selection', 
   await page.route('**/api/v1/creator-marketplace/products/next-free', route => route.fulfill({ json: { data: nextProduct } }))
   await visit(page, '/platform/marketplace/taylor')
   await page.getByRole('button', { name: '开始提问', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText(taylor.title)
+  await expectSelectedService(page, taylor.id)
   await page.evaluate(() => (window as any).__marketplaceHarness.router.push({ path: '/platform/creatChat', query: { marketplace_product: 'reading-free' } }))
   await requested
   await page.evaluate(() => (window as any).__marketplaceHarness.router.push({ path: '/platform/creatChat', query: { marketplace_product: 'next-free' } }))
-  await expect(page.getByRole('status')).toContainText(nextProduct.title)
+  await expectSelectedService(page, nextProduct.id)
   const staleResponse = page.waitForResponse(response => response.url().endsWith('/products/reading-free'))
   releaseEntry()
   await staleResponse
   await page.waitForLoadState('networkidle')
-  await expect(page.getByRole('status')).toContainText(nextProduct.title)
+  await expectSelectedService(page, nextProduct.id)
   expect(await page.evaluate(() => (window as any).__marketplaceHarness.router.currentRoute.value.path)).toBe('/platform/creatChat')
   expect(await page.evaluate(() => (window as any).__marketplaceHarness.settings.settings.marketplaceProductId)).toBe(nextProduct.id)
   expect(api.requests).toHaveLength(0)
@@ -506,13 +508,13 @@ for (const free of [true, false]) {
 }
 
 
-const libraryEntry = { product_id: 'taylor', product_title: taylor.title, agent_id: 'platform-agent', knowledge_base_id: 'platform-kb', name: '已订阅泰勒知识库', description: 'Published Wiki and graph.', wiki_enabled: true, can_read: true, status: 'active', paid_through: '2026-10-22T00:00:00Z', cancel_at_period_end: true }
+const libraryEntry = { product_id: 'taylor', product_title: taylor.title, agent_id: 'platform-agent', agent_name: '泰勒专属智能体', can_chat: true, knowledge_base_id: 'platform-kb', name: '已订阅泰勒知识库', description: 'Published Wiki and graph.', wiki_enabled: true, can_read: true, status: 'active', paid_through: '2026-10-22T00:00:00Z', cancel_at_period_end: true }
 async function mockLibrary(page: Page, options: { denied?: boolean; empty?: boolean } = {}) {
   await mockMarket(page, { paid: true })
   const reads: string[] = []
   const forbidden: string[] = []
   let contentFailure = 0
-  const entry = { ...libraryEntry, can_read: !options.denied, wiki_enabled: !options.empty, status: options.denied ? 'refunded' : 'active' }
+  const entry = { ...libraryEntry, can_chat: !options.denied, can_read: !options.denied, wiki_enabled: !options.empty, status: options.denied ? 'refunded' : 'active' }
   const second = { ...libraryEntry, product_id: 'other', knowledge_base_id: 'other-kb', name: '第二个订阅库' }
   const wikiPage = (name: string) => ({ id: name, slug: 'published', title: name, page_type: 'concept', status: 'published', content: `# ${name}\n公开 Wiki 正文。[[other|下一页]]\n![private](/api/v1/knowledge/platform-kb/file)\n[原文件](/api/v1/knowledge/source-doc/download)\n<svg><image href="/api/v1/knowledge/source-doc/file" /></svg><span style="background-image:url(/api/v1/knowledge/source-doc/background)">已发布文本</span>`, source_refs: ['source-doc'], in_links: [], out_links: ['other'], aliases: [], category_path: [], version: 1, created_at: '2026-09-22T00:00:00Z', updated_at: '2026-09-22T00:00:00Z' })
   await page.route('**/api/v1/**', async route => {
@@ -541,17 +543,17 @@ const libraryPath = '/platform/marketplace/taylor/knowledge-bases/platform-kb'
 test('subscribed knowledge cards open existing read-only Wiki and retain the product chat entry', async ({ page }) => {
   const api = await mockLibrary(page)
   await visit(page, '/platform/knowledge-bases')
-  const section = page.getByRole('region', { name: '订阅知识库', exact: true })
+  const section = page.getByRole('region', { name: '已订阅知识库', exact: true })
   await expect(section).toContainText('已订阅泰勒知识库')
   await expect(section).not.toContainText('只读')
-  await expect(section.locator('.visual-reference-kb-card__footer').first()).toHaveAttribute('aria-hidden', 'true')
-  await expect(section.locator('.visual-reference-kb-card__footer')).toHaveText(['', ''])
+  await expect(section.locator('.visual-reference-kb-card__footer').first()).toContainText('2026')
+  await expect(section.locator('.visual-reference-kb-card__footer').first()).toContainText('已取消续费')
   await expect(page.locator('.visual-kb-empty')).toHaveCount(0)
   await expect(section.getByRole('button', { name: /更多|收藏|复制/ })).toHaveCount(0)
   await section.getByText('已订阅泰勒知识库', { exact: true }).click()
   await expect(page.locator('.visual-knowledge-page .visual-knowledge-header')).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Wiki', exact: true })).toHaveAttribute('aria-selected', 'true')
-  await expect(page.locator('.visual-knowledge-header')).not.toContainText('已取消续费')
+  await expect(page.locator('.visual-knowledge-header')).toContainText('已取消续费')
   await expect(page.locator('.visual-knowledge-header')).not.toContainText('分别计费')
   await expect(page.locator('.visual-knowledge-header')).not.toContainText('只读')
   await expect(page.locator('.visual-knowledge-wiki-host .wiki-browser')).toBeVisible()
@@ -563,16 +565,16 @@ test('subscribed knowledge cards open existing read-only Wiki and retain the pro
   await expect(page.locator('.wiki-reader a[href*="/api/v1/"]')).toHaveCount(0)
   expect(api.forbidden).toEqual([])
   await page.getByRole('button', { name: '开始提问', exact: true }).click()
-  await expect(page.getByRole('status')).toContainText(taylor.title)
+  await expectSelectedService(page, taylor.id)
   expect(await page.evaluate(() => (window as any).__marketplaceHarness.settings.settings.marketplaceProductId)).toBe('taylor')
 })
 
 test('expired subscriptions remain visible but never request Wiki content', async ({ page }) => {
   const api = await mockLibrary(page, { denied: true })
   await visit(page, '/platform/knowledge-bases')
-  const section = page.getByRole('region', { name: '订阅知识库', exact: true })
-  await expect(section).toContainText('不可访问')
-  await expect(section).not.toContainText('已退款')
+  const section = page.getByRole('region', { name: '已订阅知识库', exact: true })
+  await expect(section).toContainText('已退款')
+  await expect(section).toContainText('2026')
   await section.getByText('已订阅泰勒知识库', { exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('当前订阅不可访问')
   await expect(page.getByRole('link', { name: '订单管理', exact: true })).toBeVisible()
@@ -667,17 +669,17 @@ test('subscription cards share native grid geometry and Wiki badges without inve
   await page.route('**/api/v1/knowledge-bases', route => route.fulfill({ json: { data: [{ id: 'own-kb', name: '我的对照知识库', description: libraryEntry.description, type: 'document', tenant_id: 42, knowledge_count: 7, indexing_strategy: { wiki_enabled: true } }] } }))
   await page.route('**/api/v1/creator-marketplace/library', route => route.fulfill({ json: { data: [libraryEntry, { ...libraryEntry, product_id: 'without-wiki', knowledge_base_id: 'plain-kb', name: '未公开索引配置的订阅库', wiki_enabled: false }] } }))
   await visit(page, '/platform/knowledge-bases')
-  const subscribed = page.getByRole('region', { name: '订阅知识库', exact: true })
+  const subscribed = page.getByRole('region', { name: '已订阅知识库', exact: true })
   const nativeCard = page.locator('.visual-reference-kb-card').filter({ hasText: '我的对照知识库' })
   const subscribedCard = subscribed.locator('.visual-reference-kb-card').first()
   await expect(nativeCard).toBeVisible()
   await expect(subscribedCard.locator('[data-indexing-strategy="wiki"]')).toHaveText('Wiki')
   await expect(subscribed.locator('[data-indexing-strategy="unconfigured"]')).toHaveCount(0)
-  await expect(subscribed.locator('.visual-reference-kb-card__footer')).toHaveText(['', ''])
-  await expect(subscribedCard.locator('.visual-reference-kb-card__footer')).toHaveAttribute('aria-hidden', 'true')
+  await expect(subscribed.locator('.visual-reference-kb-card__footer').first()).toContainText('2026')
+  await expect(subscribedCard.locator('.market-access-status')).toBeVisible()
   await expect(nativeCard.locator('.visual-reference-kb-card__footer')).toContainText('7')
   await expect(subscribed).not.toContainText('只读')
-  await expect(subscribed).not.toContainText('可使用至')
+  await expect(subscribed).toContainText('可使用至')
   const badgeStyle = (el: Element) => { const css = getComputedStyle(el); return [css.padding, css.borderRadius, css.backgroundColor, css.fontSize, css.lineHeight] }
   expect(await subscribedCard.locator('[data-indexing-strategy="wiki"]').evaluate(badgeStyle)).toEqual(await nativeCard.locator('[data-indexing-strategy="wiki"]').evaluate(badgeStyle))
   for (const width of [1440, 900, 430]) {
@@ -686,7 +688,7 @@ test('subscription cards share native grid geometry and Wiki badges without inve
     expect(owned).not.toBeNull()
     expect(bought).not.toBeNull()
     expect(Math.abs(owned!.width - bought!.width)).toBeLessThanOrEqual(1)
-    expect(Math.abs(owned!.height - bought!.height)).toBeLessThanOrEqual(1)
+    expect(bought!.height).toBeGreaterThanOrEqual(owned!.height - 1)
     expect(Math.abs(owned!.x - bought!.x)).toBeLessThanOrEqual(1)
     const ownedTitle = await nativeCard.locator('strong').boundingBox(), boughtTitle = await subscribedCard.locator('strong').boundingBox()
     const ownedBadge = await nativeCard.locator('[data-indexing-strategy="wiki"]').boundingBox(), boughtBadge = await subscribedCard.locator('[data-indexing-strategy="wiki"]').boundingBox()
@@ -710,7 +712,7 @@ test('subscribed reader uses the native workspace shell on desktop and mobile', 
   await expect(main.locator('.visual-knowledge-wiki-host .wiki-browser')).toBeVisible()
   await expect(main.getByRole('tab', { name: 'Wiki', exact: true })).toHaveAttribute('aria-selected', 'true')
   await expect(main).not.toContainText('分别计费')
-  await expect(main).not.toContainText('已取消续费')
+  await expect(main).toContainText('已取消续费')
   await expect(main.getByRole('button', { name: /编辑|历史|删除|新建|修复|导出|下载/ })).toHaveCount(0)
   for (const width of [1440, 430]) {
     await page.setViewportSize({ width, height: 932 })
@@ -725,4 +727,363 @@ test('subscribed reader uses the native workspace shell on desktop and mobile', 
   await expect(main).toHaveClass(/is-graph-tab/)
   await expect(main.locator('.wiki-graph-search-container')).toBeVisible()
   expect(api.forbidden).toEqual([])
+})
+
+
+test('library source filters separate owned and subscribed sections and retain expiry', async ({ page }) => {
+  await mockLibrary(page)
+  await page.route('**/api/v1/knowledge-bases', route => route.fulfill({ json: { data: [{ id: 'own-kb', name: '我的测试资料', description: 'Only owned', type: 'document', tenant_id: 42, knowledge_count: 2, indexing_strategy: { wiki_enabled: true } }] } }))
+  await visit(page, '/platform/knowledge-bases')
+  const filters = page.getByRole('tablist', { name: '来源筛选', exact: true })
+  await expect(filters.getByRole('tab', { name: '全部', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('heading', { name: /我的知识库/, level: 2 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /订阅知识库/, level: 2 })).toBeVisible()
+  await expect(page.locator('.market-library-cards')).toContainText('2026')
+  await filters.getByRole('tab', { name: '我的', exact: true }).click()
+  await expect(page.getByText('我的测试资料', { exact: true })).toBeVisible()
+  await expect(page.getByText('已订阅泰勒知识库', { exact: true })).not.toBeVisible()
+  await filters.getByRole('tab', { name: '已订阅', exact: true }).click()
+  await expect(page.getByText('已订阅泰勒知识库', { exact: true })).toBeVisible()
+  await expect(page.getByText('我的测试资料', { exact: true })).not.toBeVisible()
+  await filters.getByRole('tab', { name: '全部', exact: true }).click()
+  await expect(page.getByText('我的测试资料', { exact: true })).toBeVisible()
+})
+
+test('purchased agents appear once per service and open scoped chat without exposing editing', async ({ page }) => {
+  const api = await mockLibrary(page)
+  await page.route('**/api/v1/creator-marketplace/library', route => route.fulfill({ json: { data: [libraryEntry, { ...libraryEntry, knowledge_base_id: 'second-kb', name: '第二份订阅资料' }] } }))
+  await page.route('**/api/v1/agents', route => route.fulfill({ json: { data: [{ id: 'own-agent', name: '我的测试智能体', is_builtin: false, config: { agent_mode: 'smart-reasoning' } }] } }))
+  await visit(page, '/platform/agents')
+  const filters = page.getByRole('tablist', { name: '来源筛选', exact: true })
+  await expect(filters.getByRole('tab', { name: '全部', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByText('我的测试智能体', { exact: true })).toBeVisible()
+  const subscribed = page.getByRole('region', { name: '已订阅智能体', exact: true })
+  await expect(subscribed.getByText('泰勒专属智能体', { exact: true })).toHaveCount(1)
+  await expect(subscribed).toContainText('2026')
+  await expect(subscribed.getByRole('button', { name: /编辑|复制|分享|删除/ })).toHaveCount(0)
+  await filters.getByRole('tab', { name: '我的', exact: true }).click()
+  await expect(subscribed).not.toBeVisible()
+  await filters.getByRole('tab', { name: '已订阅', exact: true }).click()
+  await expect(subscribed).toBeVisible()
+  await expect(page.getByText('我的测试智能体', { exact: true })).not.toBeVisible()
+  await subscribed.getByText('泰勒专属智能体', { exact: true }).click()
+  await expectSelectedService(page, taylor.id)
+  expect(await page.evaluate(() => (window as any).__marketplaceHarness.settings.settings.marketplaceProductId)).toBe('taylor')
+  expect(api.forbidden).toEqual([])
+})
+
+for (const directory of ['knowledge-bases', 'agents']) test(`${directory} source groups use the real workspace at desktop and phone widths`, async ({ page }, testInfo) => {
+  await mockLibrary(page)
+  await page.route('**/api/v1/knowledge-bases', route => route.fulfill({ json: { data: [{ id: 'own-kb', name: '我的研究资料', description: '整理我自己的资料和笔记。', type: 'document', tenant_id: 42, knowledge_count: 2, indexing_strategy: { wiki_enabled: true } }] } }))
+  await page.route('**/api/v1/agents', route => route.fulfill({ json: { data: [{ id: 'own-agent', name: '我的研究助手', description: '帮助整理我的资料和笔记。', is_builtin: false, config: { agent_mode: 'smart-reasoning' } }] } }))
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await page.goto(`/e2e/mobile-harness.html?page=/platform/${directory}`)
+  const filters = page.getByRole('tablist', { name: '来源筛选', exact: true })
+  await expect(filters.getByRole('tab', { name: '全部', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.locator('.market-access-status').first()).toContainText('2026')
+  for (const width of [1440, 430]) {
+    await page.setViewportSize({ width, height: 932 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    for (const label of ['全部', '我的', '已订阅']) await expect(filters.getByRole('tab', { name: label, exact: true })).toBeVisible()
+    if (directory === 'agents') {
+      await expect(page.locator('.market-agent-cards .agent-avatar')).toHaveCount(0)
+      const header = await page.locator('.agent-list-content > .header').boundingBox()
+      const tabs = await filters.boundingBox()
+      expect(tabs!.y - header!.y - header!.height).toBeLessThanOrEqual(20)
+    }
+    await page.screenshot({ path: testInfo.outputPath(`${directory}-${width}.png`), animations: 'disabled' })
+  }
+  await filters.getByRole('tab', { name: '已订阅', exact: true }).click()
+  await expect(page.getByText(directory === 'agents' ? '我的研究助手' : '我的研究资料', { exact: true })).not.toBeVisible()
+})
+
+test('a locked subscribed agent shows its actual status and opens service details without sending a question', async ({ page }) => {
+  const api = await mockLibrary(page, { denied: true })
+  await page.route('**/api/v1/agents', route => route.fulfill({ json: { data: [] } }))
+  await visit(page, '/platform/agents')
+  const subscribed = page.getByRole('region', { name: '已订阅智能体', exact: true })
+  await expect(subscribed).toContainText('已退款')
+  await subscribed.getByRole('button', { name: '泰勒专属智能体', exact: true }).filter({ hasText: '已退款' }).click()
+  expect(await page.evaluate(() => (window as any).__marketplaceHarness.router.currentRoute.value.path)).toBe('/platform/marketplace/taylor')
+  expect(api.reads).toEqual([])
+  expect(api.forbidden).toEqual([])
+})
+
+const flashModelId = 'builtin-deepseek-v4-flash'
+const proModelId = 'builtin-deepseek-v4-pro'
+async function mockComposerChoices(page: Page, paidMembership = true) {
+  const api = await mockMarket(page, { paid: true, max: paidMembership })
+  const models = [flashModelId, proModelId].map((id, index) => ({ id, name: index ? 'DeepSeek V4 Pro' : 'DeepSeek V4.1 Flash', display_name: index ? 'DeepSeek V4 Pro' : 'DeepSeek V4.1 Flash', type: 'KnowledgeQA', source: 'remote', status: 'active', is_builtin: true, parameters: { provider: 'openrouter', reasoning: { supported: true, mandatory: false, supported_efforts: ['low', 'high', 'max'], default_effort: 'low' } } }))
+  const owned = { id: 'own-agent', name: '我的研究助手', is_builtin: false, config: { model_id: flashModelId, rerank_model_id: 'test-rerank', agent_mode: 'smart-reasoning', kb_selection_mode: 'selected', knowledge_bases: ['own-kb'] } }
+  const writing = { ...taylor, id: 'writing', title: '清晰写作', agent_id: 'writing-agent', agent_name: '写作助手', knowledge_base_ids: ['writing-kb'], knowledge_base_names: ['写作资料'], access: { can_chat: true, status: 'active', cancel_at_period_end: false } }
+  const entries = [libraryEntry, { ...libraryEntry, product_id: 'writing', product_title: writing.title, agent_id: writing.agent_id, agent_name: writing.agent_name, knowledge_base_id: 'writing-kb', name: '写作资料' }, { ...libraryEntry, product_id: 'expired', agent_name: '已过期助手', can_chat: false, can_read: false }]
+  await page.route('**/api/v1/**', route => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/v1/models') return route.fulfill({ json: { success: true, data: [...models, { id: 'test-rerank', name: 'Rerank', type: 'Rerank', status: 'active', is_builtin: true, parameters: { provider: 'openrouter' } }] } })
+    if (path.startsWith('/api/v1/models/scene-options/')) return route.fulfill({ json: { success: true, data: { scene: path.split('/').at(-1), effective_model_id: flashModelId, options: models.map((m, i) => ({ model_id: m.id, display_name: m.display_name, model_type: 'KnowledgeQA', selectable: i === 0 || paidMembership, locked: i > 0 && !paidMembership, required_plan: 'paid', is_scene_default: i === 0, is_effective: i === 0 })) } } })
+    if (path === '/api/v1/creator-marketplace/library') return route.fulfill({ json: { data: entries } })
+    if (path === '/api/v1/creator-marketplace/products/writing') return route.fulfill({ json: { data: writing } })
+    if (path === '/api/v1/agents') return route.fulfill({ json: { success: true, data: [owned] } })
+    if (path === '/api/v1/agents/own-agent') return route.fulfill({ json: { success: true, data: owned } })
+    if (path === '/api/v1/knowledge-bases') return route.fulfill({ json: { success: true, data: [{ id: 'own-kb', name: '我的资料', type: 'document', tenant_id: 42, capabilities: { ready: true } }] } })
+    return route.fallback()
+  })
+  return api
+}
+async function openComposerSection(page: Page, section: '智能体' | '模型' | '推理强度') {
+  const trigger = page.locator('.visual-chat-composer__combined-picker')
+  if (await trigger.getAttribute('aria-expanded') !== 'true') {
+    await expect(page.locator('.visual-model-selector__chat-panel')).toBeHidden()
+    await trigger.click()
+  }
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  await page.locator('.visual-model-selector__chat-row').filter({ has: page.locator('span').filter({ hasText: new RegExp(`^${section}$`) }) }).hover()
+  return page.getByRole('listbox', { name: section, exact: true })
+}
+
+test('composer selects subscribed and owned agents with draft, member model and reasoning freedom', async ({ page }) => {
+  const api = await mockComposerChoices(page)
+  await visit(page, '/platform/creatChat')
+  await page.locator('textarea').first().fill('保留我的草稿')
+  let picker = await openComposerSection(page, '智能体')
+  await expect(picker.getByRole('option', { name: '我的研究助手', exact: true })).toBeVisible()
+  await expect(picker.getByRole('option', { name: '已过期助手', exact: true })).toHaveCount(0)
+  await picker.getByRole('option', { name: '泰勒专属智能体', exact: true }).click()
+  await expectSelectedService(page, taylor.id)
+  await expect(page.locator('textarea').first()).toHaveValue('保留我的草稿')
+  picker = await openComposerSection(page, '模型')
+  await picker.getByRole('option', { name: 'DeepSeek V4 Pro', exact: true }).click()
+  picker = await openComposerSection(page, '推理强度')
+  await picker.getByRole('option', { name: '最高', exact: true }).click()
+  await expect(page.locator('.visual-chat-composer__combined-picker')).toContainText('DeepSeek V4 Pro')
+  await expect(page.locator('.visual-chat-composer__combined-picker')).toContainText('最高')
+  // Same-agent selection must preserve the user's model and reasoning, not reset Flash.
+  picker = await openComposerSection(page, '智能体')
+  await picker.getByRole('option', { name: '泰勒专属智能体', exact: true }).click()
+  await expect(page.locator('.visual-chat-composer__combined-picker')).toContainText('DeepSeek V4 Pro')
+  await page.locator('[data-guide="chat-send"]').click()
+  await expect.poll(() => api.requests.find(r => r.path.includes('/agent-chat/'))?.body).toMatchObject({ marketplace_product_id: 'taylor', agent_id: 'platform-agent', summary_model_id: proModelId, thinking: true, reasoning_effort: 'max', query: '保留我的草稿' })
+})
+
+test('composer switching service then owned agent clears stale scope and retains draft', async ({ page }) => {
+  const api = await mockComposerChoices(page)
+  await visit(page, '/platform/creatChat?marketplace_product=taylor')
+  await expectSelectedService(page, taylor.id)
+  await page.locator('textarea').first().fill('切换时保留草稿')
+  let picker = await openComposerSection(page, '智能体')
+  await picker.getByRole('option', { name: '写作助手', exact: true }).click()
+  await expectSelectedService(page, 'writing')
+  await expect(page.locator('.visual-chat-resource')).toContainText('写作资料')
+  await expect(page.locator('textarea').first()).toHaveValue('切换时保留草稿')
+  picker = await openComposerSection(page, '智能体')
+  await picker.getByRole('option', { name: '我的研究助手', exact: true }).click()
+  await expect(page.locator('.market-service-selection')).toHaveCount(0)
+  await expect(page.locator('textarea').first()).toHaveValue('切换时保留草稿')
+  const state = await page.evaluate(() => { const s = (window as any).__marketplaceHarness.settings; return { product: s.settings.marketplaceProductId, agent: s.selectedAgentId, kbs: s.settings.selectedKnowledgeBases } })
+  expect(state.product).toBeFalsy()
+  expect(state.agent).toBe('own-agent')
+  expect(state.kbs).not.toContain('writing-kb')
+  expect(state.kbs).not.toContain('platform-kb')
+  expect(api.counts.chat).toBe(0)
+})
+
+test('subscribed composer respects membership locked models', async ({ page }) => {
+  await mockComposerChoices(page, false)
+  await visit(page, '/platform/creatChat?marketplace_product=taylor')
+  await expectSelectedService(page, taylor.id)
+  const picker = await openComposerSection(page, '模型')
+  const pro = picker.getByRole('option', { name: /DeepSeek V4 Pro/ })
+  await expect(pro).toHaveAttribute('aria-disabled', 'true')
+  await expect(pro).toBeDisabled()
+  expect(await page.evaluate(() => (window as any).__marketplaceHarness.settings.conversationModels.selectedChatModelId)).toBe(flashModelId)
+})
+
+for (const target of ['写作助手', '我的研究助手']) test(`historical composer switches to ${target} in a fresh conversation with its draft`, async ({ page }) => {
+  const api = await mockComposerChoices(page)
+  await page.route('**/api/v1/sessions/chat-fixture', route => route.fulfill({ json: { success: true, data: { id: 'chat-fixture', title: '保存的泰勒对话', last_request_state: { marketplace_product_id: 'taylor', agent_id: 'platform-agent', agent_enabled: true, model_id: proModelId, thinking: true, reasoning_effort: 'max', knowledge_base_ids: ['platform-kb'] } } } }))
+  await page.route('**/api/v1/messages/chat-fixture/load?*', route => route.fulfill({ json: { success: true, data: [{ id: 'saved-question', role: 'user', content: '原来的问题', is_completed: true }, { id: 'saved-answer', role: 'assistant', content: '原来的回答', is_completed: true, marketplace_product_id: 'taylor', model_id: proModelId }] } }))
+  await visit(page, '/platform/chat/chat-fixture')
+  await expect(page.getByText('原来的回答', { exact: true })).toBeVisible()
+  await expect(page.locator('.visual-chat-composer__combined-picker')).toContainText('DeepSeek V4 Pro')
+  await page.locator('textarea').first().fill('旧对话中的未发草稿')
+  // Reasoning remains adjustable in history without changing its product scope.
+  let picker = await openComposerSection(page, '推理强度')
+  await picker.getByRole('option', { name: '高', exact: true }).click()
+  await expect(page.locator('.visual-chat-composer__combined-picker')).toContainText('高')
+  expect(await page.evaluate(() => (window as any).__marketplaceHarness.router.currentRoute.value.path)).toBe('/platform/chat/chat-fixture')
+  picker = await openComposerSection(page, '智能体')
+  await picker.getByRole('option', { name: target, exact: true }).click()
+  await expect.poll(() => page.evaluate(() => (window as any).__marketplaceHarness.router.currentRoute.value.path)).toBe('/platform/creatChat')
+  await expect(page.locator('textarea').first()).toHaveValue('旧对话中的未发草稿')
+  await expect(page.locator('.visual-chat-composer__combined-picker')).toContainText(target)
+  const state = await page.evaluate(() => { const h = (window as any).__marketplaceHarness; return { product: h.settings.settings.marketplaceProductId, agent: h.settings.selectedAgentId, kbs: h.settings.settings.selectedKnowledgeBases } })
+  expect(state.product || '').toBe(target === '写作助手' ? 'writing' : '')
+  expect(state.kbs).not.toContain('platform-kb')
+  expect(api.counts.chat).toBe(0)
+})
+
+
+test('ordinary history keeps owned agent changes in the current conversation', async ({ page }) => {
+  await mockComposerChoices(page)
+  await page.route('**/api/v1/sessions/chat-fixture', route => route.fulfill({ json: { success: true, data: { id: 'chat-fixture', last_request_state: { agent_id: 'builtin-smart-reasoning', agent_enabled: true, model_id: proModelId, knowledge_base_ids: [] } } } }))
+  await page.route('**/api/v1/messages/chat-fixture/load?*', route => route.fulfill({ json: { success: true, data: [{ id: 'saved', role: 'user', content: '普通对话', is_completed: true }] } }))
+  await visit(page, '/platform/chat/chat-fixture')
+  await expect(page.getByText('普通对话', { exact: true })).toBeVisible()
+  await page.locator('textarea').first().fill('继续这个对话')
+  const picker = await openComposerSection(page, '智能体')
+  await picker.getByRole('option', { name: '我的研究助手', exact: true }).click()
+  await expect(page.locator('.visual-chat-composer__combined-picker')).toContainText('我的研究助手')
+  await expect(page.locator('textarea').first()).toHaveValue('继续这个对话')
+  expect(await page.evaluate(() => (window as any).__marketplaceHarness.router.currentRoute.value.path)).toBe('/platform/chat/chat-fixture')
+})
+
+test('local workspace sidebar opens marketplace and returns from product details', async ({ page }) => {
+  await mockMarket(page, { paid: true })
+  await page.goto('/e2e/mobile-harness.html?page=/platform/agents')
+  await page.locator('.visual-sidebar').getByRole('button', { name: '知识市场', exact: true }).click()
+  await expect(page.locator('.market-featured')).toContainText(taylor.title, { timeout: 3000 })
+  await page.locator('.market-featured').click()
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toBeVisible()
+  await page.locator('.visual-sidebar').getByRole('button', { name: '知识市场', exact: true }).click()
+  await expect(page.locator('.market-featured')).toContainText(taylor.title)
+})
+
+
+test('marketplace categories, price, access and sorting filters compose with search', async ({ page }) => {
+  await mockMarket(page)
+  const catalog = [
+    { ...taylor, title: '泰勒', category: '成长', monthly_amount: 1900 },
+    { ...taylor, id: 'writing', title: '写作方法', category: '写作', featured: false, monthly_amount: 0, yearly_amount: 0 },
+    { ...taylor, id: 'career', title: '职场成长', category: '成长', featured: false, monthly_amount: 900, created_at: '2026-09-23T00:00:00Z', access: { can_chat: true } },
+  ]
+  await page.route('**/api/v1/creator-marketplace/products', route => route.fulfill({ json: { data: catalog, total: 3 } }))
+  await visit(page)
+  await page.getByRole('tab', { name: '成长', exact: true }).click()
+  await expect(page.locator('.market-grid .market-card')).toHaveCount(2)
+  await page.getByRole('combobox', { name: '排序', exact: true }).click()
+  await page.locator('.t-select__dropdown:visible').getByText('价格从低到高', { exact: true }).click()
+  await expect(page.locator('.market-grid .market-card').first()).toContainText('职场成长')
+  await page.getByRole('combobox', { name: '排序', exact: true }).click()
+  await page.locator('.t-select__dropdown:visible').getByText('最新上线', { exact: true }).click()
+  await expect(page.locator('.market-grid .market-card').first()).toContainText('职场成长')
+  await page.getByRole('combobox', { name: '状态', exact: true }).click()
+  await page.locator('.t-select__dropdown:visible').getByText('已开通', { exact: true }).click()
+  await expect(page.locator('.market-grid .market-card')).toHaveCount(1)
+  await expect(page.locator('.market-grid')).toContainText('职场成长')
+  await page.getByRole('combobox', { name: '状态', exact: true }).click()
+  await page.locator('.t-select__dropdown:visible').getByText('全部状态', { exact: true }).click()
+  await page.getByRole('tab', { name: '全部推荐', exact: true }).click()
+  await page.getByRole('combobox', { name: '价格', exact: true }).click()
+  await page.locator('.t-select__dropdown:visible').getByText('免费', { exact: true }).click()
+  await expect(page.locator('.market-grid .market-card')).toHaveCount(1)
+  await expect(page.locator('.market-grid')).toContainText('写作方法')
+  await page.getByRole('textbox', { name: '搜索商品', exact: true }).fill('不存在的资料')
+  await expect(page.locator('.market-grid .market-card')).toHaveCount(0)
+  await expect(page.getByText('没有符合筛选条件的商品。', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '清除筛选', exact: true }).click()
+  await expect(page.locator('.market-grid .market-card')).toHaveCount(3)
+})
+
+
+test('marketplace filters fit a Pro Max viewport and an individual featured item stays static', async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 932 })
+  await mockMarket(page)
+  await visit(page)
+  await expect(page.getByRole('combobox', { name: '价格', exact: true })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: '状态', exact: true })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: '排序', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '下一条推荐', exact: true })).toHaveCount(0)
+  await expect(page.locator('.market-cover')).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  for (const width of [430, 1440]) {
+    await page.setViewportSize({ width, height: 932 })
+    for (const name of ['价格', '状态', '排序']) {
+      const trigger = page.getByRole('combobox', { name, exact: true })
+      await trigger.click()
+      const panel = page.locator('.t-select__dropdown:visible > .t-popup__content')
+      await expect(panel).toBeVisible()
+      await expect.poll(async () => Math.abs((await panel.boundingBox())!.width - (await trigger.boundingBox())!.width)).toBeLessThan(1)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+      await page.getByRole('heading', { name: '知识市场', exact: true }).click()
+      await expect(panel).toHaveCount(0)
+    }
+  }
+  const trigger = page.getByRole('combobox', { name: '排序', exact: true })
+  await trigger.click()
+  await page.setViewportSize({ width: 430, height: 932 })
+  const panel = page.locator('.t-select__dropdown:visible > .t-popup__content')
+  await expect(panel).toBeVisible()
+  await expect.poll(async () => Math.abs((await panel.boundingBox())!.width - (await trigger.boundingBox())!.width)).toBeLessThan(1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+
+test('marketplace filtering includes products beyond the first catalog page', async ({ page }) => {
+  await mockMarket(page)
+  await page.route('**/api/v1/creator-marketplace/products*', route => {
+    const offset = Number(new URL(route.request().url()).searchParams.get('offset') || 0)
+    return route.fulfill({ json: { data: offset ? [{ ...taylor, id: 'later', title: '下一页的写作知识', category: '写作', featured: false }] : [taylor], total: 2 } })
+  })
+  await visit(page)
+  await page.getByRole('tab', { name: '写作', exact: true }).click()
+  await expect(page.locator('.market-grid .market-card')).toHaveCount(1)
+  await expect(page.locator('.market-grid')).toContainText('下一页的写作知识')
+})
+
+test('featured recommendations rotate, support arrows and dots, and pause while being read', async ({ page }) => {
+  await page.clock.install()
+  await mockMarket(page)
+  const recommendations = [taylor, { ...taylor, id: 'second', title: '第二个精选', category: '写作' }]
+  await page.route('**/api/v1/creator-marketplace/products', route => route.fulfill({ json: { data: recommendations, total: 2 } }))
+  await visit(page)
+  const active = page.locator('.market-featured-swiper .swiper-slide-active h2')
+  await expect(page.getByRole('button', { name: /暂停轮播|继续轮播|停止轮播/ })).toHaveCount(0)
+  await expect(active).toHaveText(taylor.title)
+  await page.mouse.move(0, 0)
+  await page.clock.runFor(5600)
+  await expect(active).toHaveText('第二个精选')
+  await page.getByRole('button', { name: '上一条推荐', exact: true }).click()
+  await page.clock.runFor(400)
+  await expect(active).toHaveText(taylor.title)
+  await page.clock.runFor(6000)
+  await expect(active).toHaveText(taylor.title)
+  await page.getByRole('button', { name: '精选推荐: 第二个精选', exact: true }).click()
+  await page.clock.runFor(400)
+  await expect(active).toHaveText('第二个精选')
+  await page.getByRole('textbox', { name: '搜索商品', exact: true }).click()
+  await page.mouse.move(0, 0)
+  await page.clock.runFor(5600)
+  await expect(active).toHaveText(taylor.title)
+  await page.locator('.market-featured-carousel').hover()
+  await page.clock.runFor(6000)
+  await expect(active).toHaveText(taylor.title)
+})
+
+test('reduced-motion users get manual featured navigation without automatic movement', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.clock.install()
+  await mockMarket(page)
+  await page.route('**/api/v1/creator-marketplace/products', route => route.fulfill({ json: { data: [taylor, { ...taylor, id: 'second', title: '第二个精选' }], total: 2 } }))
+  await visit(page)
+  const active = page.locator('.market-featured-swiper .swiper-slide-active h2')
+  await expect(active).toHaveText(taylor.title)
+  await expect(page.getByRole('button', { name: /暂停轮播|继续轮播|停止轮播/ })).toHaveCount(0)
+  await page.clock.runFor(6000)
+  await expect(active).toHaveText(taylor.title)
+  await page.getByRole('button', { name: '下一条推荐', exact: true }).click()
+  await expect(active).toHaveText('第二个精选')
+})
+
+
+test('marketplace cards open from the card body and support keyboard navigation without detail buttons', async ({ page }) => {
+  await mockMarket(page, { paid: true })
+  await visit(page)
+  await expect(page.getByRole('button', { name: '查看详情', exact: true })).toHaveCount(0)
+  const card = page.locator('.market-grid').getByRole('link', { name: taylor.title, exact: true })
+  await card.locator('.market-card-description').click()
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toBeVisible()
+  await page.getByRole('link', { name: '返回市场', exact: true }).click()
+  await card.focus()
+  await card.press('Enter')
+  await expect(page.getByRole('button', { name: '开始提问', exact: true })).toBeVisible()
 })

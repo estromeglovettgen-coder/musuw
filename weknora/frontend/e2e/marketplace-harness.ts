@@ -3,6 +3,7 @@ import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import { createPinia } from 'pinia'
 import TDesign from 'tdesign-vue-next'
 import 'tdesign-vue-next/dist/tdesign.css'
+import '@/assets/musuw-visual.less'
 // Discover the real default graph renderer dependency before interactions.
 // Otherwise Vite's first cold lazy import re-optimizes deps and reloads the harness.
 import 'pixi.js'
@@ -44,6 +45,7 @@ const ReferenceHarness = defineComponent({ setup() {
 const router = createRouter({ history: createMemoryHistory(), routes: [
   { path: '/platform/marketplace/:productId/knowledge-bases/:kbId', name: 'marketplaceKnowledgeBase', component: MarketplaceKnowledgeBase },
   { path: '/platform/knowledge-bases', component: KnowledgeBaseList },
+  { path: '/platform/agents', component: () => import('@/views/agent/AgentList.vue') },
   { path: '/platform/marketplace', name: 'marketplace', component: Marketplace },
   { path: '/platform/marketplace/:productId', name: 'marketplaceProduct', component: ProductDetail },
   { path: '/platform/orders', name: 'marketplaceOrders', component: Orders },

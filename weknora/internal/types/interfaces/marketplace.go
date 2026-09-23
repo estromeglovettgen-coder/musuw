@@ -20,6 +20,7 @@ type MarketplaceCatalogQuery struct {
 type MarketplaceRepository interface {
 	ListProducts(context.Context, MarketplaceCatalogQuery) ([]*types.MarketplaceProduct, int64, error)
 	GetProduct(context.Context, string) (*types.MarketplaceProduct, error)
+	PreviewDirectory(context.Context, uint64, []string) ([]types.MarketplaceDirectoryEntry, error)
 	SaveProduct(context.Context, *types.MarketplaceProduct, time.Time) error
 	ClaimCheckout(context.Context, *types.MarketplaceSubscription) (*types.MarketplaceSubscription, bool, error)
 	GetSubscription(context.Context, string) (*types.MarketplaceSubscription, error)
@@ -46,6 +47,7 @@ type MarketplacePaymentGateway interface {
 type MarketplaceService interface {
 	ListProducts(context.Context, MarketplaceCatalogQuery, bool, bool) ([]*types.MarketplaceProduct, int64, error)
 	GetProduct(context.Context, string) (*types.MarketplaceProduct, error)
+	Preview(context.Context, string) (*types.MarketplacePreview, error)
 	SaveProduct(context.Context, string, types.MarketplaceProductInput, bool) (*types.MarketplaceProduct, error)
 	SubmitProduct(context.Context, string) (*types.MarketplaceProduct, error)
 	ReviewProduct(context.Context, string, types.MarketplaceReviewInput) (*types.MarketplaceProduct, error)
