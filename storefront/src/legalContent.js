@@ -20,7 +20,7 @@ export const PUBLIC_DOCUMENT_PATHS = Object.freeze([
 const updated = "2026-08-27";
 const billingPolicyUpdated = "2026-09-03";
 const accountLifecycleUpdated = "2026-09-03";
-const analyticsNoticeUpdated = "2026-09-18";
+const analyticsNoticeUpdated = "2026-09-24";
 const operator = `${LEGAL_OPERATOR.englishName}（${LEGAL_OPERATOR.chineseName}）`;
 
 const p = (text) => ({ type: "paragraph", text });
@@ -204,7 +204,8 @@ const englishDocuments = {
         blocks: [
           p("We collect data directly from you, automatically from your device when you use the service, from connected services you authorize, and from payment, fraud-prevention, support, or infrastructure providers involved in delivering the service."),
           p("Cloudflare may provide a country code for storefront language selection. We use that code to select Chinese for visitors in mainland China and English elsewhere; we do not use it to infer a precise location."),
-          p("Cloudflare processes request metadata at the public edge for delivery, TLS, abuse prevention, and country-level language selection. Cloudflare also provides cookie-free page-usage and performance analytics through a browser beacon.")
+          p("Cloudflare processes request metadata at the public edge for delivery, TLS, abuse prevention, and country-level language selection. Cloudflare also provides cookie-free page-usage and performance analytics through a browser beacon."),
+          p("When enabled, optional Google Analytics 4 (GA4) runs only on public storefront pages and only after you consent. It measures page visits and basic session activity using browser and device information and cookie identifiers. Page addresses are limited to approved public paths with query strings and fragments removed; referrers are limited to their source origin, without a path, query, or fragment. We do not send musuw account identifiers, email addresses, knowledge content, or conversations to GA4. Advertising features and Google signals are disabled.")
         ]
       },
       {
@@ -216,6 +217,7 @@ const englishDocuments = {
             "Secure, troubleshoot, prevent fraud and abuse, enforce policies, and maintain auditability as needed to perform the contract, comply with legal obligations, or protect users and the service.",
             "Comply with tax, accounting, sanctions, law-enforcement, and other legal requirements.",
             "Improve usability and reliability using aggregated, de-identified, or limited service data where applicable law permits it.",
+            "Measure public storefront usage through optional GA4 only with your consent, which you can withdraw through Analytics preferences in the footer.",
             "Send optional marketing only when you requested it or gave any consent required by law. You can unsubscribe at any time."
           ),
           p("The available legal bases depend on where you live. They may include performing a contract, complying with legal obligations, your consent, and other grounds expressly permitted by applicable law. A legitimate-interest basis is used only in jurisdictions that recognize it and only after the required balancing; you may object where that right applies. You may withdraw consent at any time without affecting earlier lawful processing.")
@@ -239,7 +241,7 @@ const englishDocuments = {
           list(
             "Supabase, Inc. provides identity and one-time-code services and processes account email, profile claims, identity identifiers, and login/session data for that role.",
             "Resend, Inc. delivers transactional authentication email and processes the recipient address, authentication-message content and metadata, and delivery and security events for that role.",
-            "Google LLC processes Google-account data when you choose Google sign-in. musuw requests only the openid, profile, and email scopes and receives the identifiers and profile fields that Google returns for them.",
+            "Google LLC processes Google-account data when you choose Google sign-in. musuw requests only the openid, profile, and email scopes and receives the identifiers and profile fields that Google returns for them. Separately, when GA4 is enabled and you consent, Google processes the limited public storefront usage data described above to provide analytics.",
             "Cloudflare, Inc. provides DNS and edge delivery, transport security, abuse prevention, country-level language selection, and R2 object storage. It may process IP and request metadata, security signals, and uploaded source objects for those roles.",
             "Musuw's self-hosted SearXNG instance performs the product's web search and currently sends the search query from your request to Microsoft Bing, which returns public result titles, URLs, and snippets. The request does not include your musuw email or account identifier, but the query itself may reveal what you ask; Microsoft processes it under its own notice. The configured upstream search engine may change, and this notice will be updated when the production route changes.",
             "TikHub, LLC. resolves a supported public social-media URL when you choose the paid social-link import feature. Depending on the platform endpoint, musuw sends the normalized public share URL or share text, or the public post or video identifier; it does not send your musuw email or account identifier. TikHub returns public media and metadata and states that it may keep service logs and usage statistics and use service-related data for diagnostics, development, and correction.",
@@ -300,7 +302,7 @@ const englishDocuments = {
       {
         heading: "11. Cookies and similar technology",
         blocks: [
-          p("Cloudflare provides cookie-free page-usage and performance analytics and processes edge request and security metadata as described above. We do not use advertising cookies or cross-site behavioral tracking. Essential browser storage is used for language, authentication, security, and checkout-return state. External identity and checkout providers may use their own necessary technology under their notices."),
+          p("Cloudflare provides cookie-free page-usage and performance analytics and processes edge request and security metadata as described above. We do not use advertising cookies or cross-site behavioral tracking. Essential browser storage is used for language, authentication, security, checkout-return state, and your analytics choice. When enabled, optional GA4 uses analytics cookies only after consent. External identity and checkout providers may use their own necessary technology under their notices."),
           link("Read the Cookie Notice", "/cookies")
         ]
       },
@@ -538,7 +540,7 @@ const englishDocuments = {
     eyebrow: "Privacy",
     title: "Cookie Notice",
     summary:
-      "This notice explains the limited browser storage used by the musuw storefront and product, including essential preferences, security, and external checkout technology.",
+      "This notice explains browser storage used by the musuw storefront and product, including essential preferences, optional analytics, security, and external checkout technology.",
     updated: analyticsNoticeUpdated,
     sections: [
       {
@@ -546,7 +548,9 @@ const englishDocuments = {
         blocks: [
           p("Cloudflare provides cookie-free page-usage and performance analytics through a browser beacon. It also processes edge request and security metadata to deliver and protect the site, and supplies a country code used only for language selection."),
           p("The storefront does not set advertising cookies or use cross-site behavioral tracking. It stores the selected language in the essential musuw_locale cookie for up to one year and does not store a precise location."),
-          p("If we introduce analytics that uses non-essential browser storage or advertising technology, we will update this notice and request consent where required."),
+          p("When enabled, optional Google Analytics 4 (GA4) runs only on public storefront pages after you accept analytics. Before consent, or if you reject it, we do not load Google's analytics script. No GA4 measurement runs when the site's measurement ID is unconfigured. Rejecting analytics does not prevent you from using the site."),
+          p("After consent, GA4 may set _ga cookies to distinguish browsers and sessions and collect page visits and basic session events. We limit page addresses to approved public paths, remove query strings and fragments, and send only the source origin as the referrer. We do not send musuw account identifiers, emails, knowledge content, or conversations. Advertising features and Google signals are disabled."),
+          link("Google Privacy Policy", "https://policies.google.com/privacy"),
           link("Cloudflare RUM beacon information", "https://developers.cloudflare.com/speed/observatory/rum-beacon/")
         ]
       },
@@ -554,6 +558,7 @@ const englishDocuments = {
         heading: "2. Essential storage",
         blocks: [
           p("musuw may use cookies, local storage, or similar browser features that are necessary to keep you signed in, protect sessions, remember language or accessibility preferences, preserve checkout return state, prevent abuse, and provide requested features."),
+          p("We remember your analytics choice in local storage as musuw_analytics_consent_v1 until you change it or clear site data. This preference does not identify your musuw account; if storage is unavailable, the choice applies only to the current tab."),
           p("Essential storage cannot always be disabled through a consent control because the requested account or security function may not work without it. You can clear it using browser settings.")
         ]
       },
@@ -566,6 +571,7 @@ const englishDocuments = {
       {
         heading: "4. Managing browser storage",
         blocks: [
+          p("When optional analytics is enabled, open Analytics preferences in the footer to manage your analytics preference at any time. Withdrawing consent stops analytics, clears the site's accessible _ga cookies, and reloads the page once if Google's script was already loaded. Withdrawal does not delete data already sent to Google; contact us for a data-rights request."),
           p("Most browsers let you inspect, block, or delete cookies and site data. Blocking essential storage may prevent sign-in, checkout, saved preferences, or other requested functions."),
           p("A browser's “Do Not Track” signal is not a uniform legal standard. We do not use the public storefront for cross-site behavioral advertising regardless of that signal.")
         ]
@@ -869,7 +875,8 @@ const chineseDocuments = {
         blocks: [
           p("信息可能直接来自您、您使用服务时的设备、您授权连接的服务，以及参与交付服务的付款、反欺诈、支持或基础设施服务商。"),
           p("Cloudflare 可能向我们提供国家或地区代码，用于向中国大陆访问者显示中文、向其他访问者显示英文。我们不会借此推断精确位置。"),
-          p("Cloudflare 在公开网站边缘处理请求元数据，用于内容交付、TLS、滥用防护和国家或地区层级的语言选择。Cloudflare 还通过浏览器信标提供不使用 Cookie 的页面访问及性能统计。")
+          p("Cloudflare 在公开网站边缘处理请求元数据，用于内容交付、TLS、滥用防护和国家或地区层级的语言选择。Cloudflare 还通过浏览器信标提供不使用 Cookie 的页面访问及性能统计。"),
+          p("启用可选的 Google Analytics 4（GA4）时，仅在您同意后于公开官网页面运行，利用浏览器与设备信息及 Cookie 标识统计页面访问与基础会话活动。页面地址仅包含允许统计的公开路径，并移除查询参数和片段；来源地址仅保留来源站点的协议与域名，不包含路径、查询参数或片段。我们不向 GA4 发送 musuw 账户标识、邮箱、知识内容或对话。广告功能和 Google signals 均关闭。")
         ]
       },
       {
@@ -881,6 +888,7 @@ const chineseDocuments = {
             "为履行合同、履行法定义务或保护用户与服务，保障安全、排查故障、防止欺诈和滥用、执行政策并保持可审计性。",
             "履行税务、会计、制裁、执法及其他法律义务。",
             "在允许范围内使用汇总、去标识化或有限服务数据改进可用性和可靠性。",
+            "仅在您同意后使用可选 GA4 统计公开官网的使用情况，您可通过页脚“统计偏好”随时撤回。",
             "仅在您主动请求或已取得法律要求的同意时发送可选营销信息，您可随时退订。"
           ),
           p("在中华人民共和国境内，我们仅在为订立或履行合同所必需、履行法定义务、已取得您的同意或个人信息保护法允许的其他情形下处理个人信息。依赖同意处理时，您可随时撤回，但不影响撤回前处理的合法性；其他地区适用当地法律认可的处理依据和相应权利。")
@@ -904,7 +912,7 @@ const chineseDocuments = {
           list(
             "Supabase, Inc. 提供身份认证和一次性验证码服务，为此处理账户邮箱、资料声明、身份标识以及登录和会话数据。",
             "Resend, Inc. 发送身份认证事务邮件，为此处理收件地址、认证邮件内容和元数据，以及投递与安全事件。",
-            "您选择 Google 登录时，Google LLC 处理 Google 账户数据。musuw 仅请求 openid、profile 和 email 范围，并接收 Google 就这些范围返回的标识和资料字段。",
+            "您选择 Google 登录时，Google LLC 处理 Google 账户数据。musuw 仅请求 openid、profile 和 email 范围，并接收 Google 就这些范围返回的标识和资料字段。另在 GA4 已启用且您同意时，Google 会处理上文所述有限的公开官网使用数据，以提供统计服务。",
             "Cloudflare, Inc. 提供 DNS 与边缘交付、传输安全、滥用防护、国家或地区层级语言选择和 R2 对象存储，为此可能处理 IP 与请求元数据、安全信号和上传的原始资料对象。",
             "Musuw 自托管的 SearXNG 实例执行产品网络搜索，目前会将来自您请求的搜索查询发送给 Microsoft Bing，并取回公开结果标题、URL 和摘要。请求不包含您的 musuw 邮箱或账户标识，但查询本身可能透露您所问的内容；Microsoft 依其自身声明处理该查询。配置的上游搜索引擎可能变化，生产路由变更时我们会更新本说明。",
             "当您主动使用付费社媒链接导入功能时，TikHub, LLC. 会解析支持的公开社媒链接。根据平台接口，musuw 会发送标准化的公开分享 URL 或分享文本，或公开帖子/视频标识；不会发送您的 musuw 邮箱或账户标识。TikHub 返回公开媒体与元数据，并在其政策中说明可留存服务日志和使用统计，且可将服务相关数据用于诊断、开发和纠错。",
@@ -965,7 +973,7 @@ const chineseDocuments = {
       {
         heading: "11. Cookie 与类似技术",
         blocks: [
-          p("Cloudflare 提供不使用 Cookie 的页面访问及性能统计，并按上文说明处理边缘请求和安全元数据。我们不使用广告 Cookie 或跨站行为追踪；仅为语言、身份认证、安全和结账返回状态使用必要浏览器存储。外部身份和结账服务商可依据其告知使用必要技术。"),
+          p("Cloudflare 提供不使用 Cookie 的页面访问及性能统计，并按上文说明处理边缘请求和安全元数据。我们不使用广告 Cookie 或跨站行为追踪；为语言、身份认证、安全、结账返回状态和统计选择使用必要浏览器存储。可选 GA4 启用时，仅在同意后使用统计 Cookie。外部身份和结账服务商可依据其告知使用必要技术。"),
           link("查看 Cookie 说明", "/cookies")
         ]
       },
@@ -1195,7 +1203,7 @@ const chineseDocuments = {
     path: "/cookies",
     eyebrow: "隐私",
     title: "Cookie 说明",
-    summary: "本说明介绍 musuw 官网和产品使用的有限浏览器存储，包括必要偏好、安全状态与外部结账技术。",
+    summary: "本说明介绍 musuw 官网和产品使用的浏览器存储，包括必要偏好、可选统计、安全状态与外部结账技术。",
     updated: analyticsNoticeUpdated,
     sections: [
       {
@@ -1203,7 +1211,9 @@ const chineseDocuments = {
         blocks: [
           p("Cloudflare 通过浏览器信标提供不使用 Cookie 的页面访问及性能统计，并为交付和保护网站处理边缘请求与安全元数据，提供仅用于语言选择的国家或地区代码。"),
           p("官网不设置广告 Cookie，也不进行跨站行为追踪。所选语言存储在必要的 musuw_locale Cookie 中，最长保留一年；我们不存储精确位置。"),
-          p("如未来引入使用非必要浏览器存储的分析工具或广告技术，我们会更新本说明，并在法律要求时先取得同意。"),
+          p("启用可选的 Google Analytics 4（GA4）时，仅在您同意统计后于公开官网页面运行。在您同意前或拒绝后，我们不加载 Google 统计脚本；网站未配置测量 ID 时，不运行 GA4 统计。拒绝统计不影响使用网站。"),
+          p("同意后，GA4 可设置 _ga Cookie 以区分浏览器与会话，采集页面访问及基础会话事件。页面地址仅包含允许统计的公开路径，并移除查询参数和片段；来源地址仅保留来源站点的协议与域名。我们不发送 musuw 账户标识、邮箱、知识内容或对话。广告功能和 Google signals 均关闭。"),
+          link("Google 隐私政策", "https://policies.google.com/privacy"),
           link("Cloudflare RUM 信标说明", "https://developers.cloudflare.com/speed/observatory/rum-beacon/")
         ]
       },
@@ -1211,6 +1221,7 @@ const chineseDocuments = {
         heading: "2. 必要存储",
         blocks: [
           p("musuw 可能使用为保持登录、保护会话、记住语言或无障碍偏好、保留结账返回状态、防止滥用及提供所请求功能而必需的 Cookie、本地存储或类似浏览器功能。"),
+          p("您的统计选择保存在本地存储 musuw_analytics_consent_v1 中，直至您更改选择或清除站点数据。该偏好不标识您的 musuw 账户；若浏览器无法保存本地存储，选择仅适用于当前标签页。"),
           p("必要存储有时无法通过同意控件关闭，因为关闭后账户或安全功能可能无法使用。您可通过浏览器设置清除。")
         ]
       },
@@ -1221,6 +1232,7 @@ const chineseDocuments = {
       {
         heading: "4. 管理浏览器存储",
         blocks: [
+          p("可选统计启用时，您可随时打开页脚“统计偏好”调整统计选择。撤回同意会停止统计并清除本站可访问的 _ga Cookie；如果已加载 Google 脚本，页面会刷新一次。撤回不会删除已发送给 Google 的数据；如需行使数据权利，请联系我们。"),
           p("多数浏览器允许查看、阻止或删除 Cookie 和站点数据。阻止必要存储可能影响登录、结账、偏好保存或其他请求的功能。"),
           p("浏览器的“请勿追踪”信号尚无统一法律标准。无论该信号如何，公开官网都不用于跨站行为广告。")
         ]

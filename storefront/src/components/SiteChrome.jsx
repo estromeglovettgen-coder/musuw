@@ -12,6 +12,7 @@ import {
 } from "../homepageMarketingRefresh";
 import { APP_LOGIN_URL, APP_URL } from "../productHandoff";
 import { readStorefrontAuthentication } from "../storefrontAuthStatus";
+import { AnalyticsPreferences } from "./AnalyticsPreferences.jsx";
 
 const defaultCopy = getStorefrontCopy("en");
 const navigationLabels = Object.freeze({
@@ -286,6 +287,7 @@ export function SiteFooter({ copy = defaultCopy, groups = MARKETING_FOOTER_GROUP
       </div>
       <div className="container footer-bottom">
         <span>{copy.footer.copyright}</span>
+        <AnalyticsPreferences isZh={copy?.pricing?.currencyCode === "CNY"} />
       </div>
     </footer>
   );
