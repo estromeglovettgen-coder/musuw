@@ -21,6 +21,7 @@ import {
 } from "./seoMetadata.js";
 import { applyTheme, getInitialTheme } from "./theme.js";
 import { CustomerServiceEmbed } from "./components/CustomerServiceEmbed.jsx";
+import { HOME_PAGES, homeLocale, localeHref } from "./publicRoutes.js";
 
 function setMeta(attribute, key, content) {
   let element = document.querySelector(`meta[${attribute}="${key}"]`);
@@ -33,7 +34,7 @@ function setMeta(attribute, key, content) {
 }
 
 export default function App() {
-  const [locale, setLocale] = useState(() => getCitationGuide(window.location.pathname)?.locale ?? getNotebookComparison(window.location.pathname)?.locale ?? getInitialLocale());
+  const [locale] = useState(() => getCitationGuide(window.location.pathname)?.locale ?? getNotebookComparison(window.location.pathname)?.locale ?? getInitialLocale());
   const [theme, setTheme] = useState(() => getInitialTheme());
   const copy = useMemo(() => getStorefrontCopy(locale), [locale]);
   const pricingCurrency = selectPricingCurrency(getInitialPricingCountry(), copy.pricing.currencyCode);
@@ -47,18 +48,18 @@ export default function App() {
   const comparison = getNotebookComparison(pathname);
   const article = guide ?? comparison;
   const alternateArticles = comparison ? NOTEBOOK_COMPARISONS : CITATION_GUIDES;
-  const isHome = pathname === "/";
+  const isHome = Boolean(homeLocale(pathname));
   const isPress = normalizePathname(pathname) === PRESS_PATH;
 
   const handleLocaleChange = useCallback((nextLocale) => {
     const normalized = nextLocale === "zh-CN" || nextLocale === "zh" ? "zh-CN" : "en";
     persistLocalePreference(normalized);
-    if (article) {
-      window.location.assign(alternateArticles[normalized].path);
-      return;
-    }
-    setLocale(normalized);
-  }, [article, alternateArticles]);
+    window.location.assign(localeHref(pathname, normalized, {
+      search: window.location.search,
+      hash: window.location.hash,
+      alternatePath: article ? alternateArticles[normalized].path : undefined,
+    }));
+  }, [article, alternateArticles, pathname]);
 
   const handleThemeToggle = useCallback(() => {
     setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
@@ -106,8 +107,9 @@ export default function App() {
       document.head.appendChild(canonical);
     }
     canonical.setAttribute("href", pageUrl);
-    if (article) {
-      for (const alternate of Object.values(alternateArticles)) {
+    if (article || isHome) {
+      const alternates = article ? Object.values(alternateArticles) : [...HOME_PAGES, { locale: "x-default", path: "/" }];
+      for (const alternate of alternates) {
         let link = document.querySelector(`link[rel="alternate"][hreflang="${alternate.locale}"]`);
         if (!link) {
           link = document.createElement("link");
@@ -176,6 +178,7 @@ export default function App() {
       <NotFoundPage
         copy={copy}
         locale={locale}
+        pathname={pathname}
         onLocaleChange={handleLocaleChange}
         theme={theme}
         onThemeToggle={handleThemeToggle}

@@ -10,6 +10,7 @@ import {
   PlatformSection,
 } from "./components/HomeRefreshSections";
 import { SiteFooter, SiteHeader } from "./components/SiteChrome";
+import { HomeResources } from "./components/HomeResources";
 import { applyHomepagePlanPresentation } from "./planPresentation";
 import {
   applyHomepageMarketingRefresh,
@@ -44,6 +45,7 @@ export function HomePage({
         <PlatformSection copy={homepageCopy} locale={resolvedLocale} />
         <MarketingPricingSection copy={homepageCopy} pricingCurrency={pricingCurrency} />
         <MarketingComparisonSection copy={homepageCopy} />
+        <HomeResources locale={resolvedLocale} />
         <FAQSection copy={homepageCopy} />
         <FinalCTA copy={homepageCopy} locale={resolvedLocale} />
       </main>

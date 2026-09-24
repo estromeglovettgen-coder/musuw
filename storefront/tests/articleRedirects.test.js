@@ -28,7 +28,7 @@ test("the shared Chinese homepage URL enters the existing Chinese homepage", asy
       );
       assert.equal(response.status, 301);
       assert.equal(response.headers.get("location"),
-        "https://musuw.com/?utm_source=github&lang=zh-CN");
+        "https://musuw.com/?utm_source=github");
     }
   }
 });

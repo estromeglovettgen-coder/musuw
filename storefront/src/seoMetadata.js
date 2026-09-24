@@ -26,6 +26,8 @@ export function openGraphLocale(locale) {
 }
 
 export function structuredData({ locale = "en", pathname = "/", article } = {}) {
+  const pageUrl = canonicalUrl(pathname);
+  const language = locale === "zh-CN" ? "zh-CN" : "en";
   return {
     "@context": "https://schema.org",
     "@graph": [
@@ -42,10 +44,15 @@ export function structuredData({ locale = "en", pathname = "/", article } = {}) 
         name: SITE_NAME,
         url: `${SITE_ORIGIN}/`,
         publisher: { "@id": `${SITE_ORIGIN}/#organization` },
-        inLanguage: locale === "zh-CN" ? "zh-CN" : "en",
-        ...(normalizePathname(pathname) === "/"
-          ? {}
-          : { mainEntityOfPage: canonicalUrl(pathname) }),
+        inLanguage: ["zh-CN", "en"],
+      },
+      {
+        "@type": "WebPage",
+        "@id": `${pageUrl}#webpage`,
+        url: pageUrl,
+        inLanguage: language,
+        isPartOf: { "@id": `${SITE_ORIGIN}/#website` },
+        ...(article ? { name: article.title, breadcrumb: { "@id": `${pageUrl}#breadcrumb` } } : {}),
       },
       ...(article ? [{
         "@type": "Article",
@@ -58,6 +65,15 @@ export function structuredData({ locale = "en", pathname = "/", article } = {}) 
         author: { "@type": "Organization", name: "Musuw", url: `${SITE_ORIGIN}/` },
         publisher: { "@id": `${SITE_ORIGIN}/#organization` },
         isAccessibleForFree: true,
+        ...(article.meta.datePublished ? { datePublished: article.meta.datePublished } : {}),
+        ...(article.meta.dateModified ? { dateModified: article.meta.dateModified } : {}),
+      }, {
+        "@type": "BreadcrumbList",
+        "@id": `${pageUrl}#breadcrumb`,
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: language === "zh-CN" ? "首页" : "Home", item: canonicalUrl(language === "zh-CN" ? "/" : "/en") },
+          { "@type": "ListItem", position: 2, name: article.title, item: pageUrl },
+        ],
       }] : []),
     ],
   };

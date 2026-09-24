@@ -20,7 +20,7 @@ test("the homepage price book follows each request's country across languages an
   // personalized bootstrap. UI language must not select the price book.
   for (const country of ["JP", "CN", "US", "CN"]) {
     for (const locale of ["en", "zh-CN"]) {
-      const request = new Request(`https://musuw.com/?lang=${locale}`, {
+      const request = new Request(`https://musuw.com${locale === "en" ? "/en" : "/"}`, {
         headers: { cookie: `musuw_locale=${locale}`, "CF-IPCountry": "JP" },
       });
       Object.defineProperty(request, "cf", { value: { country } });

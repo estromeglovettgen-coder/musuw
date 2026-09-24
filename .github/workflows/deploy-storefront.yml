@@ -276,7 +276,7 @@ jobs:
           for origin in https://musuw.com https://www.musuw.com; do
             headers="$RUNNER_TEMP/musuw-headers-${origin#https://}.txt"
             body="$RUNNER_TEMP/musuw-body-${origin#https://}.html"
-            curl --fail --silent --show-error --retry 8 --retry-delay 3 --connect-timeout 10 --max-time 30 \
+            curl --fail --location --max-redirs 2 --silent --show-error --retry 8 --retry-delay 3 --connect-timeout 10 --max-time 30 \
               -D "$headers" -o "$body" "$origin/"
             grep -Eiq '^content-language:[[:space:]]*(en|zh-CN)' "$headers"
             grep -Eiq '<html[^>]+lang="(en|zh-CN)"' "$body"
@@ -322,6 +322,47 @@ jobs:
                 | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
             fi
           done
+          # Public language URLs must be stable even with an opposite preference.
+          for locale in zh-CN en; do
+            page_path=/
+            cookie_locale=en
+            if [ "$locale" = en ]; then page_path=/en; cookie_locale=zh-CN; fi
+            locale_ready=false
+            for attempt in $(seq 1 12); do
+              curl --fail --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 --connect-timeout 10 --max-time 30 \
+                -H "Cookie: musuw_locale=$cookie_locale" \
+                -D "$RUNNER_TEMP/musuw-seo-$locale.headers" -o "$RUNNER_TEMP/musuw-seo-$locale.html" "https://musuw.com$page_path"
+              if grep -Fq "<link rel=\"canonical\" href=\"https://musuw.com$page_path\">" "$RUNNER_TEMP/musuw-seo-$locale.html" && \
+                grep -Eiq "<html[^>]*[[:space:]]lang=\"$locale\"([[:space:]]|>)" "$RUNNER_TEMP/musuw-seo-$locale.html" && \
+                grep -Eiq "^content-language:[[:space:]]*$locale[[:space:]]*$" "$RUNNER_TEMP/musuw-seo-$locale.headers" && \
+                grep -Fq 'hreflang="en" href="https://musuw.com/en"' "$RUNNER_TEMP/musuw-seo-$locale.html" && \
+                grep -Fq 'hreflang="zh-CN" href="https://musuw.com/"' "$RUNNER_TEMP/musuw-seo-$locale.html"; then
+                locale_ready=true
+                break
+              fi
+              if [ "$attempt" -lt 12 ]; then sleep 5; fi
+            done
+            if [ "$locale_ready" != true ]; then
+              printf 'storefront locale did not converge for locale=%s\n' "$locale" >&2
+              exit 1
+            fi
+            printf 'https://musuw.com%s fixed-language=%s canonical=ok hreflang=ok\n' "$page_path" "$locale" | tee -a "$RUNNER_TEMP/musuw-storefront-smoke.txt"
+          done
+          canonical_ready=false
+          for attempt in $(seq 1 12); do
+            canonical_status="$(curl --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 --connect-timeout 10 --max-time 30 \
+              -D "$RUNNER_TEMP/musuw-www-canonical.headers" -o /dev/null -w '%{http_code}' 'https://www.musuw.com/?lang=en&source=seo-smoke' || true)"
+            if [ "$canonical_status" = 301 ] && \
+              grep -Eiq '^location:[[:space:]]*https://musuw.com/en\?source=seo-smoke[[:space:]]*$' "$RUNNER_TEMP/musuw-www-canonical.headers"; then
+              canonical_ready=true
+              break
+            fi
+            if [ "$attempt" -lt 12 ]; then sleep 5; fi
+          done
+          if [ "$canonical_ready" != true ]; then
+            printf 'storefront canonical redirect did not converge (last status=%s)\n' "${canonical_status:-unavailable}" >&2
+            exit 1
+          fi
           for locale in zh en; do
             headers="$RUNNER_TEMP/musuw-partners-$locale.headers"
             body="$RUNNER_TEMP/musuw-partners-$locale.html"

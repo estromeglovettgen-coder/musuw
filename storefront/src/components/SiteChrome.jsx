@@ -13,6 +13,9 @@ import {
 import { APP_LOGIN_URL, APP_URL } from "../productHandoff";
 import { readStorefrontAuthentication } from "../storefrontAuthStatus";
 import { AnalyticsPreferences } from "./AnalyticsPreferences.jsx";
+import { homePath, homepageHref, localeHref } from "../publicRoutes.js";
+import { CITATION_GUIDES, getCitationGuide } from "../citationGuideContent.js";
+import { NOTEBOOK_COMPARISONS, getNotebookComparison } from "../notebookComparisonContent.js";
 
 const defaultCopy = getStorefrontCopy("en");
 const navigationLabels = Object.freeze({
@@ -27,12 +30,12 @@ function publicNavigationLabels(copy) {
 const footerLabels = Object.freeze({
   en: Object.freeze([
     Object.freeze({ title: "Product", links: Object.freeze(["Features", "Platform", "Pricing", "Docs"]) }),
-    Object.freeze({ title: "Trust", links: Object.freeze(["FAQ", "Security", "Contact"]) }),
+    Object.freeze({ title: "Trust", links: Object.freeze(["FAQ", "Security", "Contact", "Media kit"]) }),
     Object.freeze({ title: "Legal", links: Object.freeze(["Terms", "Privacy", "Refunds", "Subscription", "Cookies"]) }),
   ]),
   zh: Object.freeze([
     Object.freeze({ title: "产品", links: Object.freeze(["功能", "平台", "定价", "文档"]) }),
-    Object.freeze({ title: "信任", links: Object.freeze(["常见问题", "安全", "联系"]) }),
+    Object.freeze({ title: "信任", links: Object.freeze(["常见问题", "安全", "联系", "媒体资料"]) }),
     Object.freeze({ title: "法律", links: Object.freeze(["服务条款", "隐私", "退款", "订阅与取消", "Cookie"]) }),
   ]),
 });
@@ -41,9 +44,9 @@ function publicFooterLabels(copy) {
   return copy?.pricing?.currencyCode === "CNY" ? footerLabels.zh : footerLabels.en;
 }
 
-export function Brand({ copy = defaultCopy }) {
+export function Brand({ copy = defaultCopy, locale = copy?.pricing?.currencyCode === "CNY" ? "zh-CN" : "en" }) {
   return (
-    <a className="brand" href="/" aria-label={copy.brand.homeLabel}>
+    <a className="brand" href={homePath(locale)} aria-label={copy.brand.homeLabel}>
       <span className="brand-mark" aria-hidden="true">
         <img src="/images/musuw-logo.png" alt="" width="30" height="30" draggable={false} />
       </span>
@@ -90,21 +93,52 @@ export function ButtonLink({
   );
 }
 
-export function LanguageSwitcher({ locale = "en", onLocaleChange }) {
+export function LanguageSwitcher({ locale = "en", onLocaleChange, pathname }) {
   const isZh = locale === "zh-CN" || locale === "zh";
+  const menuRef = useRef(null);
+  const path = pathname ?? (typeof window !== "undefined" ? window.location.pathname : homePath(locale));
+  const alternates = getCitationGuide(path) ? CITATION_GUIDES : getNotebookComparison(path) ? NOTEBOOK_COMPARISONS : null;
+
+  useEffect(() => {
+    const closeOutside = (event) => {
+      if (!menuRef.current?.contains(event.target)) menuRef.current?.removeAttribute("open");
+    };
+    const closeOnEscape = (event) => {
+      if (event.key !== "Escape" || !menuRef.current?.open) return;
+      menuRef.current.removeAttribute("open");
+      menuRef.current.querySelector("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
 
   return (
-    <div className="lang-switcher">
-      <select
-        className="lang-select"
-        value={isZh ? "zh-CN" : "en"}
-        onChange={(event) => onLocaleChange?.(event.target.value)}
-        aria-label={isZh ? "选择语言" : "Select language"}
-      >
-        <option value="zh-CN">ZH</option>
-        <option value="en">EN</option>
-      </select>
-    </div>
+    <details className="lang-switcher" ref={menuRef}>
+      <summary className="lang-select" aria-label={isZh ? "选择语言" : "Select language"}>{isZh ? "ZH" : "EN"}<span aria-hidden="true">⌄</span></summary>
+      <div className="lang-options">
+        {["zh-CN", "en"].map((nextLocale) => <a
+          key={nextLocale}
+          href={localeHref(path, nextLocale, { alternatePath: alternates?.[nextLocale].path })}
+          lang={nextLocale}
+          hrefLang={nextLocale}
+          aria-current={(isZh ? "zh-CN" : "en") === nextLocale ? "page" : undefined}
+          onClick={(event) => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            // Keep campaign details and an in-page destination when navigating in the browser.
+            event.currentTarget.href = localeHref(path, nextLocale, { search: window.location.search, hash: window.location.hash, alternatePath: alternates?.[nextLocale].path });
+            menuRef.current?.removeAttribute("open");
+            if (onLocaleChange) {
+              event.preventDefault();
+              onLocaleChange(nextLocale);
+            }
+          }}
+        >{nextLocale === "en" ? "English" : "中文"}</a>)}
+      </div>
+    </details>
   );
 }
 
@@ -130,6 +164,7 @@ export function SiteHeader({
   onLocaleChange,
   theme = "light",
   onThemeToggle,
+  pathname,
 }) {
   const [open, setOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
@@ -205,10 +240,10 @@ export function SiteHeader({
       }}
     >
       <div className="container nav-shell">
-        <Brand copy={copy} />
+        <Brand copy={copy} locale={currentLocale} />
         <nav className="desktop-nav" aria-label={copy.nav.primaryAria}>
           {navigation.map((item, index) => (
-            <a key={item.href} href={item.href}>
+            <a key={item.href} href={homepageHref(item.href, currentLocale)}>
               {labels[index] ?? item.label}
             </a>
           ))}
@@ -223,7 +258,7 @@ export function SiteHeader({
           >
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
-          <LanguageSwitcher locale={currentLocale} onLocaleChange={onLocaleChange} />
+          <LanguageSwitcher locale={currentLocale} pathname={pathname} onLocaleChange={onLocaleChange} />
           <ProductEntryLinks authenticated={authenticated} copy={copy} />
           <button
             aria-controls={mobileNavId}
@@ -250,7 +285,7 @@ export function SiteHeader({
             transition={{ duration: 0.22 }}
           >
             {navigation.map((item, index) => (
-              <a key={item.href} href={item.href} onClick={() => setOpen(false)}>
+              <a key={item.href} href={homepageHref(item.href, currentLocale)} onClick={() => setOpen(false)}>
                 {labels[index] ?? item.label}
                 <ArrowUpRight size={18} aria-hidden="true" />
               </a>
@@ -267,6 +302,7 @@ export function SiteHeader({
 
 export function SiteFooter({ copy = defaultCopy, groups = MARKETING_FOOTER_GROUPS }) {
   const labels = publicFooterLabels(copy);
+  const locale = copy?.pricing?.currencyCode === "CNY" ? "zh-CN" : "en";
 
   return (
     <footer className="site-footer">
@@ -278,7 +314,7 @@ export function SiteFooter({ copy = defaultCopy, groups = MARKETING_FOOTER_GROUP
           <div className="footer-group" key={group.title}>
             <h3>{labels[groupIndex]?.title ?? group.title}</h3>
             {group.links.map(([label, href], linkIndex) => (
-              <a href={href} key={label}>
+              <a href={homepageHref(href, locale)} key={label}>
                 {labels[groupIndex]?.links[linkIndex] ?? label}
               </a>
             ))}

@@ -11,6 +11,7 @@ import { localizeDocumentResponse } from "../worker/localization.js";
 import { prerenderAssetPath } from "../worker/prerender.js";
 import { getPublicDocument, PUBLIC_DOCUMENT_PATHS } from "../src/legalContent.js";
 import { selectPricingCurrency } from "../src/pricingLocalization.js";
+import { homePath } from "../src/publicRoutes.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const shell = await readFile(join(root, "dist/index.html"), "utf8");
@@ -44,7 +45,8 @@ try {
   const { LegalPage } = await server.ssrLoadModule("/src/LegalPage.jsx");
   for (const locale of ["en", "zh-CN"]) {
     for (const country of ["US", "CN", "JP"]) {
-      await writePage(HomePage, { pricingCurrency: selectPricingCurrency(country) }, locale, "/", prerenderAssetPath("/", locale, country), country);
+      const path = homePath(locale);
+      await writePage(HomePage, { pricingCurrency: selectPricingCurrency(country) }, locale, path, prerenderAssetPath(path, locale, country), country);
     }
     await writePage(PressPage, {}, locale, "/press", prerenderAssetPath("/press", locale));
     for (const path of PUBLIC_DOCUMENT_PATHS) {

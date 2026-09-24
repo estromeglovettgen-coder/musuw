@@ -6,6 +6,7 @@ import { Check } from "@phosphor-icons/react/Check";
 import { EnvelopeSimple } from "@phosphor-icons/react/EnvelopeSimple";
 import { SiteFooter, SiteHeader } from "./components/SiteChrome";
 import { LEGAL_OPERATOR } from "./legalContent";
+import { homePath } from "./publicRoutes.js";
 
 const navigation = {
   en: [
@@ -147,6 +148,7 @@ function ContactPage({ document, copy, locale, onLocaleChange, theme, onThemeTog
       <SiteHeader
         copy={copy}
         locale={locale}
+        pathname={document.path}
         onLocaleChange={onLocaleChange}
         theme={theme}
         onThemeToggle={onThemeToggle}
@@ -154,7 +156,7 @@ function ContactPage({ document, copy, locale, onLocaleChange, theme, onThemeTog
       <main className="contact-page">
         <div className="container contact-layout">
           <section className="contact-intro">
-            <a className="legal-back" href="/">
+            <a className="legal-back" href={homePath(locale)}>
               <ArrowLeft size={16} weight="bold" aria-hidden="true" />
               {labels.back}
             </a>
@@ -250,6 +252,7 @@ export function LegalPage({ document, copy, locale, onLocaleChange, theme, onThe
       <SiteHeader
         copy={copy}
         locale={locale}
+        pathname={document.path}
         onLocaleChange={onLocaleChange}
         theme={theme}
         onThemeToggle={onThemeToggle}
@@ -258,7 +261,7 @@ export function LegalPage({ document, copy, locale, onLocaleChange, theme, onThe
         <div className="legal-glow" aria-hidden="true" />
         <div className="container legal-layout">
           <aside className="legal-sidebar" aria-label={labels.policies}>
-            <a className="legal-back" href="/">
+            <a className="legal-back" href={homePath(locale)}>
               <ArrowLeft size={16} weight="bold" aria-hidden="true" />
               {labels.back}
             </a>
@@ -323,12 +326,13 @@ export function LegalPage({ document, copy, locale, onLocaleChange, theme, onThe
   );
 }
 
-export function NotFoundPage({ copy, locale, onLocaleChange, theme, onThemeToggle }) {
+export function NotFoundPage({ copy, locale, pathname = "/", onLocaleChange, theme, onThemeToggle }) {
   return (
     <>
       <SiteHeader
         copy={copy}
         locale={locale}
+        pathname={pathname}
         onLocaleChange={onLocaleChange}
         theme={theme}
         onThemeToggle={onThemeToggle}
@@ -342,7 +346,7 @@ export function NotFoundPage({ copy, locale, onLocaleChange, theme, onThemeToggl
               ? "链接可能已经变化。您可以返回 musuw 官网继续查看产品。"
               : "The link may have changed. Return to the musuw homepage to continue."}
           </p>
-          <a className="button button-primary" href="/">
+          <a className="button button-primary" href={homePath(locale)}>
             <span>{locale === "zh-CN" ? "返回首页" : "Back to home"}</span>
           </a>
         </div>

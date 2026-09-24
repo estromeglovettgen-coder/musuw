@@ -1,3 +1,5 @@
+import { homeLocale } from "./publicRoutes.js";
+
 const en = {
   meta: {
     title: "musuw | Evidence-first personal knowledge base",
@@ -793,11 +795,6 @@ export function persistLocalePreference(locale) {
   // Otherwise www.musuw.com can send two conflicting values on refresh.
   document.cookie = "musuw_locale=; Path=/; Max-Age=0; SameSite=Lax";
   document.cookie = localePreferenceCookie(normalized, window.location.hostname);
-  const url = new URL(window.location.href);
-  if (url.searchParams.has("lang")) {
-    url.searchParams.set("lang", normalized);
-    window.history.replaceState(window.history.state, "", url);
-  }
   try {
     localStorage.setItem("musuw_locale", normalized);
   } catch {}
@@ -805,6 +802,8 @@ export function persistLocalePreference(locale) {
 
 export function getInitialLocale() {
   if (typeof window !== "undefined") {
+    const routeLocale = homeLocale(window.location.pathname);
+    if (routeLocale) return routeLocale;
     if (window.__MUSUW_LOCALE__ === "zh-CN" || window.__MUSUW_LOCALE__ === "zh") return "zh-CN";
     if (window.__MUSUW_LOCALE__ === "en") return "en";
     const cookieMatch = document.cookie.match(/(?:^|;\s*)musuw_locale=([^;]+)/);

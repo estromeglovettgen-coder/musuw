@@ -214,11 +214,16 @@ textarea {
 }
 
 .lang-switcher {
-  display: inline-flex;
-  align-items: center;
+  position: relative;
+  display: inline-block;
 }
 
 .lang-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  list-style: none;
   min-width: 68px;
   min-height: 38px;
   padding: 0 8px 0 11px;
@@ -245,6 +250,34 @@ textarea {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
+
+.lang-select::-webkit-details-marker { display: none; }
+
+.lang-options {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  min-width: 112px;
+  padding: 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+}
+
+.lang-options a {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.lang-options a:hover, .lang-options a[aria-current="page"] { background: var(--surface-soft, #f3f4f6); }
+.lang-options a:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 
 .button {
   display: inline-flex;

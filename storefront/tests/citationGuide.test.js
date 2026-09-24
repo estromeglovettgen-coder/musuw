@@ -69,7 +69,8 @@ test("built guide responses contain the complete article without running JavaScr
 test("site verification survives localization and unknown guide URLs remain 404", async () => {
   for (const path of ["/", "/press", "/guides/citation-checks", "/zh/guides/citation-checks", "/guides/missing"]) {
     for (const locale of ["en", "zh-CN"]) {
-      const response = await handleRequest(new Request(`https://musuw.com${path}?lang=${locale}`), {
+      const requestPath = path === "/" ? (locale === "en" ? "/en" : "/") : `${path}?lang=${locale}`;
+      const response = await handleRequest(new Request(`https://musuw.com${requestPath}`), {
         ASSETS: { fetch: async () => new Response(readFileSync(new URL("index.html", root), "utf8"), { headers: { "content-type": "text/html" } }) },
       });
       const html = await response.text();

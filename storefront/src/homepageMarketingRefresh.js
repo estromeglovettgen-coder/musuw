@@ -11,14 +11,14 @@ export const MARKETING_NAVIGATION = Object.freeze([
 
 export const MARKETING_FOOTER_GROUPS = Object.freeze([
   Object.freeze({ title: "Product", links: Object.freeze([Object.freeze(["Features", "/#feature"]), Object.freeze(["Platform", "/#platform"]), Object.freeze(["Pricing", "/#pricing"]), Object.freeze(["Docs", "https://docs.musuw.com"])]) }),
-  Object.freeze({ title: "Trust", links: Object.freeze([Object.freeze(["FAQ", "/#faq"]), Object.freeze(["Security", "/security"]), Object.freeze(["Contact", "/contact"])]) }),
+  Object.freeze({ title: "Trust", links: Object.freeze([Object.freeze(["FAQ", "/#faq"]), Object.freeze(["Security", "/security"]), Object.freeze(["Contact", "/contact"]), Object.freeze(["Media kit", "/press"])]) }),
   Object.freeze({ title: "Legal", links: Object.freeze([Object.freeze(["Terms", "/terms"]), Object.freeze(["Privacy", "/privacy"]), Object.freeze(["Refunds", "/refund-policy"]), Object.freeze(["Subscription", "/subscription-policy"]), Object.freeze(["Cookies", "/cookies"])]) }),
 ]);
 
 const MARKETING_COPY = Object.freeze({
   en: {
     navLabels: ["Features", "Platform", "Pricing", "Security", "Contact", "Docs"],
-    meta: { title: "musuw | Turn source material into intelligent knowledge assets", description: "Retrieve verifiable answers across multiple sources, then organize key information into a connected knowledge system that stays traceable and reusable." },
+    meta: { title: "musuw AI Knowledge Base | Document Chat, Wiki and Citations", description: "Build an AI knowledge base from your documents. Ask questions across sources, check original citations, and organize knowledge with connected Wiki pages and a knowledge graph." },
     hero: HOMEPAGE_STORIES.en.hero,
     features: HOMEPAGE_STORIES.en.features,
     platform: {
@@ -66,13 +66,13 @@ const MARKETING_COPY = Object.freeze({
     },
     footerGroups: [
       { title: "Product", links: ["Features", "Platform", "Pricing", "Docs"] },
-      { title: "Trust", links: ["FAQ", "Security", "Contact"] },
+      { title: "Trust", links: ["FAQ", "Security", "Contact", "Media kit"] },
       { title: "Legal", links: ["Terms", "Privacy", "Refunds", "Subscription & cancellation", "Cookies"] },
     ],
   },
   zh: {
     navLabels: ["功能", "平台", "定价", "安全", "联系", "文档"],
-    meta: { title: "musuw | 把资料转化为会思考的知识资产", description: "统一检索多种资料，生成可验证、可追溯的回答，并将关键信息组织为可持续更新与复用的知识体系。" },
+    meta: { title: "musuw AI 知识库｜文档问答、来源引用与 Wiki", description: "将 PDF、文档和笔记整理成 AI 知识库，跨资料提问、查看原文引用，并通过相互关联的 Wiki 页面与知识图谱持续积累知识。" },
     hero: HOMEPAGE_STORIES["zh-CN"].hero,
     features: HOMEPAGE_STORIES["zh-CN"].features,
     platform: {
@@ -120,7 +120,7 @@ const MARKETING_COPY = Object.freeze({
     },
     footerGroups: [
       { title: "产品", links: ["功能", "平台", "定价", "文档"] },
-      { title: "信任", links: ["常见问题", "安全", "联系"] },
+      { title: "信任", links: ["常见问题", "安全", "联系", "媒体资料"] },
       { title: "法律", links: ["服务条款", "隐私", "退款", "订阅与取消", "Cookie"] },
     ],
   },

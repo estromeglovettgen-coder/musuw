@@ -36,7 +36,7 @@ test("comparison URLs serve their full article and matching metadata despite con
     assert.equal((html.match(/<th scope="row">/g) ?? []).length, 4);
     assert.match(html, /href="https:\/\/support\.google\.com\/gemininotebook\/answer\/16206563"/);
     assert.ok(html.includes(`href="${locale === "en" ? "" : "/zh"}/guides/citation-checks"`));
-    assert.ok(html.includes(`href="/?lang=${locale}#pricing"`));
+    assert.ok(html.includes(`href="${locale === "en" ? "/en" : "/"}#pricing"`));
     assert.match(html, /src="\/images\/musuw-wiki-page\.jpg"/);
     assert.equal((html.match(/id="musuw-locale-bootstrap"/g) ?? []).length, 1);
   }

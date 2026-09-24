@@ -15,8 +15,8 @@ const env = { ASSETS: { fetch: async (request) => {
 
 test("public pages contain readable localized body text before JavaScript", async () => {
   for (const locale of ["en", "zh-CN"]) {
-    for (const path of ["/", "/press", ...PUBLIC_DOCUMENT_PATHS]) {
-      const response = await handleRequest(new Request(`https://musuw.com${path}?lang=${locale}`, {
+    for (const path of [locale === "en" ? "/en" : "/", "/press", ...PUBLIC_DOCUMENT_PATHS]) {
+      const response = await handleRequest(new Request(`https://musuw.com${path}${["/", "/en"].includes(path) ? "" : `?lang=${locale}`}`, {
         headers: { cookie: `musuw_locale=${locale === "en" ? "zh-CN" : "en"}`, "CF-IPCountry": "US" },
       }), env);
       assert.equal(response.status, 200, path);
@@ -30,7 +30,7 @@ test("public pages contain readable localized body text before JavaScript", asyn
       const document = getPublicDocument(locale, path);
       if (document && path !== "/contact") assert.ok(html.includes(`<h1>${document.title}</h1>`));
       if (path === "/press") assert.ok(html.includes("/media/press/"));
-      if (path === "/") {
+      if (path === "/" || path === "/en") {
         const heading = html.match(/<h1\b[\s\S]*?<\/h1>/)[0];
         assert.doesNotMatch(heading, /opacity:0|filter:blur/);
         assert.doesNotMatch(html, /renderToString.*Suspense/);
@@ -46,7 +46,7 @@ test("pre-rendered home prices follow country independently of preferred languag
     ["US", "zh-CN", "$5"], ["GB", "zh-CN", "$5"],
     ["", "zh-CN", "¥29"], ["", "en", "$5"],
   ]) {
-    const response = await handleRequest(new Request(`https://musuw.com/?lang=${locale}`, {
+    const response = await handleRequest(new Request(`https://musuw.com${locale === "en" ? "/en" : "/"}`, {
       headers: { "CF-IPCountry": country },
     }), env);
     const html = await response.text();

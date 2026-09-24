@@ -6,6 +6,7 @@ import { NOTEBOOK_COMPARISONS, getNotebookComparison } from "../src/notebookComp
 import { applyHomepagePlanPresentation } from "../src/planPresentation.js";
 import { applyHomepageMarketingRefresh } from "../src/homepageMarketingRefresh.js";
 import { normalizeCountry } from "../src/pricingLocalization.js";
+import { HOME_PAGES, homeLocale } from "../src/publicRoutes.js";
 import {
   SITE_SOCIAL_IMAGE,
   canonicalUrl,
@@ -53,7 +54,7 @@ function withDocumentLocale(html, locale, pathname = "/", country = "") {
   const comparison = getNotebookComparison(normalizedPath);
   const article = getCitationGuide(normalizedPath) ?? comparison;
   const pageMeta = article?.meta ?? getPublicDocumentMeta(locale, normalizedPath) ?? getPressMeta(locale, normalizedPath);
-  const isHome = normalizedPath === "/";
+  const isHome = Boolean(homeLocale(normalizedPath));
   const meta =
     pageMeta ??
     (isHome
@@ -125,8 +126,9 @@ function withDocumentLocale(html, locale, pathname = "/", country = "") {
     /<link\s+rel=["']canonical["']\s+href=["'][^"']*["']\s*\/?\s*>/i,
     `<link rel="canonical" href="${escapeAttribute(pageUrl)}">`,
   );
-  if (article) {
-    for (const alternate of Object.values(comparison ? NOTEBOOK_COMPARISONS : CITATION_GUIDES)) {
+  if (article || isHome) {
+    const alternates = article ? Object.values(comparison ? NOTEBOOK_COMPARISONS : CITATION_GUIDES) : [...HOME_PAGES, { locale: "x-default", path: "/" }];
+    for (const alternate of alternates) {
       localizedHtml = upsertHead(
         localizedHtml,
         new RegExp(`<link\\s+rel=["']alternate["']\\s+hreflang=["']${alternate.locale}["'][^>]*>`, "i"),
@@ -151,10 +153,10 @@ export async function localizeDocumentResponse(
   hostname = "musuw.com",
   country = "",
 ) {
-  const normalizedLocale = getCitationGuide(pathname)?.locale ?? getNotebookComparison(pathname)?.locale ?? (locale === "zh-CN" ? "zh-CN" : "en");
+  const normalizedLocale = homeLocale(pathname) ?? getCitationGuide(pathname)?.locale ?? getNotebookComparison(pathname)?.locale ?? (locale === "zh-CN" ? "zh-CN" : "en");
   const normalizedPath = normalizeDocumentPath(pathname);
   const knownDocument =
-    normalizedPath === "/" || Boolean(getCitationGuide(normalizedPath) ?? getNotebookComparison(normalizedPath) ?? getPublicDocumentMeta(normalizedLocale, normalizedPath) ?? getPressMeta(normalizedLocale, normalizedPath));
+    Boolean(homeLocale(normalizedPath)) || Boolean(getCitationGuide(normalizedPath) ?? getNotebookComparison(normalizedPath) ?? getPublicDocumentMeta(normalizedLocale, normalizedPath) ?? getPressMeta(normalizedLocale, normalizedPath));
   const headers = new Headers(assetResponse.headers);
   headers.set("content-language", normalizedLocale);
   headers.set("cache-control", "private, no-store");

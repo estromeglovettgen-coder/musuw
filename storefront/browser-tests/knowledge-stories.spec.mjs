@@ -182,7 +182,7 @@ for (const locale of ["zh-CN", "en"]) {
         localStorage.setItem("musuw_locale", value);
       }, locale);
       if (reducedMotion === "no-preference") await observeHeroWalkthrough(page);
-      await page.goto("/", { waitUntil: "networkidle" });
+      await page.goto(locale === "en" ? "/en" : "/", { waitUntil: "networkidle" });
       await expect(page.locator("html")).toHaveAttribute("lang", locale);
       await expect(page.locator("header.site-header")).toHaveCount(1);
       await expect(page.locator(".desktop-nav")).toHaveCount(1);
