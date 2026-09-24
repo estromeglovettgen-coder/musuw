@@ -26,7 +26,9 @@ test("article metadata matches the fixed-language content before and after hydra
     const built = readFileSync(new URL(`../dist${article.path}.html`, import.meta.url), "utf8");
     assert.ok(built.includes(`src="${new URL(entry.image).pathname}"`), "schema image must be visible in the actual article");
     assert.equal(entry.aggregateRating, undefined);
-    assert.equal(entry.datePublished, undefined, "do not infer a publication timestamp");
+    assert.equal(entry.datePublished, "2026-09-19", "publication date is established by the original release history");
+    assert.equal(entry.dateModified, "2026-09-24");
+    assert.match(built, new RegExp(`<time datetime="${entry.dateModified}">${entry.dateModified}</time>`, "i"), "visible revision date must match schema");
   }
 });
 

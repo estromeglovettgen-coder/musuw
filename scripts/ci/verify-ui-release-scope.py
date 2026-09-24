@@ -58,7 +58,8 @@ REVIEWED_UI_CONTENT = {
     # this exact-content pin so later workflow edits still require review.
     # 9ff30b1 adds only the public GA4 measurement ID to the storefront build;
     # analytics still requires the visitor's explicit consent in the reviewed UI.
-    ".github/workflows/deploy-storefront.yml": {"de051d83aab6281d0c89b2943dca87c8118fbbd1", "0bd421b23303c181500a49cdff8e141d4ac7d991", "a3426cbc189f35856ca23134c9cc94f4ed57d5fe", "6f345b6505682c959580633c5dfafb01e2d58376", "bf49f05ad8875a1b46baa863294e9b767acb9daf", "9ff30b16b8200ef2d6b7ae75ea538bcf90faa42c"},
+    # fc32fcc adds reviewed canonical locale/redirect smoke checks only.
+    ".github/workflows/deploy-storefront.yml": {"fc32fcc8365813f191049dca8e7c59c386ed78e9", "de051d83aab6281d0c89b2943dca87c8118fbbd1", "0bd421b23303c181500a49cdff8e141d4ac7d991", "a3426cbc189f35856ca23134c9cc94f4ed57d5fe", "6f345b6505682c959580633c5dfafb01e2d58376", "bf49f05ad8875a1b46baa863294e9b767acb9daf", "9ff30b16b8200ef2d6b7ae75ea538bcf90faa42c"},
     "README.md": {"32bfedf673e7951d615dc231ce12867a218be613"},
     "auth/e2e/background-stability.spec.ts": {"5259bb88fe9802ab6bb04ae72b7fb7664ad9e91e"},
     "auth/playwright.config.ts": {"8982318e2d188f555b20769aeb6da0d60a4b43b9"},

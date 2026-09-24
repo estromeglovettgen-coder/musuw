@@ -3,6 +3,18 @@ import test from "node:test";
 import { createPublicAnalytics } from "../src/publicAnalytics.js";
 
 const measurementId = "G-TEST123456";
+
+test("the English homepage uses the same consent boundary and strips URL details", () => {
+  const env = browser({ href: "https://musuw.com/en?source=private#private" });
+  const analytics = createPublicAnalytics({ ...env, measurementId });
+  analytics.start();
+  assert.equal(analytics.enabled, true);
+  assert.equal(env.scripts.length, 0);
+  analytics.setConsent("accepted");
+  assert.equal(env.scripts.length, 1);
+  const config = env.window.dataLayer.map((command) => [...command]).find(([command]) => command === "config")[2];
+  assert.equal(config.page_location, "https://musuw.com/en");
+});
 function browser({ consent, href = "https://musuw.com/?email=private@example.com#private", referrer = "https://example.org/search?q=private#private" } = {}) {
   const values = new Map(consent ? [["musuw_analytics_consent_v1", consent]] : []);
   const scripts = [];

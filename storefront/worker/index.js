@@ -2,6 +2,7 @@ import { normalizeCountry } from "../src/pricingLocalization.js";
 import { localizeDocumentResponse, selectLocale } from "./localization.js";
 import { prerenderAssetPath } from "./prerender.js";
 import { customerServiceResponse } from "./customerService.js";
+import { homeLocale } from "../src/publicRoutes.js";
 
 function requestCountry(request) {
   return normalizeCountry(request.cf?.country || request.headers.get("CF-IPCountry"));
@@ -60,19 +61,33 @@ export async function handleRequest(request, env) {
     return notFound();
   }
   if (request.method === "GET" || request.method === "HEAD") {
+    let redirect = false;
+    if (url.hostname === "www.musuw.com") {
+      url.hostname = "musuw.com";
+      redirect = true;
+    }
     if (pathname === "/zh" || pathname === "/zh/") {
       url.pathname = "/";
-      url.searchParams.set("lang", "zh-CN");
-      return Response.redirect(url.toString(), 301);
+      url.searchParams.delete("lang");
+      redirect = true;
+    } else if (pathname === "/" && url.searchParams.has("lang")) {
+      url.pathname = url.searchParams.get("lang") === "en" ? "/en" : "/";
+      url.searchParams.delete("lang");
+      redirect = true;
+    } else if (pathname === "/en" || pathname === "/en/") {
+      redirect ||= pathname !== "/en" || url.searchParams.has("lang");
+      url.pathname = "/en";
+      url.searchParams.delete("lang");
     }
     if (pathname === "/guides/check-ai-answer-sources" || pathname === "/guides/check-ai-answer-sources/") {
       url.pathname = "/guides/citation-checks";
-      return Response.redirect(url.toString(), 301);
+      redirect = true;
     }
+    if (redirect) return Response.redirect(url.toString(), 301);
   }
 
   const country = requestCountry(request);
-  const locale = selectLocale(country, request.headers.get("cookie") ?? "", url.searchParams.get("lang") ?? "");
+  const locale = homeLocale(url.pathname) ?? selectLocale(country, request.headers.get("cookie") ?? "", url.searchParams.get("lang") ?? "");
   const isDocumentRequest = request.method === "GET" || request.method === "HEAD";
   const prerenderPath = isDocumentRequest ? prerenderAssetPath(url.pathname, locale, country) : null;
   let assetRequest = request;

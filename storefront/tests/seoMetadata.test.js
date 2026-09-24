@@ -130,6 +130,7 @@ test("the sitemap keeps every public Musuw route current and canonical", () => {
   const sitemap = read("public/sitemap.xml");
   const routes = [
     "/",
+    "/en",
     "/terms",
     "/privacy",
     "/refund-policy",
@@ -145,7 +146,7 @@ test("the sitemap keeps every public Musuw route current and canonical", () => {
     "/zh/compare/notebooklm",
   ];
   for (const pathname of routes) {
-    const lastmod = (pathname === "/press" || pathname.endsWith("/guides/citation-checks") || pathname.endsWith("/compare/notebooklm")) ? "2026-09-19" : ["/", "/privacy", "/cookies"].includes(pathname) ? "2026-09-18" : ["/terms", "/refund-policy", "/subscription-policy"].includes(pathname)
+    const lastmod = (["/", "/en", "/press", "/privacy", "/cookies"].includes(pathname) || pathname.endsWith("/guides/citation-checks") || pathname.endsWith("/compare/notebooklm")) ? "2026-09-24" : ["/terms", "/refund-policy", "/subscription-policy"].includes(pathname)
       ? "2026-08-29"
       : "2026-08-22";
     assert.match(sitemap, new RegExp(`<loc>https://musuw\\.com${pathname === "/" ? "/" : pathname}</loc><lastmod>${lastmod}</lastmod>`));
@@ -191,10 +192,11 @@ test("the Worker keeps localized social metadata and structured data aligned", a
 
 test("homepage previews keep the current localized title and one large image before hydration", async () => {
   for (const locale of ["en", "zh-CN"]) {
+    const path = locale === "en" ? "/en" : "/";
     const meta = applyHomepageMarketingRefresh(applyHomepagePlanPresentation(getStorefrontCopy(locale))).meta;
     const response = await localizeDocumentResponse(new Response(read("index.html"), {
       headers: { "content-type": "text/html" },
-    }), locale, "/");
+    }), locale, path);
     const html = await response.text();
     assert.ok(html.includes(`<title>${meta.title}</title>`));
     assert.ok(html.includes(`<meta property="og:title" content="${meta.title}">`));
@@ -202,6 +204,6 @@ test("homepage previews keep the current localized title and one large image bef
     assert.equal((html.match(/property="og:image"/g) || []).length, 1);
     assert.ok(html.includes(`<meta property="og:image" content="${SITE_SOCIAL_IMAGE.url}">`));
     assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
-    assert.match(html, /<link rel="canonical" href="https:\/\/musuw\.com\/">/);
+    assert.ok(html.includes(`<link rel="canonical" href="https://musuw.com${path}">`));
   }
 });

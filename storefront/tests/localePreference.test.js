@@ -2,6 +2,40 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getInitialLocale, persistLocalePreference } from "../src/i18n.js";
 import { handleRequest } from "../worker/index.js";
+import { localeHref } from "../src/publicRoutes.js";
+
+test("legal and press language links survive reload while retaining campaign and fragment", async (t) => {
+  const browser = browserAt("https://musuw.com/privacy");
+  installBrowser(t, browser);
+  for (const path of ["/privacy", "/press"]) {
+    for (const selectedLocale of ["zh-CN", "en"]) {
+      const previousLocale = selectedLocale === "en" ? "zh-CN" : "en";
+      for (const query of [`?lang=${previousLocale}&source=footer`, "?source=footer"]) {
+        browser.window.location = new URL(`https://musuw.com${path}${query}#details`);
+        const next = localeHref(path, selectedLocale, browser.window.location);
+        browser.window.location = new URL(next, browser.window.location);
+        assert.equal(browser.window.location.pathname, path);
+        assert.equal(browser.window.location.searchParams.get("lang"), selectedLocale);
+        assert.equal(browser.window.location.searchParams.get("source"), "footer");
+        assert.equal(browser.window.location.hash, "#details");
+        // Explicit navigation works even with an opposing saved cookie and country.
+        browser.document.cookie = `musuw_locale=${previousLocale}`;
+        assert.equal((await reload(browser, selectedLocale === "en" ? "CN" : "US")).locale, selectedLocale);
+      }
+    }
+  }
+});
+
+test("homepage initialization follows the path despite stale bootstrap and storage", (t) => {
+  const browser = browserAt("https://musuw.com/en", "musuw_locale=zh-CN");
+  browser.window.__MUSUW_LOCALE__ = "zh-CN";
+  browser.localStorage.setItem("musuw_locale", "zh-CN");
+  installBrowser(t, browser);
+  assert.equal(getInitialLocale(), "en");
+  browser.window.location = new URL("https://musuw.com/");
+  browser.window.__MUSUW_LOCALE__ = "en";
+  assert.equal(getInitialLocale(), "zh-CN");
+});
 
 const assets = {
   ASSETS: {
@@ -95,13 +129,13 @@ test("a fresh explicit link still overrides a different saved preference", async
 });
 
 test("manual choice without a locale query survives navigation and blocked local storage", async (t) => {
-  const browser = browserAt("https://www.musuw.com/?source=footer#pricing");
+  const browser = browserAt("https://musuw.com/privacy?source=footer#cookies");
   browser.localStorage.setItem = () => { throw new Error("Storage disabled"); };
   installBrowser(t, browser);
   await reload(browser, "CN");
 
   persistLocalePreference("en");
-  assert.equal(browser.window.location.href, "https://www.musuw.com/?source=footer#pricing");
+  assert.equal(browser.window.location.href, "https://musuw.com/privacy?source=footer#cookies");
   const writes = browser.document.cookieWrites;
   assert.match(writes[0], /Max-Age=0/);
   assert.doesNotMatch(writes[0], /Domain=/);
@@ -109,12 +143,12 @@ test("manual choice without a locale query survives navigation and blocked local
   assert.equal(response.headers.get("content-language"), "en");
   assert.equal(writes.at(-1), response.headers.get("set-cookie"));
 
-  browser.window.location = new URL("https://www.musuw.com/privacy");
+  browser.window.location = new URL("https://musuw.com/cookies");
   assert.equal((await reload(browser, "CN")).locale, "en");
 });
 
 test("localhost retains manual locale with a local cookie and no production domain", async (t) => {
-  const browser = browserAt("http://127.0.0.1:4190/");
+  const browser = browserAt("http://127.0.0.1:4190/privacy");
   installBrowser(t, browser);
   await reload(browser, "US");
 

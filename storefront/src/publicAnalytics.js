@@ -3,7 +3,7 @@ import { CITATION_GUIDES } from "./citationGuideContent.js";
 import { NOTEBOOK_COMPARISONS } from "./notebookComparisonContent.js";
 
 const CONSENT_KEY = "musuw_analytics_consent_v1";
-const PUBLIC_PATHS = new Set(["/", "/zh", "/press", ...PUBLIC_DOCUMENT_PATHS,
+const PUBLIC_PATHS = new Set(["/", "/en", "/zh", "/press", ...PUBLIC_DOCUMENT_PATHS,
   ...Object.values(CITATION_GUIDES).map((page) => page.path),
   ...Object.values(NOTEBOOK_COMPARISONS).map((page) => page.path)]);
 

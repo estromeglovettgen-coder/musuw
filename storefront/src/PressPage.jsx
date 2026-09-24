@@ -3,6 +3,7 @@ import { LEGAL_OPERATOR } from "./legalContent";
 import { SITE_LOGO_PATH } from "./seoMetadata";
 import { getPressContent, PRESS_ARCHIVE, PRESS_BRIEFS, PRESS_IMAGES, PRESS_VIDEOS, WALKTHROUGH_VIDEOS } from "./pressContent";
 import "./press.css";
+import { homePath } from "./publicRoutes.js";
 
 export function PressPage({ copy, locale, onLocaleChange, theme, onThemeToggle }) {
   const text = getPressContent(locale);
@@ -25,7 +26,7 @@ export function PressPage({ copy, locale, onLocaleChange, theme, onThemeToggle }
   );
   return (
     <div className="press-page">
-      <SiteHeader copy={copy} locale={locale} onLocaleChange={onLocaleChange} theme={theme} onThemeToggle={onThemeToggle} />
+      <SiteHeader copy={copy} locale={locale} pathname="/press" onLocaleChange={onLocaleChange} theme={theme} onThemeToggle={onThemeToggle} />
       <main className="container press-layout">
         <header className="press-intro">
           <p className="section-label">{text.eyebrow}</p>
@@ -33,7 +34,7 @@ export function PressPage({ copy, locale, onLocaleChange, theme, onThemeToggle }
           <p className="press-description">{text.intro}</p>
           <div className="press-actions">
             <ButtonLink href={locale === "zh-CN" ? "/zh/guides/citation-checks" : "/guides/citation-checks"}>{text.demo}</ButtonLink>
-            <ButtonLink href="/#pricing" variant="secondary">{text.pricing}</ButtonLink>
+            <ButtonLink href={`${homePath(locale)}#pricing`} variant="secondary">{text.pricing}</ButtonLink>
           </div>
           <a className="press-download" href={PRESS_ARCHIVE} download>{text.downloadKit} ↓</a>
           <p className="press-note">{text.kitNote}</p>
@@ -61,7 +62,7 @@ export function PressPage({ copy, locale, onLocaleChange, theme, onThemeToggle }
           <div className="press-grid">
             {PRESS_IMAGES.map((image) => (
               <figure className="press-card" key={image.src}>
-                <a href={image.src} download><img src={image.src} alt={image[imageLocale]} loading="lazy" /></a>
+                <a href={image.src} download><img src={image.src} alt={image[imageLocale]} width="3024" height="1898" loading="lazy" /></a>
                 <figcaption><h3>{image[imageLocale]}</h3><a href={image.src} download>{text.downloadImage} ↓</a></figcaption>
               </figure>
             ))}

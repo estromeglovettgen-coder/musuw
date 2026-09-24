@@ -1,3 +1,5 @@
+import { homeLocale } from "./publicRoutes.js";
+
 const en = {
   meta: {
     title: "musuw | Evidence-first personal knowledge base",
@@ -805,6 +807,8 @@ export function persistLocalePreference(locale) {
 
 export function getInitialLocale() {
   if (typeof window !== "undefined") {
+    const routeLocale = homeLocale(window.location.pathname);
+    if (routeLocale) return routeLocale;
     if (window.__MUSUW_LOCALE__ === "zh-CN" || window.__MUSUW_LOCALE__ === "zh") return "zh-CN";
     if (window.__MUSUW_LOCALE__ === "en") return "en";
     const cookieMatch = document.cookie.match(/(?:^|;\s*)musuw_locale=([^;]+)/);
