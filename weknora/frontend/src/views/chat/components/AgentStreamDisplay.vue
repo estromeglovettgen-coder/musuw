@@ -793,6 +793,7 @@ watch(wikiDrawerContent, async () => {
 
 const openWikiDrawer = async (kbId: string, slug: string) => {
   if (!kbId || !slug) return;
+  if (marketplaceActive.value) { openReferencesDrawer(); return; }
   try {
     currentWikiKbId.value = kbId;
     const res = await getWikiPage(kbId, slug);
@@ -805,7 +806,7 @@ const openWikiDrawer = async (kbId: string, slug: string) => {
 };
 
 const wikiGraphHref = computed(() => {
-  if (!currentWikiKbId.value || !wikiDrawerPage.value?.slug) return '';
+  if (marketplaceActive.value || !currentWikiKbId.value || !wikiDrawerPage.value?.slug) return '';
   return router.resolve({
     path: `/platform/knowledge-bases/${currentWikiKbId.value}`,
     query: { tab: 'graph', slug: wikiDrawerPage.value.slug },
@@ -813,6 +814,7 @@ const wikiGraphHref = computed(() => {
 });
 
 const openRouteInNewTab = (path: string) => {
+  if (marketplaceActive.value && path.startsWith('/platform/knowledge-bases/')) { openReferencesDrawer(); return; }
   const href = router.resolve(path).href;
   window.open(href, '_blank', 'noopener,noreferrer');
 };
@@ -849,6 +851,7 @@ import thinkingIcon from '@/assets/img/Frame3718.svg';
 interface SessionData {
   id?: string;
   assistant_message_id?: string;
+  marketplace_product_id?: string;
   request_id?: string;
   debugRequest?: Record<string, unknown>;
   isAgentMode?: boolean;
@@ -869,6 +872,8 @@ const props = defineProps<{
   ragMode?: boolean;
   followUpLoading?: boolean;
 }>();
+
+const marketplaceActive = computed(() => Boolean(props.session.marketplace_product_id));
 
 const emit = defineEmits<{
   (event: 'render-complete-change', ready: boolean): void;
@@ -984,6 +989,7 @@ const {
   scheduleClose: scheduleCitationClose,
 } = useChatCitationPopover(rootElement, {
   getKnowledgeReferences: () => props.session?.knowledge_references,
+  marketplaceProductId: () => props.session?.marketplace_product_id,
   embedChannelId: () => (props.embeddedMode ? props.embedChannelId : undefined),
   embedToken: () => (props.embeddedMode ? props.embedToken : undefined),
   sessionId: () => props.sessionId,
@@ -1019,6 +1025,7 @@ const openReferencesDrawer = (
     references: refs,
     highlight: highlight || null,
     messageId: props.session?.id,
+    marketplaceProductId: props.session?.marketplace_product_id,
   })
   return true
 }
@@ -1343,6 +1350,7 @@ const openToolReferences = (event: any): boolean => {
     references: refs,
     highlight: null,
     messageId: props.session?.id,
+    marketplaceProductId: props.session?.marketplace_product_id,
     sourceKey: `tool:${props.session?.id || 'session'}:${event.tool_call_id || event.event_id || event.tool_name || 'references'}`,
   });
   return true;

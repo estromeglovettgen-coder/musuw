@@ -1,4 +1,6 @@
+import { creatorMarketplaceRu } from '../creatorMarketplace'
 export default {
+  creatorMarketplace: creatorMarketplaceRu,
   platformApiKeys: {
     title: 'Платформенные API-ключи',
     description: 'Учетные данные для автоматизации между рабочими пространствами. Для API пространства используйте X-Tenant-ID.',

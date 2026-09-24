@@ -228,6 +228,8 @@ type paddleTransactionClient interface {
 }
 
 type EntitlementHandler struct {
+	prices        paddleMarketplacePriceReader
+	marketplace   *MarketplaceHandler
 	service       interfaces.EntitlementService
 	paddle        PaddleConfig
 	portal        paddlePortalSessionCreator
@@ -259,6 +261,7 @@ func NewEntitlementHandler(service interfaces.EntitlementService, tasks interfac
 	handler.portal = sdk
 	handler.subscriptions = sdk
 	handler.transactions = sdk
+	handler.prices = sdk
 	return handler
 }
 
@@ -1299,6 +1302,16 @@ type paddleEvent struct {
 }
 
 type paddleEventData struct {
+	CurrencyCode string `json:"currency_code"`
+	Details      struct {
+		Totals struct {
+			Total string `json:"total"`
+		} `json:"totals"`
+	} `json:"details"`
+	ScheduledChange *struct {
+		Action      string    `json:"action"`
+		EffectiveAt time.Time `json:"effective_at"`
+	} `json:"scheduled_change"`
 	ID                   string               `json:"id"`
 	Status               string               `json:"status"`
 	Action               string               `json:"action"`
@@ -1398,6 +1411,11 @@ func (h *EntitlementHandler) PaddleWebhook(c *gin.Context) {
 	var event paddleEvent
 	if err := json.Unmarshal(body, &event); err != nil || event.EventID == "" || event.OccurredAt.IsZero() {
 		_ = c.Error(apperrors.NewBadRequestError("invalid Paddle event"))
+		return
+	}
+	// Marketplace subscriptions have their own durable entitlement records.
+	// Dispatch only after the same Paddle signature verification used above.
+	if h.marketplace != nil && h.marketplace.handleVerifiedWebhook(c, event) {
 		return
 	}
 	if isAdjustmentPaddleEvent(event.EventType) {

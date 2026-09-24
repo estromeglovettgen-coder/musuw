@@ -104,6 +104,7 @@ import { createRagWaitController, getRagPipelineWaitKind, type RagWaitView } fro
 const props = defineProps<{
   session?: {
     id?: string | number
+    marketplace_product_id?: string
     agentEventStream?: Array<Record<string, unknown>>
     content?: string
     knowledge_references?: Array<{ chunk_type?: string; knowledge_id?: string; knowledge_title?: string }>
@@ -291,6 +292,7 @@ function toggleReferencesDrawer() {
     references: refs,
     highlight: null,
     messageId: props.session?.id ? String(props.session.id) : '',
+    marketplaceProductId: props.session?.marketplace_product_id,
     sourceKey: `rag:${props.session?.id || refs.map((item) => item.knowledge_id || item.knowledge_title).join('|')}`,
   })
 }

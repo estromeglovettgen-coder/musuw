@@ -489,6 +489,17 @@ func (s *sessionService) buildSearchTargets(
 	knowledgeIDs []string,
 	tagScopes []types.TagScope,
 ) (types.SearchTargets, error) {
+	if ctx.Value(types.MarketplaceScopeContextKey) != nil {
+		scope, ok := types.MarketplaceScopeFromContext(ctx)
+		if !ok || tenantID != scope.SourceTenantID() || len(knowledgeIDs) != 0 || len(tagScopes) != 0 {
+			return nil, apperrors.NewForbiddenError("purchased service retrieval scope is invalid")
+		}
+		for _, id := range knowledgeBaseIDs {
+			if !scope.AllowsKnowledgeBase(id, tenantID) {
+				return nil, apperrors.NewForbiddenError("knowledge base is outside the purchased service")
+			}
+		}
+	}
 	var targets types.SearchTargets
 	tagIDsByKB := mergeTagScopesByKB(tagScopes)
 

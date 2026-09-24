@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 )
@@ -35,6 +36,25 @@ func (s *knowledgeBaseService) fetchKnowledgeDataWithShared(ctx context.Context,
 	tenantID uint64,
 	knowledgeIDs []string,
 ) (map[string]*types.Knowledge, error) {
+	if ctx.Value(types.MarketplaceScopeContextKey) != nil {
+		scope, ok := types.MarketplaceScopeFromContext(ctx)
+		if !ok || types.MustTenantIDFromContext(ctx) != tenantID {
+			return nil, apperrors.NewForbiddenError("purchased service retrieval scope is invalid")
+		}
+		// Only the data query uses the source tenant; model billing retains the
+		// buyer context. Even index results must match the exact reviewed KBs.
+		rows, err := s.kgRepo.GetKnowledgeBatch(ctx, scope.SourceTenantID(), knowledgeIDs)
+		if err != nil {
+			return nil, err
+		}
+		knowledgeMap := make(map[string]*types.Knowledge, len(rows))
+		for _, row := range rows {
+			if row != nil && scope.AllowsKnowledgeBase(row.KnowledgeBaseID, row.TenantID) {
+				knowledgeMap[row.ID] = row
+			}
+		}
+		return knowledgeMap, nil
+	}
 	knowledgeMap, err := s.fetchKnowledgeData(ctx, tenantID, knowledgeIDs)
 	if err != nil {
 		return nil, err
@@ -91,6 +111,23 @@ func (s *knowledgeBaseService) listChunksByIDWithShared(ctx context.Context,
 	tenantID uint64,
 	chunkIDs []string,
 ) ([]*types.Chunk, error) {
+	if ctx.Value(types.MarketplaceScopeContextKey) != nil {
+		scope, ok := types.MarketplaceScopeFromContext(ctx)
+		if !ok || types.MustTenantIDFromContext(ctx) != tenantID {
+			return nil, apperrors.NewForbiddenError("purchased service retrieval scope is invalid")
+		}
+		rows, err := s.chunkRepo.ListChunksByID(ctx, scope.SourceTenantID(), chunkIDs)
+		if err != nil {
+			return nil, err
+		}
+		chunks := make([]*types.Chunk, 0, len(rows))
+		for _, row := range rows {
+			if row != nil && scope.AllowsKnowledgeBase(row.KnowledgeBaseID, row.TenantID) {
+				chunks = append(chunks, row)
+			}
+		}
+		return chunks, nil
+	}
 	chunks, err := s.chunkRepo.ListChunksByID(ctx, tenantID, chunkIDs)
 	if err != nil {
 		return nil, err

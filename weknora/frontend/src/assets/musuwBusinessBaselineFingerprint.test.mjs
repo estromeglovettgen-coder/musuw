@@ -31,10 +31,11 @@ const KNOWLEDGE_AI_TITLE_DISPLAY_CHANGE = 'display-materialized-ai-title'
 const KNOWLEDGE_FAILURE_REASON_CHANGE = 'surface-document-failure-reason'
 const KNOWLEDGE_UPLOAD_FEEDBACK_CHANGE = 'retain-upload-progress-and-refresh-accepted-files+surface-list-load-failures+retain-child-folders+batch-stop-parsing+expand-folder-documents+delete-folder-subtree+retain-complete-folder-view'
 const MODEL_REASONING_DEFAULT_CHANGE = 'refresh-global-model-catalog'
+const CREATOR_MARKETPLACE_CHANGE = 'creator-marketplace-subscriptions'
 
 const LOCKED_BUSINESS_BLOBS = {
-  './business-baselines/ChatIndex.pre-view.vue': '6fef46c48deaabd283f4f23670824a18874dce51',
-  './business-baselines/Input-field.pre-view.vue': '0042d53343af50d0dd1a35edd22b7192241bea4b',
+  './business-baselines/ChatIndex.pre-view.vue': '49e439ef2fc54b2a5a5403ed6eae15d5a647a9af',
+  './business-baselines/Input-field.pre-view.vue': 'c384320815e08b7305ef7395fb94c11205c76388',
   './business-baselines/KnowledgeBase.pre-view.vue': '77905990552ca5baa76310c0ea34c0c29df1d638',
   './business-baselines/KnowledgeBaseList.pre-view.vue': 'c49c30b1e68b3e99b8965b447eadac4bfc268249',
   './business-baselines/manual-knowledge-editor.pre-view.vue': '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e',
@@ -52,14 +53,14 @@ const INITIAL_MUSUW_BYTE_IDENTICAL = {
 const INTENTIONAL_BEHAVIOR_EVOLUTION = {
   inputField: {
     commit: NATIVE_MULTI_MODEL_RESTORE_COMMIT,
-    change: `${NATIVE_AGENT_MCP_EXPOSURE_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}`,
+    change: `${NATIVE_AGENT_MCP_EXPOSURE_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}+${CREATOR_MARKETPLACE_CHANGE}`,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/Input-field.pre-view.vue'],
-    authority: 'WeKnora main 81142df native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy; explicit user-requested minimum enabled reasoning defaults with model-scoped saved depth',
+    authority: 'WeKnora main 81142df native multi-model, tenant Agent selection, and MCP catalog flow constrained by server-authoritative consumer scene and Lite route policy; explicit user-requested minimum enabled reasoning defaults with model-scoped saved depth; approved marketplace delivery uses a separate safe agent/KB projection, preserves the homepage draft while consuming its route parameter, and relies on server-authorized product readiness; explicit marketplace entry supersedes restored product selection and blocks sends until the current entry resolves; approved consumer owned/subscribed agents use the buyer membership model catalog and runtime model for readiness, preserving explicit model/depth against source defaults while Standard native/shared source-model behavior remains unchanged',
   },
   chatParent: {
-    change: `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}+${CHAT_HISTORY_FEEDBACK_CHANGE}`,
+    change: `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}+${CHAT_HISTORY_FEEDBACK_CHANGE}+${CREATOR_MARKETPLACE_CHANGE}`,
     resultingBlob: LOCKED_BUSINESS_BLOBS['./business-baselines/ChatIndex.pre-view.vue'],
-    authority: 'WeKnora main 81142df Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort, plus immediate server-authoritative entitlement revalidation after metered temporary uploads and explicit transport of the first-message reasoning depth through route navigation; failed history loads retain their cursor and expose retry without masquerading as empty conversations',
+    authority: 'WeKnora main 81142df Agent chat flow routing the selected Agent and source tenant while forwarding the consumer-selected model and reasoning effort, plus immediate server-authoritative entitlement revalidation after metered temporary uploads and explicit transport of the first-message reasoning depth through route navigation; failed history loads retain their cursor and expose retry without masquerading as empty conversations; approved marketplace chat transports its product ID, retains per-answer source context, and uses published starter questions without extra suggestion generation',
   },
   knowledgeBase: {
     commit: OPENROUTER_VIDEO_INGESTION_COMMIT,
@@ -102,7 +103,7 @@ test('first Musuw byte-identical controllers remain byte-identical where upstrea
 
 test('upstream behavior restorations are explicit and locked, never inferred from visual code', () => {
   assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.commit, NATIVE_MULTI_MODEL_RESTORE_COMMIT)
-  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.change, `${NATIVE_AGENT_MCP_EXPOSURE_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}`)
+  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.change, `${NATIVE_AGENT_MCP_EXPOSURE_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}+${CREATOR_MARKETPLACE_CHANGE}`)
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.inputField.resultingBlob,
     gitBlobSha(read('./business-baselines/Input-field.pre-view.vue')),
@@ -111,7 +112,7 @@ test('upstream behavior restorations are explicit and locked, never inferred fro
     INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.resultingBlob,
     gitBlobSha(read('./business-baselines/ChatIndex.pre-view.vue')),
   )
-  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.change, `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}+${CHAT_HISTORY_FEEDBACK_CHANGE}`)
+  assert.equal(INTENTIONAL_BEHAVIOR_EVOLUTION.chatParent.change, `${ENTITLEMENT_USAGE_REVALIDATION_CHANGE}+${MODEL_REASONING_DEFAULT_CHANGE}+${CHAT_HISTORY_FEEDBACK_CHANGE}+${CREATOR_MARKETPLACE_CHANGE}`)
   assert.equal(
     INTENTIONAL_BEHAVIOR_EVOLUTION.knowledgeBase.resultingBlob,
     gitBlobSha(read('./business-baselines/KnowledgeBase.pre-view.vue')),

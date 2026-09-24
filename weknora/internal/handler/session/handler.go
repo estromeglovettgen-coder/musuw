@@ -17,6 +17,7 @@ import (
 
 // Handler handles all HTTP requests related to conversation sessions
 type Handler struct {
+	marketplaceService   interfaces.MarketplaceService
 	messageService       interfaces.MessageService // Service for managing messages
 	suggestionService    interfaces.MessageSuggestionService
 	sessionService       interfaces.SessionService       // Service for managing sessions
@@ -59,8 +60,10 @@ func NewHandler(
 	temporaryDocuments interfaces.TemporaryDocumentService,
 	artifactCollector *service.ArtifactCollector,
 	memoryService interfaces.MemoryService,
+	marketplaceService interfaces.MarketplaceService,
 ) *Handler {
 	return &Handler{
+		marketplaceService:   marketplaceService,
 		sessionService:       sessionService,
 		messageService:       messageService,
 		suggestionService:    suggestionService,

@@ -25,6 +25,7 @@ function loadModule(name) {
 const { useSettingsStore } = loadModule('@/stores/settings');
 const { createPinia } = require('pinia');
 const { nextTick } = require('vue');
+const { watch } = require('vue');
 
 function setup() {
   const storage = new Map([['weknora_lite_mode', 'true']]);
@@ -38,6 +39,43 @@ function setup() {
   store.updateConversationModels({ selectedChatModelId: 'grok', reasoningEffort: 'high', reasoningModelId: 'grok', thinkingEnabled: true });
   return { store, storage };
 }
+
+test('marketplace entry selects its agent and KB atomically without a prior agent watcher clearing them', async () => {
+  const { store, storage } = setup();
+  store.settings.selectedFiles = ['unrelated-file'];
+  const stop = watch(() => store.selectedAgentId, () => {
+    if (!store._isApplyingSessionState) store.selectKnowledgeBases(['previous-agent-kb']);
+  });
+  await store.selectMarketplaceProduct({
+    productId: 'product-taylor', agentId: 'agent-taylor', knowledgeBaseIds: ['kb-taylor'],
+  });
+  assert.equal(store.settings.marketplaceProductId, 'product-taylor');
+  assert.equal(store.selectedAgentId, 'agent-taylor');
+  assert.equal(store.selectedAgentSourceTenantId, null);
+  assert.deepEqual(store.settings.selectedKnowledgeBases, ['kb-taylor']);
+  assert.deepEqual(store.settings.selectedFiles, []);
+  assert.equal(store.conversationModels.selectedChatModelId, 'builtin-deepseek-v4-flash');
+  assert.equal(store.getConsumerSceneModel('rag'), 'builtin-deepseek-v4-flash');
+  assert.equal(store._isApplyingSessionState, false);
+  assert.equal(JSON.parse(storage.get('WeKnora_settings')).marketplaceProductId, 'product-taylor');
+  stop();
+});
+
+test('marketplace context follows the conversation and clears when the user chooses another agent', async () => {
+  const { store } = setup();
+  await store.selectMarketplaceProduct({ productId: 'product-taylor', agentId: 'agent-taylor', knowledgeBaseIds: ['kb-taylor'] });
+  store.snapshotAsDefaultsIfNeeded();
+  store.applyLastRequestState({ agent_id: 'agent-other', marketplace_product_id: 'product-other' });
+  await nextTick();
+  assert.equal(store.settings.marketplaceProductId, 'product-other');
+  store.restoreDefaultsIfSnapshotted();
+  assert.equal(store.settings.marketplaceProductId, 'product-taylor');
+  store.applyLastRequestState({ agent_id: 'builtin-smart-reasoning' });
+  await nextTick();
+  assert.equal(store.settings.marketplaceProductId, '');
+  store.selectAgent('builtin-smart-reasoning');
+  assert.equal(store.settings.marketplaceProductId, '');
+});
 
 test('restored model/depth and later metadata repair remain inside the conversation snapshot', async () => {
   const { store, storage } = setup();

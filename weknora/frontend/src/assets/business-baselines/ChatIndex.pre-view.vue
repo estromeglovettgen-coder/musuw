@@ -146,6 +146,7 @@ import { useChatStreamHandler } from '@/composables/useChatStreamHandler';
 import { useStickyBottomOnResize } from '@/composables/useStickyBottomOnResize';
 import { clearCitationChunkCache } from '@/utils/citationChunkCache';
 import ChatReferencesDrawer from '@/components/ChatReferencesDrawer.vue';
+import { useMarketplaceChatStore } from '@/stores/marketplaceChat';
 import ChatAttachmentPreviewDrawer from '@/components/ChatAttachmentPreviewDrawer.vue';
 import FollowUpSuggestions from '@/components/chat/FollowUpSuggestions.vue';
 import ChatHeader from '@/components/ChatHeader.vue';
@@ -174,6 +175,8 @@ const props = defineProps({
 
 const usemenuStore = useMenuStore();
 const useSettingsStoreInstance = useSettingsStore();
+const marketplaceChat = useMarketplaceChatStore();
+let outgoingMarketplaceProductId = "";
 const entitlementStore = useCurrentEntitlementStore();
 
 const refreshEntitlementAfterAttachmentUpload = () => {
@@ -320,6 +323,10 @@ const fetchSuggestedQuestions = async () => {
     suggestedQuestionsLoading.value = true;
     // 加载期间保留旧数据，不清空，避免布局抖动
     try {
+        if (useSettingsStoreInstance.settings.marketplaceProductId) {
+            suggestedQuestions.value = (marketplaceChat.product?.sample_questions || []).map(question => ({ question, source: 'agent_config' }));
+            return;
+        }
         const agentId = useSettingsStoreInstance.selectedAgentId;
         if (!agentId) return;
         const res = await getSuggestedQuestions(agentId, useSettingsStoreInstance.getSuggestedQuestionsParams());
@@ -353,6 +360,7 @@ const handleAnswerRenderComplete = (message, ready) => {
 };
 
 const loadFollowUpSuggestions = async (message, ensure = false, regenerate = false) => {
+    if (message.marketplace_product_id) { message.suggestionSet = null; return; }
     const messageId = resolveAssistantMessageId(message);
     const targetSessionId = session_id.value;
     if (!messageId || !targetSessionId || message.suggestionsDismissed) return;
@@ -593,10 +601,18 @@ const {
     },
     onAgentQuery: (data, existingMessage) => {
         pendingStreamDebug.value = buildStreamDebugPayload();
-        if (existingMessage) attachStreamDebugToMessage(existingMessage);
+        if (existingMessage) {
+            const productId = data?.data?.marketplace_product_id || data?.marketplace_product_id;
+            if (productId) existingMessage.marketplace_product_id = productId;
+            attachStreamDebugToMessage(existingMessage);
+        }
     },
-    onMessageCreated: (message) => attachStreamDebugToMessage(message),
+    onMessageCreated: (message) => {
+        message.marketplace_product_id ||= outgoingMarketplaceProductId;
+        attachStreamDebugToMessage(message);
+    },
     onMessageUpdated: (message, payload) => {
+        if (payload?.marketplace_product_id) message.marketplace_product_id = payload.marketplace_product_id;
         attachStreamDebugToMessage(message);
         if (payload?.is_completed) pendingStreamDebug.value = null;
     },
@@ -686,6 +702,7 @@ const handleStopGeneration = () => {
 
 const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = [], attachmentFiles = [], thinkingEnabled = useSettingsStoreInstance.conversationModels.thinkingEnabled !== false, reasoningEffort = useSettingsStoreInstance.conversationModels.reasoningEffort || '') => {
     stopStream();
+    outgoingMarketplaceProductId = props.embeddedMode ? '' : (useSettingsStoreInstance.settings.marketplaceProductId || '');
     prepareForNewOutgoingMessage();
     isReplying.value = true;
     loading.value = true;
@@ -851,6 +868,7 @@ const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = []
         knowledge_ids: knowledgeIds,
         agent_enabled: agentEnabled,
         agent_id: selectedAgentId,
+        marketplace_product_id: outgoingMarketplaceProductId || undefined,
         agent_source_tenant_id: selectedAgentSourceTenantId,
         web_search_enabled: webSearchEnabled,
         summary_model_id: modelId,

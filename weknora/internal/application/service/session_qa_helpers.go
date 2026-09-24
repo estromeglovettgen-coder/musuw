@@ -23,6 +23,22 @@ func effectiveWebSearchEnabled(requested bool) bool {
 // agent before model, KB, tool, or context-overlay consumption closes that
 // lower-level seam without changing Standard's native sharing behavior.
 func rejectLiteForeignAgent(ctx context.Context, req *types.QARequest) error {
+	if ctx.Value(types.MarketplaceScopeContextKey) != nil {
+		scope, ok := types.MarketplaceScopeFromContext(ctx)
+		if !ok || req == nil || req.Session == nil || !scope.AllowsAgent(req.CustomAgent, req.Session.TenantID) ||
+			!req.SharedAgentReadOnly || len(req.KnowledgeIDs) != 0 || len(req.TagScopes) != 0 ||
+			len(req.MCPServiceIDs) != 0 || len(req.SkillNames) != 0 {
+			return apperrors.NewForbiddenError("purchased service scope is invalid")
+		}
+		for _, ids := range [][]string{req.KnowledgeBaseIDs, req.CustomAgent.Config.KnowledgeBases} {
+			for _, id := range ids {
+				if !scope.AllowsKnowledgeBase(id, req.CustomAgent.TenantID) {
+					return apperrors.NewForbiddenError("knowledge base is outside the purchased service")
+				}
+			}
+		}
+		return nil
+	}
 	if !isLiteProductEdition() || req == nil || req.Session == nil {
 		return nil
 	}
@@ -115,11 +131,11 @@ func (s *sessionService) restrictTagScopesToAgentScope(
 
 // resolveChatModelID resolves the effective chat model ID for a QA request.
 //
-// When an agent is selected, its model configuration must be complete and
-// valid. The two platform-owned answer modes may use the request model because
-// ModelService has already reduced that ID to the caller's plan-approved,
-// platform-owned OpenRouter catalog. Their prompts/tools stay YAML-owned; only
-// the runtime model binding follows the user's allowed dropdown selection.
+// Standard agents require complete model configuration. Platform answer modes
+// and Lite agents owned by the caller may bind a request model first, validated
+// by ModelService against the caller's plan and catalog. Prompts, tools and
+// knowledge scopes remain unchanged; only the runtime model binding follows
+// the user's allowed dropdown selection.
 //
 // Without an agent, the legacy KB / session / system fallback remains
 // available for non-agent callers.
@@ -135,19 +151,26 @@ func (s *sessionService) resolveChatModelID(
 	configuredAgentModelID := ""
 
 	if customAgent != nil {
-		if isPlatformManagedBuiltinAgentID(customAgent.ID) {
+		callerTenantID, _ := types.TenantIDFromContext(ctx)
+		principal, _ := types.PrincipalFromContext(ctx)
+		liteOwnedAgent := isLiteProductEdition() && callerTenantID != 0 && session != nil &&
+			session.TenantID == callerTenantID && customAgent.TenantID == callerTenantID &&
+			!req.SharedAgentReadOnly && principal.Type != types.PrincipalIMUser
+		if isPlatformManagedBuiltinAgentID(customAgent.ID) || liteOwnedAgent {
 			runtimeModelID := strings.TrimSpace(summaryModelID)
 			if runtimeModelID != "" {
 				model, err := s.modelService.GetModelByID(ctx, runtimeModelID)
 				if err != nil || model == nil || model.Type != types.ModelTypeKnowledgeQA {
-					return "", fmt.Errorf("selected chat model %s is unavailable for platform answer mode %s", runtimeModelID, customAgent.ID)
+					return "", fmt.Errorf(
+						"selected chat model %s is unavailable for agent %s", runtimeModelID, customAgent.ID,
+					)
 				}
 				// This agent object is request-scoped. Keep downstream query
 				// understanding and AgentQA on the same policy-approved model so a
 				// Free request never falls back to the paid YAML default.
 				customAgent.Config.ModelID = runtimeModelID
 				customAgent.Config.QueryUnderstandModelID = runtimeModelID
-				logger.Infof(ctx, "Using selected platform catalog model_id %s for answer mode %s", runtimeModelID, customAgent.ID)
+				logger.Infof(ctx, "Using selected catalog model_id %s for agent %s", runtimeModelID, customAgent.ID)
 				return runtimeModelID, nil
 			}
 		}
@@ -324,6 +347,10 @@ func (s *sessionService) resolveRetrievalTenantID(
 ) uint64 {
 	session := req.Session
 	customAgent := req.CustomAgent
+	if scope, ok := types.MarketplaceScopeFromContext(ctx); ok && session != nil &&
+		scope.AllowsAgent(customAgent, session.TenantID) {
+		return scope.SourceTenantID()
+	}
 
 	// Lite is a single-workspace product. A shared/custom agent object may
 	// still be present in a stale internal request, but its source tenant must

@@ -28,15 +28,21 @@ const (
 )
 
 type accountErasureService struct {
-	repo      interfaces.AccountErasureRepository
-	knowledge interfaces.KnowledgeBaseService
-	files     interfaces.FileService
-	tenants   interfaces.TenantService
-	tasks     interfaces.TaskEnqueuer
-	inspector interfaces.TaskInspector
-	billing   accountBillingGuard
-	identity  accountIdentityAdmin
-	now       func() time.Time
+	repo        interfaces.AccountErasureRepository
+	knowledge   interfaces.KnowledgeBaseService
+	files       interfaces.FileService
+	tenants     interfaces.TenantService
+	tasks       interfaces.TaskEnqueuer
+	inspector   interfaces.TaskInspector
+	billing     accountBillingGuard
+	identity    accountIdentityAdmin
+	marketplace accountMarketplaceBillingGuard
+	now         func() time.Time
+}
+
+type accountMarketplaceBillingGuard interface {
+	PrepareAccountDeletion(context.Context, uint64) error
+	EnsureAccountTerminal(context.Context, uint64) error
 }
 
 // accountErasureFileDeleter is implemented by the concrete knowledge service,
@@ -58,8 +64,11 @@ func NewAccountErasureService(
 	inspector interfaces.TaskInspector,
 	billing accountBillingGuard,
 	identity accountIdentityAdmin,
+	marketplace interfaces.MarketplaceService,
 ) interfaces.AccountErasureService {
-	return newAccountErasureService(repo, knowledge, files, tenants, tasks, inspector, billing, identity)
+	s := newAccountErasureService(repo, knowledge, files, tenants, tasks, inspector, billing, identity)
+	s.marketplace = marketplace
+	return s
 }
 
 func newAccountErasureService(
@@ -134,17 +143,24 @@ func (s *accountErasureService) Request(ctx context.Context, userID string) erro
 	// server-side configuration before the irreversible local access fence.
 	// Billing preparation may schedule Paddle cancellation, but it never refunds
 	// or changes local entitlement state synchronously.
-	if strings.TrimSpace(target.PaddleCustomerID) != "" || strings.TrimSpace(target.PaddleSubscriptionID) != "" {
+	for _, ref := range accountErasureBillingReferences(target) {
 		if s.billing == nil {
 			return ErrAccountBillingUnavailable
 		}
-		if err := s.billing.PrepareAccountDeletion(ctx, target.PaddleCustomerID, target.PaddleSubscriptionID); err != nil {
+		if err := s.billing.PrepareAccountDeletion(ctx, ref.PaddleCustomerID, ref.PaddleSubscriptionID); err != nil {
 			return err
 		}
 	}
 	requestedAt := s.now().UTC()
 	if err := s.repo.Fence(ctx, target.UserID, requestedAt); err != nil {
 		return fmt.Errorf("fence account deletion: %w", err)
+	}
+	if s.marketplace != nil {
+		if err := s.marketplace.PrepareAccountDeletion(ctx, target.TenantID); err != nil {
+			// The durable fence prevents new checkouts. The worker recovers any
+			// provider write already in flight before allowing account purge.
+			logger.Errorf(ctx, "Marketplace cancellation deferred during account deletion: %v", err)
+		}
 	}
 	if err := s.enqueue(ctx, target.UserID); err != nil {
 		// The durable deletion_requested_at fence is the outbox. Housekeeping
@@ -153,6 +169,30 @@ func (s *accountErasureService) Request(ctx context.Context, userID string) erro
 		logger.Errorf(ctx, "Account deletion task enqueue deferred: %v", err)
 	}
 	return nil
+}
+
+func accountErasureBillingReferences(target *types.AccountErasureTarget) []types.AccountErasureBillingReference {
+	refs := append([]types.AccountErasureBillingReference{{
+		PaddleCustomerID: target.PaddleCustomerID, PaddleSubscriptionID: target.PaddleSubscriptionID,
+	}}, target.MarketplaceBilling...)
+	seen := make(map[string]bool)
+	var out []types.AccountErasureBillingReference
+	for _, ref := range refs {
+		ref.PaddleCustomerID = strings.TrimSpace(ref.PaddleCustomerID)
+		ref.PaddleSubscriptionID = strings.TrimSpace(ref.PaddleSubscriptionID)
+		key := "subscription:" + ref.PaddleSubscriptionID
+		if ref.PaddleCustomerID != "" {
+			// Existing guard inventories every subscription for this customer.
+			key = "customer:" + ref.PaddleCustomerID
+		} else if ref.PaddleSubscriptionID == "" {
+			continue
+		}
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, ref)
+		}
+	}
+	return out
 }
 
 func (s *accountErasureService) resolveAndBindIdentity(ctx context.Context, target *types.AccountErasureTarget) error {
@@ -339,11 +379,34 @@ func (s *accountErasureService) Process(ctx context.Context, task *asynq.Task) e
 	if !target.IsDeletionPending {
 		return errors.New("account erasure task target is not fenced")
 	}
-	if strings.TrimSpace(target.PaddleCustomerID) != "" || strings.TrimSpace(target.PaddleSubscriptionID) != "" {
+	if s.marketplace != nil {
+		if err := s.marketplace.PrepareAccountDeletion(ctx, target.TenantID); err != nil {
+			return err
+		}
+		if err := s.marketplace.EnsureAccountTerminal(ctx, target.TenantID); err != nil {
+			return err
+		}
+		// A checkout in flight at fencing may now have bound a customer.
+		target, err = s.repo.Preflight(ctx, payload.UserID)
+		if err != nil {
+			return err
+		}
+		if err := validateAccountErasureEligibilityForPhase(target, true); err != nil {
+			return err
+		}
+	}
+	for _, ref := range accountErasureBillingReferences(target) {
 		if s.billing == nil {
 			return ErrAccountBillingUnavailable
 		}
-		if err := s.billing.EnsureAccountTerminal(ctx, target.PaddleCustomerID, target.PaddleSubscriptionID); err != nil {
+		if s.marketplace != nil {
+			if err := s.billing.PrepareAccountDeletion(
+				ctx, ref.PaddleCustomerID, ref.PaddleSubscriptionID,
+			); err != nil {
+				return err
+			}
+		}
+		if err := s.billing.EnsureAccountTerminal(ctx, ref.PaddleCustomerID, ref.PaddleSubscriptionID); err != nil {
 			return err
 		}
 	}

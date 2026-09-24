@@ -18,6 +18,8 @@ const props = withDefaults(defineProps<{
   orgName?: string
   highlighted?: boolean
   showDetailsOnly?: boolean
+  showStrategies?: boolean
+  showFooter?: boolean
 }>(), {
   shared: false,
   favorited: false,
@@ -30,6 +32,8 @@ const props = withDefaults(defineProps<{
   orgName: '',
   highlighted: false,
   showDetailsOnly: false,
+  showStrategies: true,
+  showFooter: true,
 })
 const authStore = useAuthStore()
 
@@ -113,7 +117,8 @@ const requestDelete = () => {
       </t-popup>
     </header>
 
-    <div class="visual-reference-kb-card__strategies" :aria-label="$t('knowledgeEditor.indexing.title')">
+    <div v-if="showStrategies" class="visual-reference-kb-card__strategies" :aria-label="$t('knowledgeEditor.indexing.title')">
+      <slot name="strategies">
       <span v-if="hasRagStrategy" data-indexing-strategy="rag" class="visual-reference-kb-card__strategy">
         <t-icon name="layers" />
         <span>RAG</span>
@@ -126,11 +131,14 @@ const requestDelete = () => {
         <t-icon name="error-circle" />
         <span>{{ $t('knowledgeList.features.unconfigured') }}</span>
       </span>
+      </slot>
     </div>
 
     <p class="visual-reference-kb-card__description">{{ kb.description?.trim() || $t('knowledgeBase.noDescription') }}</p>
 
-    <footer class="visual-reference-kb-card__footer">
+    <footer class="visual-reference-kb-card__footer" :aria-hidden="!showFooter || undefined">
+      <span v-if="!showFooter" class="visual-reference-kb-card__badge" style="visibility: hidden"><t-icon name="file" /></span>
+      <slot v-else name="footer">
       <span class="visual-reference-kb-card__badge">
         <t-icon :name="kb.type === 'faq' ? 'chat-bubble-help' : 'file'" />
         <span v-if="kb.type === 'faq'">{{ kb.chunk_count ?? 0 }} Q&A</span>
@@ -146,6 +154,7 @@ const requestDelete = () => {
       <span class="visual-reference-kb-card__spacer" />
       <ResourceOriginBadge v-if="showOriginBadge" :variant="originVariant" :creator-name="creatorName" />
       <span v-else-if="orgName" class="visual-reference-kb-card__origin" :title="orgName"><t-icon name="usergroup" /><span>{{ orgName }}</span></span>
+      </slot>
     </footer>
   </article>
 </template>
@@ -170,7 +179,7 @@ const requestDelete = () => {
 }
 .visual-reference-kb-card:hover { border-color: #d1d5db; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%),0 2px 4px -2px rgb(0 0 0 / 10%); transform: none; }
 .visual-reference-kb-card.is-highlighted { border-color: #9ca3af; box-shadow: 0 0 0 2px rgb(17 24 39 / 8%),0 1px 2px rgb(0 0 0 / 5%); }
-.visual-reference-kb-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.visual-reference-kb-card__header { min-height: 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .visual-reference-kb-card__title { min-width: 0; flex: 1; padding-right: 42px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .visual-reference-kb-card__title strong { min-width: 0; flex: 1; overflow: hidden; color: #111827; font-size: 14px; line-height: 20px; font-weight: 700; letter-spacing: -.025em; text-overflow: ellipsis; white-space: nowrap; }
 .visual-reference-kb-card__pinned { flex: 0 0 auto; min-height: 18px; padding: 2px 6px; border: 1px solid rgb(253 230 138 / 60%); border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; background: rgb(255 251 235 / 90%); color: #b45309; font-size: 10px; line-height: 12px; font-weight: 500; }

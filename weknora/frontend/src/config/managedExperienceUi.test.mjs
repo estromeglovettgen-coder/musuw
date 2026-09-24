@@ -34,8 +34,9 @@ const sidebarBusiness = read("../assets/business-baselines/menu.pre-view.vue");
  *   frontend non-discoverability/deep-link contract only.
  */
 
-test("Lite sidebar exposes native Agents alongside chat and knowledge bases", () => {
-  assert.match(menuStore, /const liteVisiblePaths = new Set\(\['creatChat', 'knowledge-bases', 'agents'\]\)/);
+test("Lite sidebar exposes approved chat, knowledge, Agents and marketplace", () => {
+  assert.match(menuStore, /const liteVisiblePaths = new Set\(\['creatChat', 'knowledge-bases', 'agents', 'marketplace'\]\)/);
+  assert.doesNotMatch(sidebar, /handleMenuClick\('orders'\)/);
   assert.match(menuStore, /authStore\.isLiteMode && !liteVisiblePaths\.has\(item\.path\)/);
   assert.match(sidebar, /!authStore\.isLiteMode && showSessionSourceFilter && !batchMode/);
 

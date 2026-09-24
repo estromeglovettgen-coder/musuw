@@ -23,11 +23,18 @@ Tunnel edge 网络和同一组不可变镜像外，不共享运行状态：
 | release pointer | production current/release root | staging current/release root |
 
 Staging 只有 frontend 通过现有 edge 网络的 `staging-web` alias 暴露给 Tunnel；
-app、SearXNG 和数据服务不开放主机公网端口。SearXNG 使用同一份上游模板和
+app、SearXNG、Neo4j 和数据服务不开放主机公网端口。SearXNG 使用同一份上游模板和
 复用的 entrypoint，但配置 volume、容器和 secret 均为 staging 独立实例。Cloudflare 必须为
 `staging.musuw.com` 提供有效 TLS，并把该 exact host 路由到 staging alias，
 不能把 production 的 `web` alias 或 origin 混入。所有 workspace、auth、API 和
 静态响应都应带 `X-Robots-Tag: noindex, nofollow`。
+
+Neo4j 复用原生服务和文件型认证 entrypoint，固定为 staging 独立容器
+`weknora-v072-staging-neo4j`、卷 `weknora-v072-staging-neo4j-data` 和内部地址
+`bolt://neo4j:7687`。`NEO4J_ENABLE=true` 随发布配置持久化；独立
+`secrets/neo4j_auth` 只由容器 entrypoint 读取，不能复用 production 密码。
+容器内存上限为 768 MiB，heap 256 MiB、page cache 128 MiB，不发布主机端口。
+发布先等待 Neo4j 健康，再启动 app；主机容量与 production 健康门槛保持不变。
 
 Compose overlay 在 [`integration/weknora-staging/compose.yaml`](../integration/weknora-staging/compose.yaml)
 中固定 project、容器、网络、volume、资源上限和 Sandbox 选择；edge overlay
@@ -40,8 +47,10 @@ Compose overlay 在 [`integration/weknora-staging/compose.yaml`](../integration/
 同一个授权的 40 字符 Git SHA 只构建一次 app/frontend。CI 记录两个精确 digest，
 然后执行 staging：
 
-1. `workflow_run` 或手动 `staging-only` 只授权 main 上 CI-green SHA、构建一次、
-   通过 GitHub `staging` Environment 部署并验证 staging；不触碰 production。
+1. `workflow_run` 自动部署 main 上的 CI-green SHA。手动 `staging-only` 也可部署
+   GitHub `staging` Environment 已允许的功能分支：`--ref` 必须是该分支，
+   `immutable_ref` 必须等于该分支当前完整 SHA，且同一 SHA 已通过 CI（功能分支通过 PR 触发）。
+   两者均只构建一次，通过独立 `staging` Environment 部署并验证；不触碰 production。
 2. 远端固定 SSH gate 验证当前 SHA、容器 digest/OCI revision、健康、Sandbox
    public config、隔离 volume/network 和 noindex。GitHub runner 不直接执行
    server-local Docker verifier。
@@ -75,7 +84,7 @@ GitHub `staging` Environment 只提供 staging 部署所需的受限输入。仓
 Tokyo 的 staging runtime 目录是 `/opt/weknora/staging-runtime`，secret 子目录
 是 `/opt/weknora/staging-runtime/secrets`。数据库、Redis、AES/JWT、OIDC、Supabase
 service key、OpenRouter management key、TikHub、Paddle Sandbox API key/webhook
-secret、R2 access key 与 SearXNG secret 都必须是 regular、non-symlink、非空、
+secret、R2 access key、Neo4j auth 与 SearXNG secret 都必须是 regular、non-symlink、非空、
 root-owned `0600` 文件，再由 Compose 只读挂载。TikHub 必须使用该目录中的
 `tikhub_api_key`：
 `prepare-runtime.sh` 和部署验证只检查存在性、类型、非空、owner 与 mode。Compose

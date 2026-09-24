@@ -50,7 +50,7 @@
         </button>
 
         <a
-          v-if="!embeddedMode && group.knowledgeBaseId"
+          v-if="!embeddedMode && !marketplaceActive && group.knowledgeBaseId"
           class="visual-answer-reference-doc__navigate"
           :href="getDocumentHref(group)"
           target="_blank"
@@ -106,13 +106,14 @@ const props = defineProps({
     contentOnly: { type: Boolean, default: false }
 });
 
+const marketplaceActive = computed(() => Boolean(props.session?.marketplace_product_id));
 const showReferBox = ref(false);
 const expandedGroups = reactive({});
 
 const referBoxSwitch = () => {
     const refs = props.session?.knowledge_references;
     if (referencesDrawer && refs?.length) {
-        referencesDrawer.open({ references: refs });
+        referencesDrawer.open({ references: refs, messageId: props.session?.id, marketplaceProductId: props.session?.marketplace_product_id });
         return;
     }
     showReferBox.value = !showReferBox.value;

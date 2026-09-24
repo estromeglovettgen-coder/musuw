@@ -14,6 +14,9 @@ test('sidebar keeps the reference 256px expanded and 56px collapsed geometry', (
 test('knowledge detail shell and document toolbar follow the exported reference geometry', () => {
   const source = read('../views/knowledge/KnowledgeBase.vue')
   const closure = read('./musuw-document-list-reference-final.css')
+  const layout = read('../views/knowledge/components/knowledge-base-layout.less')
+  assert.ok(source.includes("@import './components/knowledge-base-layout.less';"))
+  assert.ok(read('../views/marketplace/MarketplaceKnowledgeBase.vue').includes("@import '../knowledge/components/knowledge-base-layout.less';"))
 
   // KnowledgeBase.tsx: p-5 md:p-7.
   assert.ok(closure.includes('.visual-knowledge-page {\n  padding: 20px !important;'))
@@ -21,12 +24,12 @@ test('knowledge detail shell and document toolbar follow the exported reference 
   assert.ok(closure.includes('.visual-knowledge-page { padding: 28px !important; }'))
 
   // Header/tabs: pb-4, rounded-xl, p-1, px-3.5 py-1.5, 14px glyphs.
-  assert.ok(source.includes('padding-bottom: 16px;'))
-  assert.ok(source.includes('border-bottom: 1px solid rgb(229 231 235 / 80%)'))
-  assert.ok(source.includes('.visual-knowledge-tabs { flex: 0 0 auto; align-self: flex-start; padding: 4px;'))
-  assert.ok(source.includes('border-radius: 12px;'))
-  assert.ok(source.includes('.visual-knowledge-tabs button { min-height: 30px; padding: 6px 14px;'))
-  assert.ok(source.includes('.visual-knowledge-tabs button :deep(.t-icon) { font-size: 14px;'))
+  assert.ok(layout.includes('padding-bottom: 16px;'))
+  assert.ok(layout.includes('border-bottom: 1px solid rgb(229 231 235 / 80%)'))
+  assert.ok(layout.includes('.visual-knowledge-tabs { flex: 0 0 auto; align-self: flex-start; padding: 4px;'))
+  assert.ok(layout.includes('border-radius: 12px;'))
+  assert.ok(layout.includes('.visual-knowledge-tabs button { min-height: 30px; padding: 6px 14px;'))
+  assert.ok(layout.includes('.visual-knowledge-tabs button :deep(.t-icon) { font-size: 14px;'))
 
   // DocumentListView.tsx toolbar: p-2.5, gap-2.5, rounded-2xl, search max-w-220.
   assert.ok(source.includes('.visual-knowledge-toolbar { flex: 0 0 auto; padding: 10px;'))

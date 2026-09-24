@@ -10,6 +10,7 @@ snapshots are not retained as operating instructions.
 | --- | --- |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Immutable build, staging, promotion, rollback, and production delivery contract. |
 | [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md) | Staging environment operation and acceptance workflow. |
+| [`CREATOR_MARKETPLACE_OPERATIONS.md`](CREATOR_MARKETPLACE_OPERATIONS.md) | Creator submission, platform publication assets, product billing, buyer access, and market withdrawal operations. |
 | [`HANDOFF.md`](HANDOFF.md) | Current no-context project handoff: source identity, Musuw product boundary, merged capabilities, deployment status, and remaining acceptance matrix. |
 | [`FULL_PRODUCT_ACCEPTANCE_CHECKLIST.md`](FULL_PRODUCT_ACCEPTANCE_CHECKLIST.md) | Durable scenario matrix and chronological evidence log; unchecked items are not implied complete. |
 | [`SECRETS_AND_INTEGRATIONS.md`](SECRETS_AND_INTEGRATIONS.md) | Secret ownership, provider boundaries, and safe operator handling. |

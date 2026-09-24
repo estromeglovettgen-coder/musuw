@@ -56,10 +56,12 @@ body .t-select__dropdown:not(.org-select-dropdown-popup):not(.share-org-select-p
   box-shadow: none !important;
   font-family: var(--app-font-family) !important;
 }
-body .t-select__dropdown:not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup) > .t-popup__content {
-  box-sizing: border-box !important;
+body .t-select__dropdown:not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup):not(.market-filter-popup) > .t-popup__content {
   width: 288px !important;
   max-width: min(288px, calc(100vw - 32px)) !important;
+}
+body .t-select__dropdown:not(.org-select-dropdown-popup):not(.share-org-select-popup):not(.sandbox-backend-popup):not(.sandbox-config-select-popup):not(.tenant-members-role-select-popup) > .t-popup__content {
+  box-sizing: border-box !important;
   max-height: 256px !important;
   overflow-y: auto !important;
   margin: 0 !important;

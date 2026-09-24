@@ -124,13 +124,15 @@ DOM snapshot、截图、日志或交接消息中查看供应商 secret。
 ### 4.1 Staging server files
 
 Staging uses `/opt/weknora/staging-runtime/secrets` and its own
-`staging.public.env`/`auth-public.env`. It has separate PostgreSQL and Redis
+`staging.public.env`/`auth-public.env`. It has separate PostgreSQL, Redis and Neo4j
 volumes/namespace, file and DocReader temporary volumes, R2 test bucket,
 Supabase test project, Paddle Sandbox account/destination and OpenRouter test
 workspace. The file names mirror the production contract where needed, but the
 environment-specific values and provider resources are never shared. TikHub has
 no Musuw Sandbox/Live split, but each overlay still receives its own protected
-file mount. The staging Compose project is `weknora-v072-staging`; production
+file mount. Staging `neo4j_auth` is generated independently, stored only in this
+protected secret directory, and read by the native app/Neo4j entrypoints; it is
+never copied from production or stored in the public environment. The staging Compose project is `weknora-v072-staging`; production
 remains `weknora-v072-production`.
 
 Staging 的 Langfuse 坐标固定为 `LANGFUSE_ENABLED=true`、JP Cloud host、release

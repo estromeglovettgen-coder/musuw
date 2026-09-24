@@ -57,7 +57,7 @@
             </t-popup>
           </div>
           <div
-            v-if="stats && stats.pending_issues > 0"
+            v-if="!subscriptionReadOnly && stats && stats.pending_issues > 0"
             class="wiki-global-issues-status graph-issues-badge"
             @click="showGlobalIssuesDrawer = true"
           >
@@ -314,7 +314,7 @@
           </div>
           <!-- Global Issues -->
           <div
-            v-if="stats && stats.pending_issues > 0"
+            v-if="!subscriptionReadOnly && stats && stats.pending_issues > 0"
             class="wiki-global-issues-status"
             @click="showGlobalIssuesDrawer = true"
           >
@@ -429,7 +429,7 @@
                     </t-tooltip>
                   </div>
                   <t-tooltip
-                    v-if="props.canEdit"
+                    v-if="canEdit"
                     :content="$t('knowledgeEditor.wikiBrowser.newRootFolder')"
                     placement="top"
                   >
@@ -446,7 +446,7 @@
                     </button>
                   </t-tooltip>
                   <t-tooltip
-                    v-if="props.canEdit"
+                    v-if="canEdit"
                     :content="$t('knowledgeEditor.wikiBrowser.newPageBtn')"
                     placement="top"
                   >
@@ -521,7 +521,7 @@
                         { 'wiki-directory-item--drop': dropTargetKey === item.pathKey },
                       ]"
                       :style="{ '--wiki-tree-depth': item.depth }"
-                      :draggable="editingFolderId !== item.folderId"
+                      :draggable="!subscriptionReadOnly && editingFolderId !== item.folderId"
                       @click="toggleDirectory(item.pathKey)"
                       @dragstart="onFolderDragStart($event, item.folderId, item.path)"
                       @dragend="onPageDragEnd"
@@ -548,7 +548,7 @@
                         <div class="wiki-tree-trailing">
                           <span class="wiki-directory-count">{{ item.count }}</span>
                           <WikiFolderActions
-                            v-if="item.folderId"
+                            v-if="!subscriptionReadOnly && item.folderId"
                             :name="item.label"
                             :page-count="item.count"
                             :has-children="item.hasChildren"
@@ -581,7 +581,7 @@
                       ]"
                       :style="{ '--wiki-tree-depth': item.depth }"
                       :title="item.page.title"
-                      draggable="true"
+                      :draggable="!subscriptionReadOnly"
                       @click="selectPage(item.page)"
                       @dragstart="onPageDragStart($event, item.page)"
                       @dragend="onPageDragEnd"
@@ -684,7 +684,7 @@
                       <span class="wiki-reader-title-text">{{ selectedPage.title }}</span>
 
                       <t-popup
-                        v-if="pageIssues.length > 0"
+                        v-if="!subscriptionReadOnly && pageIssues.length > 0"
                         v-model="showIssuesBox"
                         placement="bottom-left"
                         trigger="click"
@@ -721,7 +721,7 @@
                                 }}</span>
                               </div>
                               <t-button
-                                v-if="props.canEdit"
+                                v-if="canEdit"
                                 size="small"
                                 theme="primary"
                                 variant="base"
@@ -777,7 +777,7 @@
                                             })
                                       }}
                                     </span>
-                                    <div v-if="props.canEdit" class="wiki-issue-popup-actions">
+                                    <div v-if="canEdit" class="wiki-issue-popup-actions">
                                       <span
                                         class="wiki-issue-popup-action"
                                         @click="triggerFixIssue(issue)"
@@ -877,7 +877,7 @@
                       </template>
                       <template v-else>
                         <t-tooltip
-                          v-if="props.canEdit"
+                          v-if="canEdit"
                           :content="$t('knowledgeEditor.wikiBrowser.editBtn')"
                           placement="top"
                         >
@@ -891,6 +891,7 @@
                           </button>
                         </t-tooltip>
                         <t-tooltip
+                          v-if="!subscriptionReadOnly"
                           :content="$t('knowledgeEditor.wikiBrowser.historyBtn')"
                           placement="top"
                         >
@@ -917,7 +918,7 @@
                           </button>
                         </t-tooltip>
                         <t-popconfirm
-                          v-if="props.canEdit"
+                          v-if="canEdit"
                           theme="danger"
                           :content="
                             $t('knowledgeEditor.wikiBrowser.deletePageConfirm', {
@@ -1100,6 +1101,7 @@
 
     <!-- Global Issues Drawer -->
     <t-drawer
+      v-if="!subscriptionReadOnly"
       v-model:visible="showGlobalIssuesDrawer"
       :header="$t('knowledgeEditor.wikiBrowser.globalIssuesTitle')"
       size="480px"
@@ -1192,6 +1194,7 @@
 
     <!-- Fix Chat Drawer -->
     <t-drawer
+      v-if="!subscriptionReadOnly"
       v-model:visible="showFixDrawer"
       :header="$t('knowledgeEditor.wikiBrowser.fixAssistantTitle')"
       size="700px"
@@ -1209,16 +1212,18 @@
 
     <!-- Revision history drawer -->
     <WikiRevisionDrawer
+      v-if="!subscriptionReadOnly"
       v-model:visible="showRevisionDrawer"
       :kb-id="props.knowledgeBaseId"
       :slug="selectedPage?.slug || ''"
       :current-page="selectedPage"
-      :can-edit="props.canEdit"
+      :can-edit="canEdit"
       @reverted="onPageReverted"
     />
 
     <!-- Create page dialog -->
     <t-dialog
+      v-if="!subscriptionReadOnly"
       v-model:visible="showCreatePageDialog"
       :header="$t('knowledgeEditor.wikiBrowser.newPageTitle')"
       :confirm-btn="{ content: $t('common.confirm'), loading: creatingPage }"
@@ -1375,9 +1380,11 @@ const props = defineProps<{
   // 对应后端 g.OwnedWikiKBOrAdmin() 守卫（KB creator OR Admin+ OR
   // org-share editor）。父组件没传时按 false 兜底，避免漏 gate。
   canEdit?: boolean;
+  marketplaceProductId?: string;
 }>();
 
 const emit = defineEmits<{
+  (e: "read-error", error: unknown): void;
   (e: "open-source-doc", knowledgeId: string): void;
   (
     e: "status-change",
@@ -1385,6 +1392,24 @@ const emit = defineEmits<{
   ): void;
   (e: "view-graph", slug: string): void;
 }>();
+
+// Subscription scope cannot acquire native edit or source-file capabilities.
+const subscriptionReadOnly = computed(() => !!props.marketplaceProductId);
+const canEdit = computed(() => !!props.canEdit && !subscriptionReadOnly.value);
+const wikiReadScope = computed(() => props.marketplaceProductId
+  ? { knowledgeBaseId: props.knowledgeBaseId, marketplaceProductId: props.marketplaceProductId }
+  : props.knowledgeBaseId);
+async function readWiki<T>(request: Promise<T>): Promise<T> {
+  try { return await request; }
+  catch (error) {
+    if (subscriptionReadOnly.value) {
+      if ((error as { status?: number })?.status === 404) {
+        MessagePlugin.warning(t("creatorMarketplace.libraryPageMissing"));
+      } else emit("read-error", error);
+    }
+    throw error;
+  }
+}
 
 // Wiki content can reference objects owned by the KB's source tenant (shared
 // KBs), which the tenant-scoped /files proxy rejects as cross-tenant.
@@ -1582,7 +1607,7 @@ const GRAPH_EGO_LIMIT = 500;
 const GRAPH_EGO_DEFAULT_DEPTH = 1;
 
 watch(showGlobalIssuesDrawer, async (val) => {
-  if (val) {
+  if (val && !subscriptionReadOnly.value) {
     try {
       const res = await listWikiIssues(props.knowledgeBaseId, "", "pending");
       globalIssues.value = (res as any).data || (res as any) || [];
@@ -1604,6 +1629,7 @@ async function navigateToSlugAndFix(slug: string) {
 }
 
 async function handleGlobalIssueIgnore(issueId: string) {
+  if (subscriptionReadOnly.value) return;
   try {
     await updateWikiIssueStatus(props.knowledgeBaseId, issueId, "ignored");
     // Refresh list
@@ -1795,11 +1821,12 @@ function parseSourceRefEntry(ref: string): { id: string; title: string } {
 }
 
 const parsedSourceRefs = computed(() => {
-  if (!selectedPage.value?.source_refs?.length) return [];
+  if (subscriptionReadOnly.value || !selectedPage.value?.source_refs?.length) return [];
   return selectedPage.value.source_refs.map(parseSourceRefEntry);
 });
 
 async function hydrateSourceRefTitles(refs: string[]) {
+  if (subscriptionReadOnly.value) return;
   const ids = refs.filter((ref) => ref.indexOf("|") < 0 && !sourceRefTitleCache[ref]);
   if (!ids.length) return;
   const seq = ++sourceRefTitleRequestSeq;
@@ -2076,7 +2103,7 @@ function closeImagePreview() {
 
 watch(graphDrawerContent, async () => {
   await nextTick();
-  if (drawerBodyRef.value) {
+  if (!subscriptionReadOnly.value && drawerBodyRef.value) {
     await hydrateProtectedFileImages(drawerBodyRef.value, kbFileAccess.value);
   }
 });
@@ -2091,13 +2118,24 @@ function renderMarkdown(content: string): string {
   });
 
   const html = marked.parse(preprocessed, { breaks: true, async: false }) as string;
-  return sanitizeMarkdownHTML(html);
+  const safeHTML = sanitizeMarkdownHTML(html);
+  if (!subscriptionReadOnly.value) return safeHTML;
+  // The purchased view serves published Wiki text. Source attachments and
+  // external embeds have no read alias, so never let the browser fetch them.
+  const doc = new DOMParser().parseFromString(safeHTML, "text/html");
+  doc.querySelectorAll("img,svg,picture,video,audio,source,iframe,object,embed").forEach(el => el.remove());
+  doc.querySelectorAll("[style]").forEach(el => el.removeAttribute("style"));
+  doc.querySelectorAll("a").forEach(el => {
+    if (el.classList.contains("wiki-content-link") && el.dataset.slug) return;
+    el.replaceWith(doc.createTextNode(el.textContent || ""));
+  });
+  return doc.body.innerHTML;
 }
 
 async function openGraphDrawer(slug: string) {
   closeObsidianGraphSettings()
   try {
-    const res = await getWikiPage(props.knowledgeBaseId, slug);
+    const res = await readWiki(getWikiPage(wikiReadScope.value, slug));
     graphDrawerPage.value = (res as any).data || (res as any);
     graphDrawerVisible.value = true;
   } catch (e) {
@@ -2635,7 +2673,7 @@ const indexHasMore = computed(() => {
 
 watch(renderedContent, async () => {
   await nextTick();
-  if (readerBodyRef.value) {
+  if (!subscriptionReadOnly.value && readerBodyRef.value) {
     await hydrateProtectedFileImages(readerBodyRef.value, kbFileAccess.value);
   }
 });
@@ -2645,7 +2683,7 @@ watch(renderedContent, async () => {
 // resolve. Also re-applied after every loadMore append.
 watch(renderedIndexMarkdown, async () => {
   await nextTick();
-  if (indexBodyRef.value) {
+  if (!subscriptionReadOnly.value && indexBodyRef.value) {
     await hydrateProtectedFileImages(indexBodyRef.value, kbFileAccess.value);
   }
 });
@@ -2700,13 +2738,13 @@ async function loadFlatPagesForType(type: string, reset = false): Promise<boolea
   bucket.flatLoading = true;
   try {
     const requestPage = reset ? 1 : bucket.flatNextPage;
-    const res = await listWikiPages(props.knowledgeBaseId, {
+    const res = await readWiki(listWikiPages(wikiReadScope.value, {
       page_type: tabPageTypes(type),
       page: requestPage,
       page_size: WIKI_SIDEBAR_PAGE_SIZE,
       sort_by: "wiki_path",
       sort_order: "asc",
-    });
+    }));
     const body: any = (res as any).data || res;
     const batch: WikiPage[] = body?.pages || [];
     if (reset) {
@@ -2775,7 +2813,7 @@ async function loadCategoriesForType(
   setState({ ...state, loading: true });
   if (isRoot) bucket.categoriesLoading = true;
   try {
-    const res = await listWikiFolders(props.knowledgeBaseId, parentId || "", tabPageTypes(type));
+    const res = await readWiki(listWikiFolders(wikiReadScope.value, parentId || "", tabPageTypes(type)));
     const body: any = (res as any).data || res;
     const folders: WikiFolderNode[] = Array.isArray(body?.folders) ? body.folders : [];
     const incoming = folders
@@ -2879,11 +2917,13 @@ function primeDragData(e: DragEvent) {
 }
 
 function onPageDragStart(e: DragEvent, page: WikiPage) {
+  if (subscriptionReadOnly.value) return;
   draggedItem.value = { kind: "page", page };
   primeDragData(e);
 }
 
 function onFolderDragStart(e: DragEvent, folderId: string, path: string[]) {
+  if (subscriptionReadOnly.value) return;
   if (!folderId) return;
   draggedItem.value = { kind: "folder", folderId, path };
   primeDragData(e);
@@ -2925,6 +2965,7 @@ const pendingMove = ref<{
 } | null>(null);
 
 function onDropOnDirectory(e: DragEvent, folderId: string, path: string[]) {
+  if (subscriptionReadOnly.value) return;
   const item = draggedItem.value;
   draggedItem.value = null;
   dropTargetKey.value = "";
@@ -2956,6 +2997,7 @@ function cancelPendingMove() {
 }
 
 async function confirmPendingMove() {
+  if (subscriptionReadOnly.value) return;
   const move = pendingMove.value;
   pendingMove.value = null;
   if (!move) return;
@@ -2992,6 +3034,7 @@ async function confirmPendingMove() {
 // the API call, surface a toast, and reload the affected tab so the tree
 // reflects the new layout authoritatively.
 async function createFolder(parentId: string, parentPath: string[], name: string) {
+  if (subscriptionReadOnly.value) return;
   const type = activeTab.value;
   const scrollTop = pageListRef.value?.scrollTop;
   try {
@@ -3031,6 +3074,7 @@ const creatingRootFolderName = ref("");
 const creatingRootFolderInputRef = ref<HTMLInputElement | null>(null);
 
 function startCreateRootFolder() {
+  if (subscriptionReadOnly.value) return;
   if (creatingRootFolder.value) return;
   creatingRootFolder.value = true;
   creatingRootFolderName.value = "";
@@ -3052,6 +3096,7 @@ async function submitCreateRootFolder() {
 }
 
 function startRenameFolder(folderId: string, currentName: string) {
+  if (subscriptionReadOnly.value) return;
   if (!folderId) return;
   editingFolderId.value = folderId;
   editingName.value = currentName;
@@ -3069,6 +3114,7 @@ function cancelRenameFolder() {
 }
 
 async function commitRenameFolder(folderId: string, originalName: string) {
+  if (subscriptionReadOnly.value) return;
   if (editingFolderId.value !== folderId) return;
   const name = editingName.value.trim();
   cancelRenameFolder();
@@ -3084,6 +3130,7 @@ async function commitRenameFolder(folderId: string, originalName: string) {
 }
 
 async function deleteFolder(folderId: string) {
+  if (subscriptionReadOnly.value) return;
   if (!folderId) return;
   try {
     await deleteWikiFolder(props.knowledgeBaseId, folderId);
@@ -3142,7 +3189,7 @@ async function loadPagesForType(
       : currentScopedState
         ? currentScopedState.nextPage
         : bucket.nextPage;
-    const res = await listWikiPages(props.knowledgeBaseId, {
+    const res = await readWiki(listWikiPages(wikiReadScope.value, {
       page_type: tabPageTypes(type),
       page: requestPage,
       page_size: WIKI_SIDEBAR_PAGE_SIZE,
@@ -3150,7 +3197,7 @@ async function loadPagesForType(
       sort_order: "asc",
       category_path: categoryPath.join("/"),
       category_depth: categoryPath.length,
-    });
+    }));
     const body: any = (res as any).data || res;
     const batch: WikiPage[] = body?.pages || [];
     const reportedTotal = Number(body?.total) || 0;
@@ -3240,10 +3287,10 @@ async function loadIndex() {
     // an unknown type filter yields a cheap single count(*) + 0 rows
     // on the backend instead of scanning every directory group, and
     // the frontend discards the resulting empty group unconditionally.
-    const idxRes = await getWikiIndex(props.knowledgeBaseId, {
+    const idxRes = await readWiki(getWikiIndex(wikiReadScope.value, {
       types: ["__intro_only__"],
       limit: 1,
-    });
+    }));
     const body: any = (idxRes as any).data || (idxRes as any);
     const intro: string = body?.intro || "";
     const cleanIntro = stripLegacyIndexDirectory(intro);
@@ -3321,11 +3368,11 @@ async function loadMoreIndexSection() {
 
   indexLoading.value = true;
   try {
-    const res = await getWikiIndex(props.knowledgeBaseId, {
+    const res = await readWiki(getWikiIndex(wikiReadScope.value, {
       types: [type],
       limit: 50,
       cursor: isFirstChunkOfSection ? undefined : state.cursor || undefined,
-    });
+    }));
     const body: any = (res as any).data || (res as any);
     const group = (body?.groups || []).find((g: WikiIndexGroup) => g.type === type);
 
@@ -3488,7 +3535,7 @@ let statsTimer: ReturnType<typeof setInterval> | null = null;
 
 async function loadStats() {
   try {
-    const res = await getWikiStats(props.knowledgeBaseId);
+    const res = await readWiki(getWikiStats(wikiReadScope.value));
     stats.value = (res as any).data || (res as any);
 
     // Notify parent so it can reflect wiki status (e.g. indexing badge in the breadcrumb)
@@ -3552,6 +3599,7 @@ watch(
 );
 
 function startEditPage() {
+  if (subscriptionReadOnly.value) return;
   if (!selectedPage.value) return;
   editForm.value = {
     title: selectedPage.value.title,
@@ -3569,6 +3617,7 @@ function cancelEditPage() {
 }
 
 async function savePageEdit(versionOverride?: number) {
+  if (subscriptionReadOnly.value) return;
   if (!selectedPage.value) return;
   const slug = selectedPage.value.slug;
   savingPage.value = true;
@@ -3602,9 +3651,10 @@ async function savePageEdit(versionOverride?: number) {
 // server's current version (last write wins, but the loser's version stays
 // in the revision history, so nothing is destroyed).
 async function overwriteSavePage() {
+  if (subscriptionReadOnly.value) return;
   if (!selectedPage.value) return;
   try {
-    const res = await getWikiPage(props.knowledgeBaseId, selectedPage.value.slug);
+    const res = await readWiki(getWikiPage(wikiReadScope.value, selectedPage.value.slug));
     const latest = ((res as any).data || res) as WikiPage;
     await savePageEdit(latest.version);
   } catch (e) {
@@ -3621,6 +3671,7 @@ async function reloadLatestIntoEditor() {
 }
 
 async function confirmDeletePage() {
+  if (subscriptionReadOnly.value) return;
   if (!selectedPage.value) return;
   const slug = selectedPage.value.slug;
   try {
@@ -3635,6 +3686,7 @@ async function confirmDeletePage() {
 }
 
 function openRevisionDrawer() {
+  if (subscriptionReadOnly.value) return;
   if (!selectedPage.value) return;
   showRevisionDrawer.value = true;
 }
@@ -3646,6 +3698,7 @@ function onPageReverted(page: WikiPage) {
 }
 
 function openCreatePageDialog() {
+  if (subscriptionReadOnly.value) return;
   createPageForm.value = { title: "", slug: "", pageType: "concept", content: "" };
   createPageSlugTouched.value = false;
   showCreatePageDialog.value = true;
@@ -3667,6 +3720,7 @@ function syncCreatePageSlug() {
 }
 
 async function submitCreatePage() {
+  if (subscriptionReadOnly.value) return;
   const title = createPageForm.value.title.trim();
   const slug = createPageForm.value.slug.trim().replace(/^\/+|\/+$/g, "");
   if (!title || !slug) {
@@ -3760,7 +3814,7 @@ async function refreshSelectedPage() {
   if (!selectedPage.value) return;
   const slug = selectedPage.value.slug;
   try {
-    const res = await getWikiPage(props.knowledgeBaseId, slug);
+    const res = await readWiki(getWikiPage(wikiReadScope.value, slug));
     selectedPage.value = (res as any).data || (res as any);
     await loadPageIssues(slug);
   } catch (e) {
@@ -3806,11 +3860,11 @@ async function loadGraph() {
     return;
   }
   try {
-    const res = await getWikiGraph(props.knowledgeBaseId, {
+    const res = await readWiki(getWikiGraph(wikiReadScope.value, {
       mode: "overview",
       limit: GRAPH_OVERVIEW_LIMIT,
       types: graphFilterTypesToArray(),
-    });
+    }));
     graphData.value = normalizeWikiGraphData((res as any).data || (res as any));
     // Seed the search dropdown's empty-state with this overview snapshot
     // so opening the select without typing shows the top-500 by link_count
@@ -3861,13 +3915,13 @@ async function loadEgoGraph(slug: string, depth = GRAPH_EGO_DEFAULT_DEPTH) {
     return;
   }
   try {
-    const res = await getWikiGraph(props.knowledgeBaseId, {
+    const res = await readWiki(getWikiGraph(wikiReadScope.value, {
       mode: "ego",
       center: slug,
       depth,
       limit: GRAPH_EGO_LIMIT,
       types: graphFilterTypesToArray(),
-    });
+    }));
     const nextGraphData = normalizeWikiGraphData((res as any).data || (res as any));
     if (!nextGraphData.nodes.length) {
       graphReady.value = Boolean(graphRendererController && graphData.value?.nodes?.length);
@@ -3936,13 +3990,13 @@ async function loadBloomNeighbors(anchorSlug: string, depth = GRAPH_EGO_DEFAULT_
   }
   graphLoading.value = true;
   try {
-    const res = await getWikiGraph(props.knowledgeBaseId, {
+    const res = await readWiki(getWikiGraph(wikiReadScope.value, {
       mode: "ego",
       center: anchorSlug,
       depth,
       limit: GRAPH_EGO_LIMIT,
       types: graphFilterTypesToArray(),
-    });
+    }));
     const incoming = normalizeWikiGraphData((res as any).data || (res as any));
     if (!incoming || !Array.isArray(incoming.nodes)) return;
 
@@ -4127,13 +4181,13 @@ async function growFrontier() {
         const idx = cursor++;
         const slug = frontier[idx];
         try {
-          const res = await getWikiGraph(props.knowledgeBaseId, {
+          const res = await readWiki(getWikiGraph(wikiReadScope.value, {
             mode: "ego",
             center: slug,
             depth: GRAPH_EGO_DEFAULT_DEPTH,
             limit: GRAPH_EGO_LIMIT,
             types: graphFilterTypesToArray(),
-          });
+          }));
           const data = normalizeWikiGraphData((res as any).data || (res as any));
           if (data?.nodes) responses.push(data);
         } catch (e) {
@@ -4173,6 +4227,7 @@ async function growFrontier() {
 }
 
 async function loadPageIssues(slug: string) {
+  if (subscriptionReadOnly.value) return;
   try {
     const res = await listWikiIssues(props.knowledgeBaseId, slug, "pending");
     pageIssues.value = (res as any).data || (res as any) || [];
@@ -4195,8 +4250,9 @@ async function selectPage(page: WikiPage) {
       // stack is empty.
       navFromSystemView.value = activeSystemView.value;
     }
+    if (!subscriptionReadOnly.value) activeSystemView.value = "";
+    const res = await readWiki(getWikiPage(wikiReadScope.value, page.slug));
     activeSystemView.value = "";
-    const res = await getWikiPage(props.knowledgeBaseId, page.slug);
     selectedPage.value = (res as any).data || (res as any);
     await loadPageIssues(page.slug);
   } catch (e) {
@@ -4214,8 +4270,9 @@ async function navigateToSlug(slug: string) {
       // reader's back arrow can return to it.
       navFromSystemView.value = activeSystemView.value;
     }
+    if (!subscriptionReadOnly.value) activeSystemView.value = "";
+    const res = await readWiki(getWikiPage(wikiReadScope.value, slug));
     activeSystemView.value = "";
-    const res = await getWikiPage(props.knowledgeBaseId, slug);
     selectedPage.value = (res as any).data || (res as any);
     await loadPageIssues(slug);
   } catch (e) {
@@ -4241,6 +4298,7 @@ function goBack() {
 }
 
 async function handleIssueIgnore(issueId: string) {
+  if (subscriptionReadOnly.value) return;
   try {
     await updateWikiIssueStatus(props.knowledgeBaseId, issueId, "ignored");
     if (selectedPage.value) {
@@ -4252,6 +4310,7 @@ async function handleIssueIgnore(issueId: string) {
 }
 
 async function startFixSession(prompt: string) {
+  if (subscriptionReadOnly.value) return;
   try {
     const res = await createSessions({});
     if (res && (res as any).data && (res as any).data.id) {
@@ -4312,7 +4371,7 @@ async function doSearch() {
   }
   loading.value = true;
   try {
-    const res = await searchWikiPages(props.knowledgeBaseId, searchQuery.value);
+    const res = await readWiki(searchWikiPages(wikiReadScope.value, searchQuery.value));
     const hits: WikiPage[] = (res as any).data?.pages || (res as any).pages || [];
     searchResults.value = hits;
     // Also seed `pages.value` with hits so slugDisplayName / navigation
@@ -4569,7 +4628,7 @@ async function handleGraphRemoteSearch(keyword: string) {
   const seq = ++graphSearchSeq;
   graphSearchDebounce = setTimeout(async () => {
     try {
-      const res = await searchWikiPages(props.knowledgeBaseId, q, 20);
+      const res = await readWiki(searchWikiPages(wikiReadScope.value, q, 20));
       if (seq !== graphSearchSeq) return;
       const pages: WikiPage[] = (res as any)?.data?.pages || (res as any)?.pages || [];
       graphSearchOptions.value = pages.map((p) => ({ label: p.title, value: p.slug }));
@@ -4650,7 +4709,7 @@ async function handleGraphSearchEnter(context: { inputValue: string }) {
   // network still pending). Run a one-shot search so Enter still navigates
   // somewhere useful rather than silently doing nothing.
   try {
-    const res = await searchWikiPages(props.knowledgeBaseId, value, 1);
+    const res = await readWiki(searchWikiPages(wikiReadScope.value, value, 1));
     const pages: WikiPage[] = (res as any)?.data?.pages || (res as any)?.pages || [];
     if (pages.length > 0) {
       handleGraphSearchSelect(pages[0].slug);
@@ -4687,7 +4746,7 @@ watch(
       disposeGraphRenderer();
       graphReady.value = false;
       nextTick(async () => {
-        if (readerBodyRef.value && renderedContent.value) {
+        if (!subscriptionReadOnly.value && readerBodyRef.value && renderedContent.value) {
           await hydrateProtectedFileImages(readerBodyRef.value, kbFileAccess.value);
         }
       });

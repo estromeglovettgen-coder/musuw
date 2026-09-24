@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       immutable_ref:
-        description: Full commit SHA to release; must be on origin/main and have successful CI
+        description: Full CI-green commit SHA; staging-only must match the selected branch HEAD, promotion requires origin/main
         required: true
         type: string
       release_mode:
