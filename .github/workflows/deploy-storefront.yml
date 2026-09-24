@@ -119,6 +119,8 @@ jobs:
       - name: Install storefront dependencies
         run: npm ci --prefix storefront --ignore-scripts
       - name: Run storefront tests and build
+        env:
+          VITE_GA_MEASUREMENT_ID: ${{ vars.VITE_GA_MEASUREMENT_ID }}
         run: npm --prefix storefront test
       - name: Validate Wrangler bundle without uploading
         working-directory: storefront

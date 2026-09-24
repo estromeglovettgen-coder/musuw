@@ -33,7 +33,7 @@ test("every merchant-review document is public and complete in English and Chine
       assert.equal(
         document.updated,
         ["/privacy", "/cookies"].includes(route)
-          ? "2026-09-18"
+          ? "2026-09-24"
           : ["/subscription-policy", "/terms", "/refund-policy"].includes(route)
             ? "2026-09-03"
             : "2026-08-27",
@@ -230,14 +230,33 @@ test("policies identify the operator, support channel, Paddle terms, and mandato
           ? /Cloudflare.*不使用 Cookie.*页面访问.*性能统计/
           : /Cloudflare.*cookie-free.*page.?usage and performance analytics/i
       );
-      assert.doesNotMatch(
-        document,
-        locale === "zh-CN" ? /不加载.*分析|未加载.*分析/ : /does not load.*analytics/i
-      );
     }
     assert.match(cookies, /https:\/\/developers\.cloudflare\.com\/speed\/observatory\/rum-beacon\//);
     assert.match(cookies, locale === "zh-CN" ? /浏览器存储/ : /browser storage/i);
     assert.match(cookies, locale === "zh-CN" ? /不.*跨.*追踪/ : /does not.*use cross-site behavioral tracking/i);
+  }
+});
+
+test("optional analytics notices explain consent, limited data, and withdrawal in both languages", async () => {
+  const { getPublicDocument } = await import("../src/legalContent.js");
+  for (const locale of ["en", "zh-CN"]) {
+    const privacy = JSON.stringify(getPublicDocument(locale, "/privacy"));
+    const cookies = JSON.stringify(getPublicDocument(locale, "/cookies"));
+    for (const document of [privacy, cookies]) {
+      assert.match(document, /Google Analytics 4/);
+      assert.match(document, locale === "zh-CN" ? /仅在您同意后|仅在您同意统计后/ : /only after you consent|after you accept analytics/i);
+      assert.match(document, locale === "zh-CN" ? /基础会话/ : /basic session/i);
+      assert.match(document, locale === "zh-CN" ? /不.*(?:向 GA4 )?发送 musuw 账户标识、邮箱、知识内容或对话/ : /do not send musuw account identifiers, emails?(?: addresses)?, knowledge content, or conversations/i);
+      assert.match(document, locale === "zh-CN" ? /移除查询参数和片段/ : /query strings and fragments removed|remove query strings and fragments/i);
+      assert.match(document, locale === "zh-CN" ? /广告功能和 Google signals 均关闭/ : /Advertising features and Google signals are disabled/i);
+    }
+    assert.match(cookies, locale === "zh-CN" ? /同意前或拒绝后.*不加载 Google 统计脚本/ : /Before consent, or if you reject it, we do not load Google's analytics script/i);
+    assert.match(cookies, /musuw_analytics_consent_v1/);
+    assert.match(cookies, locale === "zh-CN" ? /页脚“统计偏好”/ : /Analytics preferences in the footer/i);
+    assert.match(cookies, locale === "zh-CN" ? /撤回同意.*停止统计.*清除.*_ga Cookie/ : /Withdrawing consent stops analytics, clears.*_ga cookies/i);
+    assert.match(cookies, locale === "zh-CN" ? /刷新一次/ : /reloads the page once/i);
+    assert.match(cookies, locale === "zh-CN" ? /撤回不会删除已发送/ : /Withdrawal does not delete data already sent/i);
+    assert.doesNotMatch(cookies, locale === "zh-CN" ? /如未来引入.*分析工具/ : /If we introduce analytics/i);
   }
 });
 
