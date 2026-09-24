@@ -108,6 +108,11 @@ for (const [initialLocale, selectedLocale, country] of [
 
     persistLocalePreference(selectedLocale);
     assert.equal(getInitialLocale(), selectedLocale);
+    // Storage must not preempt navigation: replacing a URL with its next
+    // language first would make assign() a same-document jump when it has a hash.
+    assert.equal(browser.window.location.searchParams.get("lang"), initialLocale);
+    const next = localeHref(browser.window.location.pathname, selectedLocale, browser.window.location);
+    browser.window.location = new URL(next, browser.window.location);
 
     const refreshed = await reload(browser, country);
     assert.equal(refreshed.response.headers.get("content-language"), selectedLocale);

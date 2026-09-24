@@ -795,11 +795,6 @@ export function persistLocalePreference(locale) {
   // Otherwise www.musuw.com can send two conflicting values on refresh.
   document.cookie = "musuw_locale=; Path=/; Max-Age=0; SameSite=Lax";
   document.cookie = localePreferenceCookie(normalized, window.location.hostname);
-  const url = new URL(window.location.href);
-  if (url.searchParams.has("lang")) {
-    url.searchParams.set("lang", normalized);
-    window.history.replaceState(window.history.state, "", url);
-  }
   try {
     localStorage.setItem("musuw_locale", normalized);
   } catch {}

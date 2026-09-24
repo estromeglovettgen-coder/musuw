@@ -5,7 +5,9 @@ import { handleRequest } from "../worker/index.js";
 
 // Keep the actual Worker, pre-rendered documents and built React app. Only
 // Cloudflare's country and static asset bindings are local; Chromium owns the
-// redirects, cookies, navigation and refresh behavior.
+// cookies, navigation and refresh behavior. Redirect destinations are checked
+// against the same Worker before browser navigation: Playwright only routes the
+// first request of a redirect chain, so fulfilling a 301 could reach production.
 async function serveStorefront(context, country) {
   await context.route("**/*", async (route) => {
     const incoming = route.request();
@@ -31,10 +33,31 @@ async function serveStorefront(context, country) {
         },
       },
     });
-    await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: Buffer.from(await response.arrayBuffer()) });
+    // Never let a mocked redirect escape into the production site. Real HTTP
+    // redirects are additionally verified against the preview Worker and release.
+    expect(response.status >= 300 && response.status < 400, `Unisolated redirect for ${url}`).toBe(false);
+    const headers = Object.fromEntries(response.headers);
+    headers["x-musuw-browser-fixture"] = "local-worker";
+    await route.fulfill({ status: response.status, headers, body: Buffer.from(await response.arrayBuffer()) });
   });
 }
 
+// Assert redirect status and destination with the real Worker, without allowing
+// Chromium's mocked redirect chain to make an unmocked production request.
+async function redirectTarget(source, expected) {
+  const response = await handleRequest(new Request(source), {
+    ASSETS: { fetch: () => { throw new Error("A canonical redirect must precede static asset reads"); } },
+  });
+  expect(response.status).toBe(301);
+  expect(response.headers.get("location")).toBe(expected);
+  expect(await response.text()).toBe("");
+  return response.headers.get("location");
+}
+function expectLocalDocument(response) {
+  expect(response.status()).toBe(200);
+  expect(response.headers()["x-musuw-browser-fixture"]).toBe("local-worker");
+  expect(response.request().redirectedFrom()).toBeNull();
+}
 const homePath = (locale) => locale === "en" ? "/en" : "/";
 async function chooseLanguage(page, locale, href) {
   await page.locator(".lang-select").click();
@@ -51,20 +74,16 @@ test.use({ reducedMotion: "reduce" });
 
 for (const hostname of ["musuw.com", "www.musuw.com"]) {
   for (const [initial, selected] of [["zh-CN", "en"], ["en", "zh-CN"]]) {
-    test(`${hostname}: legacy ${initial} link canonicalizes once and selecting ${selected} survives refresh`, async ({ page, context }) => {
+    test(`${hostname}: Worker canonicalizes legacy ${initial} and selecting ${selected} survives browser refresh`, async ({ page, context }) => {
       await serveStorefront(context, "CN");
-      const response = await page.goto(`https://${hostname}/?lang=${initial}&source=footer#pricing`, { waitUntil: "networkidle" });
-      await expect(page).toHaveURL(`https://musuw.com${homePath(initial)}?source=footer#pricing`);
-      // www and legacy language normalization must share one redirect.
-      const redirectedFrom = response.request().redirectedFrom();
-      expect(redirectedFrom).not.toBeNull();
-      expect(redirectedFrom.redirectedFrom()).toBeNull();
-      expect((await redirectedFrom.response()).status()).toBe(301);
+      const target = await redirectTarget(`https://${hostname}/?lang=${initial}&source=footer#pricing`, `https://musuw.com${homePath(initial)}?source=footer#pricing`);
+      expectLocalDocument(await page.goto(target, { waitUntil: "networkidle" }));
+      await expect(page).toHaveURL(target);
       await expectLocale(page, initial);
       await chooseLanguage(page, selected, homePath(selected));
       await expect(page).toHaveURL(`https://musuw.com${homePath(selected)}?source=footer#pricing`);
       await expectLocale(page, selected);
-      await page.reload({ waitUntil: "networkidle" });
+      expectLocalDocument(await page.reload({ waitUntil: "networkidle" }));
       await expectLocale(page, selected);
       const url = new URL(page.url());
       expect(url.hostname).toBe("musuw.com");
@@ -83,47 +102,49 @@ test("saved and legacy www cookies cannot change a canonical homepage language",
     { name: "musuw_locale", value: "en", domain: ".musuw.com", path: "/", secure: true },
     { name: "musuw_locale", value: "en", url: "https://www.musuw.com/" },
   ]);
-  await page.goto("https://www.musuw.com/", { waitUntil: "networkidle" });
+  const target = await redirectTarget("https://www.musuw.com/", "https://musuw.com/");
+  expectLocalDocument(await page.goto(target, { waitUntil: "networkidle" }));
   await expect(page).toHaveURL("https://musuw.com/");
   await expectLocale(page, "zh-CN");
   await chooseLanguage(page, "en", "/en");
   await expect(page).toHaveURL("https://musuw.com/en");
   await expectLocale(page, "en");
-  await page.reload({ waitUntil: "networkidle" });
+  expectLocalDocument(await page.reload({ waitUntil: "networkidle" }));
   await expectLocale(page, "en");
   expect((await context.cookies()).filter(({ name, domain }) => name === "musuw_locale" && domain === ".musuw.com").map(({ value }) => value)).toEqual(["en"]);
   await page.getByRole("link", { name: "Privacy", exact: true }).click();
   await expectLocale(page, "en");
-  await page.goto("https://musuw.com/", { waitUntil: "networkidle" });
+  expectLocalDocument(await page.goto("https://musuw.com/", { waitUntil: "networkidle" }));
   await expectLocale(page, "zh-CN");
   expect((await context.cookies()).filter(({ name, domain }) => name === "musuw_locale" && domain === ".musuw.com").map(({ value }) => value)).toEqual(["zh-CN"]);
   await context.addCookies([{ name: "musuw_locale", value: "zh-CN", domain: ".musuw.com", path: "/", secure: true }]);
-  await page.goto("https://musuw.com/en", { waitUntil: "networkidle" });
+  expectLocalDocument(await page.goto("https://musuw.com/en", { waitUntil: "networkidle" }));
   await expectLocale(page, "en");
-  await page.reload({ waitUntil: "networkidle" });
+  expectLocalDocument(await page.reload({ waitUntil: "networkidle" }));
   await expectLocale(page, "en");
 });
 
 for (const path of ["/privacy", "/press"]) {
   test(`${path}: real language links preserve the selected language on refresh`, async ({ page, context }) => {
     await serveStorefront(context, "CN");
-    await page.goto(`https://musuw.com${path}?lang=en&source=footer#details`, { waitUntil: "networkidle" });
+    expectLocalDocument(await page.goto(`https://musuw.com${path}?lang=en&source=footer#details`, { waitUntil: "networkidle" }));
     await expectLocale(page, "en");
     await chooseLanguage(page, "zh-CN", `${path}?lang=zh-CN`);
     await expect(page).toHaveURL(`https://musuw.com${path}?lang=zh-CN&source=footer#details`);
     await expectLocale(page, "zh-CN");
-    await page.reload({ waitUntil: "networkidle" });
+    expectLocalDocument(await page.reload({ waitUntil: "networkidle" }));
     await expectLocale(page, "zh-CN");
     await chooseLanguage(page, "en", `${path}?lang=en`);
     await expect(page).toHaveURL(`https://musuw.com${path}?lang=en&source=footer#details`);
-    await page.reload({ waitUntil: "networkidle" });
+    expectLocalDocument(await page.reload({ waitUntil: "networkidle" }));
     await expectLocale(page, "en");
   });
 }
 
 test("Japanese prices visibly identify yen in both fixed interface language routes", async ({ page, context }) => {
   await serveStorefront(context, "JP");
-  await page.goto("https://musuw.com/?lang=zh-CN#pricing", { waitUntil: "networkidle" });
+  const target = await redirectTarget("https://musuw.com/?lang=zh-CN#pricing", "https://musuw.com/#pricing");
+  expectLocalDocument(await page.goto(target, { waitUntil: "networkidle" }));
   await expect(page).toHaveURL("https://musuw.com/#pricing");
   await expectLocale(page, "zh-CN");
   await expect(page.locator("#pricing")).toContainText("JP¥798");
