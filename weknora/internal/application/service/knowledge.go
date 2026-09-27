@@ -709,6 +709,14 @@ func (s *knowledgeService) UpdateKnowledge(ctx context.Context, knowledge *types
 		logger.Errorf(ctx, "Failed to get knowledge record: %v", err)
 		return err
 	}
+	var curatedMeta *types.ManualKnowledgeMetadata
+	if record.IsManual() {
+		curatedMeta, err = record.ManualMetadata()
+		if err != nil {
+			return err
+		}
+	}
+	curatedManual := curatedMeta != nil && curatedMeta.SkipAutoEnrichment
 	// if need other fields update, please add here
 	if knowledge.Title != "" {
 		record.Title = knowledge.Title
@@ -722,6 +730,30 @@ func (s *knowledgeService) UpdateKnowledge(ctx context.Context, knowledge *types
 		}
 	} else if knowledge.Description != "" {
 		record.Description = knowledge.Description
+	}
+	if curatedManual && (knowledge.DescriptionSpecified || knowledge.Description != "") {
+		if strings.TrimSpace(record.Description) == "" {
+			return werrors.NewValidationError("人工摘要不能为空")
+		}
+		curatedSummary, _, err := resolveManualCuratedFields(
+			&types.ManualKnowledgePayload{CuratedSummary: record.Description}, curatedMeta,
+		)
+		if err != nil {
+			return err
+		}
+		previousOverrides, err := record.ProcessOverrides()
+		if err != nil {
+			return err
+		}
+		curatedMeta.CuratedSummary = curatedSummary
+		if err := record.SetManualMetadata(curatedMeta); err != nil {
+			return err
+		}
+		if previousOverrides != nil {
+			if err := record.SetProcessOverrides(previousOverrides); err != nil {
+				return err
+			}
+		}
 	}
 	metadataChanged := false
 	if knowledge.CustomMetadata != nil {
@@ -755,7 +787,8 @@ func (s *knowledgeService) UpdateKnowledge(ctx context.Context, knowledge *types
 		logger.Errorf(ctx, "Failed to update knowledge: %v", err)
 		return err
 	}
-	if metadataChanged && record.SummaryStatus != "" && record.SummaryStatus != types.SummaryStatusNone {
+	if metadataChanged && !curatedManual && record.SummaryStatus != "" &&
+		record.SummaryStatus != types.SummaryStatusNone {
 		if err := enqueueSummaryRefresh(ctx, s.repo, s.task, s.kbService, s.tracker(), record); err != nil {
 			logger.Warnf(ctx, "Metadata saved but summary refresh enqueue failed for %s: %v", record.ID, err)
 		} else {

@@ -1329,6 +1329,38 @@ func (s *knowledgeService) CreateKnowledgeFromPassageSync(ctx context.Context,
 	return s.createKnowledgeFromPassageInternal(ctx, kbID, passage, true, channel)
 }
 
+// resolveManualCuratedFields keeps an existing editorial summary when the
+// ordinary editor saves a curated document without knowing these API fields.
+// Explicitly setting skip_auto_enrichment=false opts back into normal
+// automatic post-processing.
+func resolveManualCuratedFields(
+	payload *types.ManualKnowledgePayload,
+	previous *types.ManualKnowledgeMetadata,
+) (string, bool, error) {
+	skip := previous != nil && previous.SkipAutoEnrichment
+	if payload.SkipAutoEnrichment != nil {
+		skip = *payload.SkipAutoEnrichment
+	}
+	summary := strings.TrimSpace(payload.CuratedSummary)
+	if summary == "" && skip && previous != nil && previous.SkipAutoEnrichment {
+		summary = previous.CuratedSummary
+	}
+	if !skip && summary != "" {
+		return "", false, werrors.NewValidationError("人工摘要需要启用跳过自动后处理")
+	}
+	if skip && summary == "" {
+		return "", false, werrors.NewValidationError("跳过自动后处理时需要人工摘要")
+	}
+	if len([]rune(summary)) > 2000 {
+		return "", false, werrors.NewValidationError("人工摘要最多2000个字符")
+	}
+	safeSummary, ok := secutils.ValidateInput(summary)
+	if !ok {
+		return "", false, werrors.NewValidationError("人工摘要包含非法字符")
+	}
+	return safeSummary, skip, nil
+}
+
 // CreateKnowledgeFromManual creates or saves manual Markdown knowledge content.
 func (s *knowledgeService) CreateKnowledgeFromManual(ctx context.Context,
 	kbID string, payload *types.ManualKnowledgePayload, channel string,
@@ -1359,6 +1391,10 @@ func (s *knowledgeService) CreateKnowledgeFromManual(ctx context.Context,
 	if status != types.ManualKnowledgeStatusDraft && status != types.ManualKnowledgeStatusPublish {
 		return nil, werrors.NewValidationError("状态仅支持 draft 或 publish")
 	}
+	curatedSummary, skipAutoEnrichment, err := resolveManualCuratedFields(payload, nil)
+	if err != nil {
+		return nil, err
+	}
 
 	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, kbID)
 	if err != nil {
@@ -1382,6 +1418,8 @@ func (s *knowledgeService) CreateKnowledgeFromManual(ctx context.Context,
 
 	fileName := ensureManualFileName(title)
 	meta := types.NewManualKnowledgeMetadata(cleanContent, status, 1)
+	meta.CuratedSummary = curatedSummary
+	meta.SkipAutoEnrichment = skipAutoEnrichment
 
 	knowledge := &types.Knowledge{
 		TenantID:         tenantID,
@@ -1389,7 +1427,7 @@ func (s *knowledgeService) CreateKnowledgeFromManual(ctx context.Context,
 		Type:             types.KnowledgeTypeManual,
 		Channel:          defaultChannel(channel),
 		Title:            title,
-		Description:      "",
+		Description:      curatedSummary,
 		Source:           types.KnowledgeTypeManual,
 		ParseStatus:      types.ManualKnowledgeStatusDraft,
 		EnableStatus:     "disabled",
@@ -1632,7 +1670,6 @@ func (s *knowledgeService) UpdateManualKnowledge(ctx context.Context,
 	if status != types.ManualKnowledgeStatusDraft && status != types.ManualKnowledgeStatusPublish {
 		return nil, werrors.NewValidationError("状态仅支持 draft 或 publish")
 	}
-
 	tenantID := ctx.Value(types.TenantIDContextKey).(uint64)
 	existing, err := s.repo.GetKnowledgeByID(ctx, tenantID, knowledgeID)
 	if err != nil {
@@ -1641,6 +1678,18 @@ func (s *knowledgeService) UpdateManualKnowledge(ctx context.Context,
 	}
 	if !existing.IsManual() {
 		return nil, werrors.NewBadRequestError("仅支持手工知识的在线编辑")
+	}
+	previousMeta, err := existing.ManualMetadata()
+	if err != nil {
+		return nil, err
+	}
+	previousOverrides, err := existing.ProcessOverrides()
+	if err != nil {
+		return nil, err
+	}
+	curatedSummary, skipAutoEnrichment, err := resolveManualCuratedFields(payload, previousMeta)
+	if err != nil {
+		return nil, err
 	}
 
 	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, existing.KnowledgeBaseID)
@@ -1657,9 +1706,18 @@ func (s *knowledgeService) UpdateManualKnowledge(ctx context.Context,
 	}
 
 	meta := types.NewManualKnowledgeMetadata(cleanContent, status, version)
+	meta.CuratedSummary = curatedSummary
+	meta.SkipAutoEnrichment = skipAutoEnrichment
 	if err := existing.SetManualMetadata(meta); err != nil {
 		logger.Errorf(ctx, "Failed to set manual metadata during update: %v", err)
 		return nil, err
+	}
+	// SetManualMetadata replaces the metadata JSON. Preserve the old process
+	// overrides when an ordinary editor does not submit a new config.
+	if payload.ProcessConfig == nil && previousOverrides != nil {
+		if err := existing.SetProcessOverrides(previousOverrides); err != nil {
+			return nil, err
+		}
 	}
 
 	if safeTitle != "" {
@@ -1677,7 +1735,7 @@ func (s *knowledgeService) UpdateManualKnowledge(ctx context.Context,
 
 	if status == types.ManualKnowledgeStatusDraft {
 		existing.ParseStatus = types.ManualKnowledgeStatusDraft
-		existing.Description = ""
+		existing.Description = curatedSummary
 		existing.ProcessedAt = nil
 
 		if err := s.repo.UpdateKnowledge(ctx, existing); err != nil {
@@ -1694,7 +1752,7 @@ func (s *knowledgeService) UpdateManualKnowledge(ctx context.Context,
 
 	// Publish: persist pending status and enqueue async task for cleanup + re-indexing
 	existing.ParseStatus = "pending"
-	existing.Description = ""
+	existing.Description = curatedSummary
 	existing.ProcessedAt = nil
 
 	if _, err := ApplyKnowledgeProcessOverrides(ctx, kb, existing, payload.ProcessConfig, nil, nil); err != nil {
@@ -1704,6 +1762,9 @@ func (s *knowledgeService) UpdateManualKnowledge(ctx context.Context,
 	if err := s.repo.UpdateKnowledge(ctx, existing); err != nil {
 		logger.Errorf(ctx, "Failed to persist manual knowledge before indexing: %v", err)
 		return nil, err
+	}
+	if skipAutoEnrichment && kb.IsWikiEnabled() {
+		s.prepareWikiForReparse(ctx, existing)
 	}
 
 	logger.Infof(ctx, "Manual knowledge updated, enqueuing async processing task, ID: %s", existing.ID)
@@ -1877,16 +1938,21 @@ func (s *knowledgeService) triggerManualProcessing(ctx context.Context,
 
 	processOverrides, _ := knowledge.ProcessOverrides()
 	eff := ResolveProcessConfig(kb, processOverrides)
+	manualMeta, metaErr := knowledge.ManualMetadata()
+	if metaErr != nil {
+		logger.Warnf(ctx, "Failed to read manual metadata for %s: %v", knowledge.ID, metaErr)
+	}
+	curatedManual := metaErr == nil && manualMeta != nil && manualMeta.SkipAutoEnrichment
 
 	// Manual content is markdown - chunk directly with Go chunker
 	chunkCfg := buildSplitterConfigFromChunking(eff.ChunkingConfig)
 
 	var parsed []types.ParsedChunk
 	opts := ProcessChunksOptions{
-		EnableMultimodel: eff.EnableMultimodel && len(resolvedImages) > 0,
+		EnableMultimodel: eff.EnableMultimodel && len(resolvedImages) > 0 && !curatedManual,
 		StoredImages:     resolvedImages,
 	}
-	if eff.QuestionGenerationConfig.Enabled {
+	if eff.QuestionGenerationConfig.Enabled && !curatedManual {
 		opts.EnableQuestionGeneration = true
 		opts.QuestionCount = eff.QuestionGenerationConfig.QuestionCount
 		if opts.QuestionCount <= 0 {

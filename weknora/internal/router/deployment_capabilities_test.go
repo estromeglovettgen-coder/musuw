@@ -89,4 +89,7 @@ func TestGetDeploymentCapabilitiesHandlerReturnsSnapshot(t *testing.T) {
 	if !body.Data.Capabilities["integrations.embed"].Supported {
 		t.Fatal("embed capability should be returned")
 	}
+	if !body.Data.CuratedManualPublishV1 {
+		t.Fatal("curated manual publishing capability should be returned")
+	}
 }

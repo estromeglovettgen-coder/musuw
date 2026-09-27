@@ -48,3 +48,16 @@ func TestSetProcessOverridesPreservesOtherMetadata(t *testing.T) {
 	require.NotNil(t, gotOverrides)
 	require.False(t, *gotOverrides.EnableMultimodel)
 }
+
+func TestCuratedManualMetadataRoundtrip(t *testing.T) {
+	k := &Knowledge{}
+	manual := NewManualKnowledgeMetadata("# public notes", ManualKnowledgeStatusPublish, 2)
+	manual.CuratedSummary = "人工整理的摘要"
+	manual.SkipAutoEnrichment = true
+	require.NoError(t, k.SetManualMetadata(manual))
+
+	got, err := k.ManualMetadata()
+	require.NoError(t, err)
+	require.Equal(t, manual.CuratedSummary, got.CuratedSummary)
+	require.True(t, got.SkipAutoEnrichment)
+}

@@ -148,6 +148,14 @@ func (s *KnowledgePostProcessService) Handle(ctx context.Context, task *asynq.Ta
 
 	processOverrides, _ := knowledge.ProcessOverrides()
 	eff := ResolveProcessConfig(kb, processOverrides)
+	curatedManual := false
+	if knowledge.IsManual() {
+		manualMeta, err := knowledge.ManualMetadata()
+		if err != nil {
+			return fmt.Errorf("read manual metadata for %s: %w", payload.KnowledgeID, err)
+		}
+		curatedManual = manualMeta != nil && manualMeta.SkipAutoEnrichment
+	}
 
 	// 2. Fetch all chunks
 	chunks, err := s.chunkService.ListChunksByKnowledgeID(ctx, payload.KnowledgeID)
@@ -178,12 +186,12 @@ func (s *KnowledgePostProcessService) Handle(ctx context.Context, task *asynq.Ta
 	//    until wiki generation actually finishes instead of flipping to
 	//    completed while wiki runs minutes later. A wiki op that never
 	//    drains is bounded by the housekeeping finalizing sweep.
-	willSpawnSummary := len(textChunks) > 0
+	willSpawnSummary := len(textChunks) > 0 && !curatedManual
 	willSpawnQuestion := willSpawnSummary && kb.NeedsEmbeddingModel() &&
 		eff.QuestionGenerationConfig.Enabled
-	willSpawnWiki := kb.IndexingStrategy.WikiEnabled && len(textChunks) > 0
+	willSpawnWiki := kb.IndexingStrategy.WikiEnabled && len(textChunks) > 0 && !curatedManual
 	willSpawnAutoTag := kb.Type == types.KnowledgeBaseTypeDocument &&
-		kb.AutoTagConfig != nil && kb.AutoTagConfig.Enabled && len(textChunks) > 0
+		kb.AutoTagConfig != nil && kb.AutoTagConfig.Enabled && len(textChunks) > 0 && !curatedManual
 	enqueuedAutoTag := false
 
 	// Question generation now fans out one subtask per plain text chunk
@@ -212,7 +220,7 @@ func (s *KnowledgePostProcessService) Handle(ctx context.Context, task *asynq.Ta
 	questionBatchCount := (len(questionChunks) + questionGenChunkBatchSize - 1) / questionGenChunkBatchSize
 
 	graphChunkCount := 0
-	if eff.GraphEnabled {
+	if eff.GraphEnabled && !curatedManual {
 		graphChunkCount = len(textChunks)
 	}
 	expectedSubtasks := 0
@@ -232,7 +240,7 @@ func (s *KnowledgePostProcessService) Handle(ctx context.Context, task *asynq.Ta
 	wikiSlotOwned := false
 
 	switch {
-	case knowledge.ParseStatus == types.ParseStatusFinalizing && kb.IndexingStrategy.WikiEnabled:
+	case knowledge.ParseStatus == types.ParseStatusFinalizing && willSpawnWiki:
 		// A previous delivery may have persisted the Wiki op but failed to
 		// enqueue its KB-scoped trigger. Retry only the trigger: appending a
 		// second pending op would duplicate durable work and its finalizer.

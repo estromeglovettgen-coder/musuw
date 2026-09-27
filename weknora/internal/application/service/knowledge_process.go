@@ -1306,6 +1306,14 @@ func (s *knowledgeService) ProcessSummaryGeneration(ctx context.Context, t *asyn
 		summaryErr = err
 		return nil
 	}
+	if err := rejectCuratedManualEnrichment(knowledge); err != nil {
+		if errors.Is(err, ErrCuratedManualEnrichmentDisabled) {
+			summaryOut["skipped"] = "curated_manual"
+			return nil
+		}
+		summaryErr = err
+		return nil
+	}
 	// Short-circuit when the user cancelled parsing or the row is being deleted.
 	if knowledge != nil {
 		switch knowledge.ParseStatus {
@@ -2398,6 +2406,9 @@ func (s *knowledgeService) RegenerateChunkQuestions(
 	if err != nil {
 		return nil, err
 	}
+	if err := rejectCuratedManualEnrichment(knowledge); err != nil {
+		return nil, err
+	}
 	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, chunk.KnowledgeBaseID)
 	if err != nil {
 		return nil, err
@@ -2474,6 +2485,9 @@ func (s *knowledgeService) RegenerateKnowledgeSummary(
 	tenantID := types.MustTenantIDFromContext(ctx)
 	knowledge, err := s.repo.GetKnowledgeByID(ctx, tenantID, knowledgeID)
 	if err != nil {
+		return nil, err
+	}
+	if err := rejectCuratedManualEnrichment(knowledge); err != nil {
 		return nil, err
 	}
 	kb, err := s.kbService.GetKnowledgeBaseByID(ctx, knowledge.KnowledgeBaseID)
@@ -2740,6 +2754,9 @@ func (s *knowledgeService) ReparseKnowledge(
 		}
 
 		resetKnowledgeForReparse(existing, kb)
+		if meta.SkipAutoEnrichment {
+			existing.Description = meta.CuratedSummary
+		}
 
 		if err := s.repo.UpdateKnowledge(ctx, existing); err != nil {
 			logger.Errorf(ctx, "Failed to update knowledge status before reparse: %v", err)

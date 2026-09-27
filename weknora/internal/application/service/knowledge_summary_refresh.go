@@ -22,6 +22,24 @@ type summaryKnowledgeBaseReader interface {
 // the current summary_status untouched so a newer refresh can finish.
 var ErrSummaryRefreshStale = errors.New("summary refresh superseded")
 
+// ErrCuratedManualEnrichmentDisabled prevents a later editor action from
+// replacing a human-authored creator summary with model-generated text.
+var ErrCuratedManualEnrichmentDisabled = errors.New("automatic enrichment is disabled for this curated manual document")
+
+func rejectCuratedManualEnrichment(knowledge *types.Knowledge) error {
+	if knowledge == nil || !knowledge.IsManual() {
+		return nil
+	}
+	meta, err := knowledge.ManualMetadata()
+	if err != nil {
+		return err
+	}
+	if meta != nil && meta.SkipAutoEnrichment {
+		return ErrCuratedManualEnrichmentDisabled
+	}
+	return nil
+}
+
 // summarySourceChanged reports whether chunk bodies or document metadata changed
 // after a summary job captured its inputs. Database lookup failures are
 // returned separately so callers do not treat transient read errors as stale
@@ -90,6 +108,9 @@ func enqueueSummaryRefresh(
 ) error {
 	if knowledge == nil || knowledge.SummaryStatus == "" || knowledge.SummaryStatus == types.SummaryStatusNone {
 		return nil
+	}
+	if err := rejectCuratedManualEnrichment(knowledge); err != nil {
+		return err
 	}
 	markFailed := func() {
 		if repo != nil {
