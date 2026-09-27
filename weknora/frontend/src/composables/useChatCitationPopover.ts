@@ -30,6 +30,7 @@ export type ChatCitationPopoverOptions = {
   embedChannelId?: () => string | undefined
   embedToken?: () => string | undefined
   sessionId?: () => string | undefined
+  marketplaceProductId?: () => string | undefined
 }
 
 export function useChatCitationPopover(
@@ -103,6 +104,14 @@ export function useChatCitationPopover(
     float.value.url = ''
     float.value.visible = true
     positionFor(el, 4)
+
+    if (options?.marketplaceProductId?.()) {
+      const reference = options.getKnowledgeReferences?.()?.find(item => item.id === chunkId)
+      float.value.content = String(reference?.content || '').trim()
+      float.value.error = float.value.content ? '' : t('agentStream.citation.notFound')
+      float.value.loading = false
+      return
+    }
 
     const scope = getCacheScope()
     const cached = getCitationChunkCache(scope, chunkId)
@@ -183,6 +192,7 @@ export function useChatCitationPopover(
     referencesDrawer.open({
       references: refs,
       highlight: payload,
+      marketplaceProductId: options?.marketplaceProductId?.(),
     })
     return true
   }

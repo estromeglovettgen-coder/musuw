@@ -236,6 +236,84 @@ func TestResolveChatModelIDRejectsUnavailableRuntimeModelForPlatformMode(t *test
 	assert.Empty(t, modelID)
 	assert.Contains(t, err.Error(), "unavailable")
 }
+
+func TestResolveChatModelIDLiteOwnedRuntimeSelectionPrecedesStaleDefaults(t *testing.T) {
+	t.Setenv("MUSUW_PRODUCT_EDITION", "lite")
+	flash := consumerSceneModel(types.CheapestChatModelID, "Flash")
+	pro := consumerSceneModel("builtin-deepseek-v4-pro", "Pro")
+	repo := &consumerSceneModelRepo{models: []*types.Model{flash, pro}}
+	svc := &sessionService{modelService: NewModelServiceWithEntitlement(
+		repo, nil, nil, nil, nil, nil, &consumerSceneResolverEntitlement{plan: types.ConsumerPlanMax},
+	)}
+	for _, tc := range []struct {
+		name, configured, requested string
+		allowed                     bool
+	}{
+		{"downgraded paid default", pro.ID, flash.ID, true},
+		{"removed default", "removed-model", flash.ID, true},
+		{"empty default", "", flash.ID, true},
+		{"paid override rejected", flash.ID, pro.ID, false},
+		{"missing override rejected", flash.ID, "missing-model", false},
+		{"no override retains configured model gate", pro.ID, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := contextWithConsumerPlan(41, types.ConsumerPlanFree)
+			req := &types.QARequest{
+				Session: &types.Session{TenantID: 41}, SummaryModelID: tc.requested,
+				CustomAgent: &types.CustomAgent{ID: "owned-agent", TenantID: 41, Config: types.CustomAgentConfig{
+					ModelID: tc.configured, QueryUnderstandModelID: tc.configured,
+					SystemPrompt: "owned persona", KnowledgeBases: []string{"owned-kb"},
+				}},
+			}
+			modelID, err := svc.resolveChatModelID(ctx, req, nil, nil)
+			if tc.allowed {
+				require.NoError(t, err)
+				require.Equal(t, flash.ID, modelID)
+				require.Equal(t, flash.ID, req.CustomAgent.Config.ModelID)
+				require.Equal(t, flash.ID, req.CustomAgent.Config.QueryUnderstandModelID)
+			} else {
+				require.Error(t, err)
+				require.Empty(t, modelID, "invalid explicit selection must not silently fall back")
+				require.Equal(t, tc.configured, req.CustomAgent.Config.ModelID)
+			}
+			require.Equal(t, "owned persona", req.CustomAgent.Config.SystemPrompt)
+			require.Equal(t, []string{"owned-kb"}, req.CustomAgent.Config.KnowledgeBases)
+		})
+	}
+}
+
+func TestResolveChatModelIDRuntimeSelectionDoesNotRelaxOtherAgentScopes(t *testing.T) {
+	for _, tc := range []struct {
+		name, edition string
+		agentTenant   uint64
+		sessionTenant uint64
+		im            bool
+	}{
+		{"Standard keeps configured model requirement", "standard", 41, 41, false},
+		{"Lite foreign agent", "lite", 99, 41, false},
+		{"Lite foreign session", "lite", 41, 99, false},
+		{"IM keeps configured model requirement", "lite", 41, 41, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("MUSUW_PRODUCT_EDITION", tc.edition)
+			ctx := contextWithConsumerPlan(41, types.ConsumerPlanFree)
+			if tc.im {
+				ctx = types.WithPrincipal(ctx, types.Principal{Type: types.PrincipalIMUser, ID: "im-user"})
+			}
+			svc := &sessionService{modelService: &stubModelService{modelsByID: map[string]*types.Model{
+				types.CheapestChatModelID: {ID: types.CheapestChatModelID, Type: types.ModelTypeKnowledgeQA},
+			}}}
+			req := &types.QARequest{
+				Session: &types.Session{TenantID: tc.sessionTenant}, SummaryModelID: types.CheapestChatModelID,
+				CustomAgent: &types.CustomAgent{ID: "custom-agent", TenantID: tc.agentTenant},
+			}
+			modelID, err := svc.resolveChatModelID(ctx, req, nil, nil)
+			require.Error(t, err)
+			require.Empty(t, modelID)
+		})
+	}
+}
+
 func TestResolveChatModelIDWikiFixerFallsBackToKnowledgeBaseModel(t *testing.T) {
 	svc := &sessionService{
 		modelService: &stubModelService{

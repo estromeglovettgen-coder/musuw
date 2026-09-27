@@ -21,6 +21,7 @@ type AccountErasureTarget struct {
 	IdentitySubject      string
 	PaddleSubscriptionID string
 	PaddleCustomerID     string
+	MarketplaceBilling   []AccountErasureBillingReference
 
 	OwnerTenantCount       int64
 	SharedMemberCount      int64
@@ -29,4 +30,11 @@ type AccountErasureTarget struct {
 	IsSystemAdmin     bool
 	IsDeletionPending bool
 	IsTenantDeleted   bool
+}
+
+// AccountErasureBillingReference is internal provider inventory. It never
+// leaves the erasure coordinator or becomes part of a queue payload.
+type AccountErasureBillingReference struct {
+	PaddleCustomerID     string
+	PaddleSubscriptionID string
 }

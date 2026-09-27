@@ -7,11 +7,13 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 const scriptOf = (path) => read(path).match(/<script setup(?: lang="ts")?>([\s\S]*?)<\/script>/)?.[1] || ''
 
+// creator-marketplace-subscriptions: consumer agent models/readiness follow the buyer membership catalog; source defaults cannot override explicit selection.
 const frozen = new Map([
-  ['./business-baselines/Input-field.pre-view.vue', '0042d53343af50d0dd1a35edd22b7192241bea4b'],
+  ['./business-baselines/Input-field.pre-view.vue', 'c384320815e08b7305ef7395fb94c11205c76388'],
   ['./business-baselines/KnowledgeBase.pre-view.vue', '77905990552ca5baa76310c0ea34c0c29df1d638'],
   ['./business-baselines/manual-knowledge-editor.pre-view.vue', '4b6090b0ee24ffbcc97ccdd3f70220cd44966a8e'],
-  ['../composables/useChatCitationPopover.ts', '948dad67061997eafc97664fabdf2d1307b203c4'],
+  // creator-marketplace-subscriptions: approved message-scoped snippets-only drawer and hover behavior.
+  ['../composables/useChatCitationPopover.ts', '2c119360d4df7a48c25999306d1b863dc83fc231'],
   ['../views/knowledge/components/KbWikiBadge.vue', '51550c1c65be38b9f47a4e9e38c49a482f449d5c'],
   ['../views/knowledge/wiki/WikiFolderActions.vue', 'f461dacf3a42a51afee8535a1ceea90e350a84c2'],
   ['../views/knowledge/wiki/WikiRevisionDrawer.vue', 'ad87842ea929a642f6001bcf5c97ced49ab17cf5'],

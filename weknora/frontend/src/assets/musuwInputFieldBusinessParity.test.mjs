@@ -6,9 +6,10 @@ import test from 'node:test'
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const blobSha = (text) => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 
-test('audited Input-field controller remains locked after main-kernel skills integration', () => {
+// creator-marketplace-subscriptions: approved membership model freedom and runtime readiness for owned/subscribed agents.
+test('audited Input-field controller remains locked after marketplace delivery, model freedom and draft preservation', () => {
   const controller = read('./business-baselines/Input-field.pre-view.vue')
-  assert.equal(blobSha(controller), '0042d53343af50d0dd1a35edd22b7192241bea4b')
+  assert.equal(blobSha(controller), 'c384320815e08b7305ef7395fb94c11205c76388')
 })
 
 test('rebuilt Input-field reuses the frozen component options and replaces only its active View', () => {

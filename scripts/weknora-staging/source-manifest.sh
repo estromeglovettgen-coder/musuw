@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generate and verify the small source bundle required by staging Compose.
 # Application and browser code stay in the immutable GHCR images; this bundle
-# contains only reviewed runtime wiring, the two reused SearXNG files, and the
+# contains only reviewed runtime wiring, the reused native service entrypoints, and the
 # two public environment files.
 set -euo pipefail
 
@@ -26,6 +26,7 @@ manifest_path() {
         weknora/docker/searxng/settings.yml|\
         integration/weknora-production/paddle-runtime-contract.sh|\
         integration/weknora-production/redis-entrypoint.sh|\
+        integration/weknora-production/neo4j-entrypoint.sh|\
         integration/weknora-production/searxng-entrypoint.sh|\
         integration/weknora-staging/*|scripts/weknora-staging/*|\
         scripts/weknora/paddle-ip-allowlist.sh|\
@@ -93,6 +94,7 @@ generate_manifest() {
     append_tracked_paths weknora/docker/searxng/settings.yml "$path_list"
     append_tracked_paths integration/weknora-production/paddle-runtime-contract.sh "$path_list"
     append_tracked_paths integration/weknora-production/redis-entrypoint.sh "$path_list"
+    append_tracked_paths integration/weknora-production/neo4j-entrypoint.sh "$path_list"
     append_tracked_paths integration/weknora-production/searxng-entrypoint.sh "$path_list"
     append_tracked_paths integration/weknora-staging "$path_list"
     append_tracked_paths scripts/weknora-staging "$path_list"

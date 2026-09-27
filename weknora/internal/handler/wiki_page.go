@@ -59,6 +59,10 @@ func (h *WikiPageHandler) validateWikiKB(c *gin.Context) (string, uint64, error)
 		logger.ErrorWithFields(ctx, err, nil)
 		return "", 0, errors.NewNotFoundError("Knowledge base not found")
 	}
+	if scope, ok := types.MarketplaceScopeFromContext(ctx); ok &&
+		(kb == nil || !scope.AllowsKnowledgeBase(kbID, kb.TenantID)) {
+		return "", 0, errors.NewForbiddenError("marketplace knowledge base access denied")
+	}
 
 	if !kb.IsWikiEnabled() {
 		return "", 0, errors.NewBadRequestError("Wiki feature is not enabled for this knowledge base")
@@ -136,7 +140,7 @@ func (h *WikiPageHandler) ListPages(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	writeWikiReadResponse(c, resp)
 }
 
 // ListFolders godoc
@@ -173,7 +177,7 @@ func (h *WikiPageHandler) ListFolders(c *gin.Context) {
 	if folders == nil {
 		folders = []types.WikiFolderNode{}
 	}
-	c.JSON(http.StatusOK, types.WikiFolderListResponse{ParentID: parentID, Folders: folders})
+	writeWikiReadResponse(c, types.WikiFolderListResponse{ParentID: parentID, Folders: folders})
 }
 
 // CreateFolder godoc
@@ -436,7 +440,7 @@ func (h *WikiPageHandler) GetPage(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, page)
+	writeWikiReadResponse(c, page)
 }
 
 // UpdatePage godoc
@@ -765,7 +769,7 @@ func (h *WikiPageHandler) GetIndex(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	writeWikiReadResponse(c, resp)
 }
 
 // Graph query parameter bounds. The defaults cap an `overview` request at
@@ -874,7 +878,7 @@ func (h *WikiPageHandler) GetGraph(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, graph)
+	writeWikiReadResponse(c, graph)
 }
 
 // GetStats godoc
@@ -899,7 +903,7 @@ func (h *WikiPageHandler) GetStats(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, stats)
+	writeWikiReadResponse(c, stats)
 }
 
 // ListIssues godoc
@@ -1012,7 +1016,7 @@ func (h *WikiPageHandler) SearchPages(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"pages": pages})
+	writeWikiReadResponse(c, gin.H{"pages": pages})
 }
 
 // RebuildLinks godoc

@@ -28,6 +28,11 @@ func (s *knowledgeBaseService) GetQueryEmbedding(ctx context.Context, kbID strin
 	}
 
 	currentTenantID := types.MustTenantIDFromContext(ctx)
+	if ctx.Value(types.MarketplaceScopeContextKey) != nil {
+		if err := s.authorizeKBAccess(ctx, []*types.KnowledgeBase{kb}, currentTenantID); err != nil {
+			return nil, err
+		}
+	}
 	var embeddingModel embedding.Embedder
 
 	if kb.TenantID != currentTenantID {

@@ -1,4 +1,6 @@
+import { creatorMarketplaceKo } from '../creatorMarketplace'
 export default {
+  creatorMarketplace: creatorMarketplaceKo,
   platformApiKeys: {
     title: '플랫폼 API 키',
     description: '워크스페이스 간 자동화를 위한 플랫폼 자격 증명입니다. 워크스페이스 API에는 X-Tenant-ID를 사용하세요.',

@@ -12,6 +12,7 @@ on:
       - 'playwright.session-batch.config.ts'
       - 'playwright.knowledge-upload.config.ts'
       - 'playwright.billing.config.ts'
+      - 'playwright.marketplace.config.ts'
       - 'playwright.operations*.config.ts'
       - 'scripts/**'
       - 'scripts/weknora-staging/**'
@@ -43,6 +44,7 @@ on:
       - 'playwright.session-batch.config.ts'
       - 'playwright.knowledge-upload.config.ts'
       - 'playwright.billing.config.ts'
+      - 'playwright.marketplace.config.ts'
       - 'playwright.operations*.config.ts'
       - 'scripts/**'
       - 'scripts/weknora-staging/**'
@@ -141,6 +143,8 @@ jobs:
         run: npx playwright test --config=playwright.knowledge-upload.config.ts
       - name: Exercise plan menu and existing purchase entry contracts
         run: npx playwright test --config=playwright.billing.config.ts
+      - name: Exercise marketplace purchase, delivery, creator and review flows
+        run: npx playwright test --config=playwright.marketplace.config.ts
       - name: Exercise operations reconnect and visibility recovery
         run: npm run admin:e2e:recovery
       - name: Preserve browser failure evidence
@@ -152,6 +156,7 @@ jobs:
             test-results/session-batch
             test-results/knowledge-upload
             test-results/billing
+            test-results/creator-marketplace
             test-results/operations-recovery
           retention-days: 7
 

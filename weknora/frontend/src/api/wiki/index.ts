@@ -8,6 +8,15 @@ function encodeSlugPath(slug: string): string {
   return slug.split("/").map(encodeURIComponent).join("/");
 }
 
+// Native callers retain the existing KB scope. Market reads are always bound
+// to both the purchased product and its approved knowledge base.
+export type WikiReadScope = string | { knowledgeBaseId: string; marketplaceProductId: string };
+function wikiReadBase(scope: WikiReadScope): string {
+  if (typeof scope === "string") return `/api/v1/knowledgebase/${scope}/wiki`;
+  return `/api/v1/creator-marketplace/products/${encodeURIComponent(scope.marketplaceProductId)}` +
+    `/knowledge-bases/${encodeURIComponent(scope.knowledgeBaseId)}/wiki`;
+}
+
 // Wiki Page Types
 export interface WikiPage {
   id: string;
@@ -111,7 +120,7 @@ export interface WikiPageIssue {
 }
 
 // Wiki API Functions
-export function listWikiPages(kbId: string, params?: {
+export function listWikiPages(kbId: WikiReadScope, params?: {
   page_type?: string;
   status?: string;
   query?: string;
@@ -131,7 +140,7 @@ export function listWikiPages(kbId: string, params?: {
     });
   }
   const qs = query.toString();
-  return get(`/api/v1/knowledgebase/${kbId}/wiki/pages${qs ? '?' + qs : ''}`);
+  return get(`${wikiReadBase(kbId)}/pages${qs ? '?' + qs : ''}`);
 }
 
 // listWikiFolders returns the direct child folders of parentId ("" = root),
@@ -140,12 +149,12 @@ export function listWikiPages(kbId: string, params?: {
 // pageTypes scopes the view to a sidebar tab: only folders whose subtree holds
 // a page of those types (or are entirely empty) come back, and page_count is
 // counted within those types.
-export function listWikiFolders(kbId: string, parentId = '', pageTypes = '') {
+export function listWikiFolders(kbId: WikiReadScope, parentId = '', pageTypes = '') {
   const query = new URLSearchParams();
   if (parentId) query.set('parent_id', parentId);
   if (pageTypes) query.set('page_types', pageTypes);
   const qs = query.toString();
-  return get(`/api/v1/knowledgebase/${kbId}/wiki/folders${qs ? '?' + qs : ''}`);
+  return get(`${wikiReadBase(kbId)}/folders${qs ? '?' + qs : ''}`);
 }
 
 // createWikiFolder creates a new empty folder under parentId ("" = root).
@@ -178,8 +187,8 @@ export function createWikiPage(kbId: string, data: Partial<WikiPage>) {
   return post(`/api/v1/knowledgebase/${kbId}/wiki/pages`, data);
 }
 
-export function getWikiPage(kbId: string, slug: string) {
-  return get(`/api/v1/knowledgebase/${kbId}/wiki/pages/${encodeSlugPath(slug)}`);
+export function getWikiPage(kbId: WikiReadScope, slug: string) {
+  return get(`${wikiReadBase(kbId)}/pages/${encodeSlugPath(slug)}`);
 }
 
 // WikiPageUpdatePayload is a partial update: absent fields keep their stored
@@ -285,7 +294,7 @@ export interface WikiIndexResponse {
 // page_type buckets come back; `limit` bounds the per-group window;
 // `cursor` resumes from a previous response.
 export function getWikiIndex(
-  kbId: string,
+  kbId: WikiReadScope,
   params?: { types?: string[]; limit?: number; cursor?: string },
 ) {
   const query = new URLSearchParams();
@@ -296,7 +305,7 @@ export function getWikiIndex(
   }
   const qs = query.toString();
   const suffix = qs ? `?${qs}` : '';
-  return get(`/api/v1/knowledgebase/${kbId}/wiki/index${suffix}`);
+  return get(`${wikiReadBase(kbId)}/index${suffix}`);
 }
 
 export interface WikiGraphQueryParams {
@@ -312,7 +321,7 @@ export interface WikiGraphQueryParams {
 // `mode: 'ego', center: <slug>` to drill into a specific page's neighborhood.
 // For knowledge bases with tens of thousands of pages the overview cap is
 // what prevents the browser from choking on a 30MB payload / 100k SVG nodes.
-export function getWikiGraph(kbId: string, params?: WikiGraphQueryParams) {
+export function getWikiGraph(kbId: WikiReadScope, params?: WikiGraphQueryParams) {
   const query = new URLSearchParams();
   if (params) {
     if (params.mode) query.set('mode', params.mode);
@@ -324,17 +333,17 @@ export function getWikiGraph(kbId: string, params?: WikiGraphQueryParams) {
     }
   }
   const qs = query.toString();
-  return get(`/api/v1/knowledgebase/${kbId}/wiki/graph${qs ? '?' + qs : ''}`);
+  return get(`${wikiReadBase(kbId)}/graph${qs ? '?' + qs : ''}`);
 }
 
-export function getWikiStats(kbId: string) {
-  return get(`/api/v1/knowledgebase/${kbId}/wiki/stats`);
+export function getWikiStats(kbId: WikiReadScope) {
+  return get(`${wikiReadBase(kbId)}/stats`);
 }
 
-export function searchWikiPages(kbId: string, q: string, limit?: number) {
+export function searchWikiPages(kbId: WikiReadScope, q: string, limit?: number) {
   const params = new URLSearchParams({ q });
   if (limit) params.set('limit', String(limit));
-  return get(`/api/v1/knowledgebase/${kbId}/wiki/search?${params.toString()}`);
+  return get(`${wikiReadBase(kbId)}/search?${params.toString()}`);
 }
 
 export function listWikiIssues(kbId: string, slug?: string, status?: string) {

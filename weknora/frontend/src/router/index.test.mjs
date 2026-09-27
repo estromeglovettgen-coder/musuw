@@ -1,8 +1,26 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { runInNewContext } from 'node:vm'
 
 const routerSource = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
+const entryHTML = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
+const entryRestoreScript = [...entryHTML.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+  .map(match => match[1]).find(script => script.includes('weknora_lite_last_path'))
+
+function runEntryRestore(path, { search = '', hash = '', lite = true } = {}) {
+  assert.ok(entryRestoreScript, 'execute the actual HTML entry restore script')
+  let url = path + search + hash
+  runInNewContext(entryRestoreScript, {
+    localStorage: { getItem: key => key === 'weknora_lite_mode' && lite ? 'true' : null },
+    sessionStorage: { getItem: key => key === 'weknora_lite_last_path' ? '/platform/creatChat' : null },
+    window: {
+      location: { pathname: path, search, hash },
+      history: { state: null, replaceState: (_state, _title, target) => { url = target } },
+    },
+  })
+  return url
+}
 
 function oidcErrorGuard() {
   const start = routerSource.indexOf('if (hasOIDCErrorCallback(window.location.hash || \'\'))')
@@ -56,6 +74,24 @@ test('only generic Lite entry routes restore the last page', () => {
   assert.match(routerSource, /path: "\/platform",[\s\S]*redirect: authenticatedEntryPath/)
   assert.doesNotMatch(routerSource, /isLiteSpaDefaultEntry/)
 })
+
+test('a cold knowledge-base list URL is not overwritten by the previous chat before Vue starts', () => {
+  assert.equal(runEntryRestore('/platform/knowledge-bases'), '/platform/knowledge-bases')
+  const wikiPath = '/platform/marketplace/product/knowledge-bases/kb'
+  assert.equal(runEntryRestore(wikiPath), wikiPath)
+})
+
+for (const path of ['/', '/platform']) {
+  test(`the generic ${path} entry retains Lite restore without overriding explicit auth or checkout intent`, () => {
+    assert.equal(runEntryRestore(path), '/platform/creatChat')
+    assert.equal(runEntryRestore(path, { lite: false }), path)
+    const search = '?plan=max&period=yearly'
+    assert.equal(runEntryRestore(path, { search }), path + search)
+    for (const hash of ['#oidc_result=callback', '#oidc_error=denied']) {
+      assert.equal(runEntryRestore(path, { hash }), path + hash)
+    }
+  })
+}
 
 test('generic product entry never restores a prior billing surface', () => {
   const policyStart = routerSource.indexOf('function isSafeLiteRestoreTarget(path: string)')

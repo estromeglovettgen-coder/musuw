@@ -473,6 +473,16 @@ func liteOperationsAdminRouteAllowed(method, path string) bool {
 	method = strings.ToUpper(strings.TrimSpace(method))
 	path = strings.TrimSpace(path)
 
+	const marketProducts = "/api/v1/system/creator-marketplace/products"
+	if path == marketProducts {
+		return method == http.MethodGet
+	}
+	if strings.HasPrefix(path, marketProducts+"/") {
+		parts := strings.Split(strings.TrimPrefix(path, marketProducts+"/"), "/")
+		return (len(parts) == 1 && parts[0] != "" && method == http.MethodPut) ||
+			(len(parts) == 2 && parts[0] != "" && parts[1] == "review" && method == http.MethodPost)
+	}
+
 	if method == http.MethodGet && path == "/api/v1/system/admin/audit-log" {
 		return true
 	}

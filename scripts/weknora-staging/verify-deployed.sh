@@ -47,6 +47,7 @@ wait_for_healthy() {
 }
 
 for container in \
+    weknora-v072-staging-neo4j \
     weknora-v072-staging-postgres \
     weknora-v072-staging-redis \
     weknora-v072-staging-docreader \
@@ -58,6 +59,7 @@ for container in \
     project="$(docker inspect "$container" --format '{{index .Config.Labels "com.docker.compose.project"}}')"
     [ "$project" = weknora-v072-staging ] || fail "staging container has the wrong Compose project: $container"
 done
+wait_for_healthy weknora-v072-staging-neo4j
 wait_for_healthy weknora-v072-staging-postgres
 init_state="$(docker inspect weknora-v072-staging-searxng-init --format '{{.State.Status}}|{{.State.ExitCode}}' 2>/dev/null || true)"
 [ "$init_state" = 'exited|0' ] || fail 'staging SearXNG init did not complete successfully'
@@ -90,6 +92,7 @@ assert_resource_limits() {
     [ "$pids_limit" -gt 0 ] || fail "staging PID limit is missing: $container"
 }
 for container in \
+    weknora-v072-staging-neo4j \
     weknora-v072-staging-postgres \
     weknora-v072-staging-redis \
     weknora-v072-staging-docreader \
@@ -110,8 +113,12 @@ for container in weknora-v072-staging-app weknora-v072-staging-frontend; do
 done
 
 service_names="$(docker ps --filter label=com.docker.compose.project=weknora-v072-staging --format '{{.Names}}' | sort | tr '\n' ' ')"
-[ "$service_names" = 'weknora-v072-staging-app weknora-v072-staging-docreader weknora-v072-staging-frontend weknora-v072-staging-postgres weknora-v072-staging-redis weknora-v072-staging-searxng ' ] || fail 'staging started services are not the six-service native stack plus init'
+[ "$service_names" = 'weknora-v072-staging-app weknora-v072-staging-docreader weknora-v072-staging-frontend weknora-v072-staging-neo4j weknora-v072-staging-postgres weknora-v072-staging-redis weknora-v072-staging-searxng ' ] || fail 'staging started services are not the seven-service native stack plus init'
 
+neo4j_port_bindings="$(docker inspect weknora-v072-staging-neo4j --format '{{json .HostConfig.PortBindings}}' 2>/dev/null || true)"
+[ "$neo4j_port_bindings" = '{}' ] || [ "$neo4j_port_bindings" = null ] || fail 'staging Neo4j unexpectedly publishes a host port'
+neo4j_networks="$(docker inspect weknora-v072-staging-neo4j --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{end}}')"
+[ "$neo4j_networks" = weknora-v072-staging-internal ] || fail 'staging Neo4j network is not isolated'
 searxng_port_bindings="$(docker inspect weknora-v072-staging-searxng --format '{{json .HostConfig.PortBindings}}' 2>/dev/null || true)"
 [ "$searxng_port_bindings" = '{}' ] || [ "$searxng_port_bindings" = 'null' ] || fail 'staging SearXNG exposes a host port'
 docker exec weknora-v072-staging-searxng python3 -c 'import json,urllib.request; response=urllib.request.urlopen("http://127.0.0.1:8080/search?q=musuw-staging-health&format=json", timeout=5); assert response.status == 200; assert isinstance(json.loads(response.read()).get("results"), list)' ||
@@ -125,7 +132,8 @@ printf '%s\n' "$app_env" | grep -Fqx 'LANGFUSE_ENABLED=true' || fail 'staging La
 printf '%s\n' "$app_env" | grep -Fqx 'LANGFUSE_HOST=https://jp.cloud.langfuse.com' || fail 'staging Langfuse host has drifted at runtime'
 printf '%s\n' "$app_env" | grep -Fqx 'LANGFUSE_RELEASE=musuw-staging' || fail 'staging Langfuse release identity has drifted at runtime'
 printf '%s\n' "$app_env" | grep -Fqx 'LANGFUSE_ENVIRONMENT=staging' || fail 'staging Langfuse environment has drifted at runtime'
-printf '%s\n' "$app_env" | grep -Fqx 'NEO4J_ENABLE=false' || fail 'staging unexpectedly enables Neo4j at runtime'
+printf '%s\n' "$app_env" | grep -Fqx 'NEO4J_ENABLE=true' || fail 'staging Neo4j is disabled at runtime'
+printf '%s\n' "$app_env" | grep -Fqx 'NEO4J_URI=bolt://neo4j:7687' || fail 'staging Neo4j endpoint is not isolated'
 printf '%s\n' "$app_env" | grep -Fqx 'WEKNORA_REDIS_NAMESPACE=weknora-v072-staging' || fail 'staging Redis namespace is not isolated at runtime'
 printf '%s\n' "$app_env" | grep -Fqx 'APP_EXTERNAL_URL=https://staging.musuw.com' || fail 'staging external origin is not dotted HTTPS'
 workspace_id="$(weknora_staging_require_env_value "$staging_env" OPENROUTER_WORKSPACE_ID)"
@@ -176,6 +184,7 @@ curl -fsS --connect-timeout 5 "http://127.0.0.1:${frontend_port}/api/v1/billing/
 jq -e '(.configured == true) and (.environment == "sandbox") and (.client_token | type == "string" and startswith("test_"))' "$paddle_json" >/dev/null || fail 'staging public Paddle config is not a configured Sandbox unit'
 
 for volume in \
+    weknora-v072-staging-neo4j-data \
     weknora-v072-staging-postgres-data \
     weknora-v072-staging-data-files \
     weknora-v072-staging-docreader-tmp \
@@ -185,4 +194,4 @@ for volume in \
 done
 docker network inspect weknora-v072-staging-internal >/dev/null 2>&1 || fail 'staging internal network is missing'
 
-printf '%s\n' 'staging deployed green: six-service health plus init, SearXNG search, noindex, Sandbox public config, isolated volumes/network, same digest release record'
+printf '%s\n' 'staging deployed green: seven-service health plus init, SearXNG search, noindex, Sandbox public config, isolated volumes/network, same digest release record'
