@@ -73,8 +73,8 @@ REVIEWED_UI_CONTENT = {
     "openspec/changes/deploy-isolated-staging/specs/sandbox-billing-release-gate/spec.md": {"5f89c66ff9261991a42692d8f8f16988c6fc5174", "4eb0d34d0f96341f4e55ae8913c987e0a8e02294"},
     "playwright.billing.config.ts": {"0af6c9ab3d45b26da9a2ad5b0517b0a7d4b64fe0"},
     "playwright.knowledge-upload.config.ts": {"fad968652432f48a144489a70c23b3967030c1a5", "0bb47d368da4d1c558eab3ce0db1cc1e210fc9db", "bde962ce72910dae6b2f618a5b6ba53c6104fc9c", "d44879f4afbe340c02c859ce4f3f82458db94e31"},
-    "scripts/ci/validate-workflows.rb": {"5154e0d6c229af1e2180bc1026d47954ecb626af", "72062480c9e6a49c3a2dd50d5935b98436e7021a", "437c9eb6204a039c9971222f3ac8b2ee375604c7"},
-    "scripts/weknora-workflow-simulation.test.sh": {"bf077e542b96ad418d13a3a8091498c05c2e72fb", "fb779bfd40c16055266bc42ceacc47bbe4df3481", "de9073a864cdaca267f713f6bfc350a7a68c4ae5"},
+    "scripts/ci/validate-workflows.rb": {"5154e0d6c229af1e2180bc1026d47954ecb626af", "72062480c9e6a49c3a2dd50d5935b98436e7021a", "437c9eb6204a039c9971222f3ac8b2ee375604c7", "6abdb58e89f368b4789e09746b8eecafc963d0f6"},
+    "scripts/weknora-workflow-simulation.test.sh": {"bf077e542b96ad418d13a3a8091498c05c2e72fb", "fb779bfd40c16055266bc42ceacc47bbe4df3481", "de9073a864cdaca267f713f6bfc350a7a68c4ae5", "4b7d521c2a37acec343a268e3576292a174a69cf"},
     # The exact integration release gate is policy-only. Pin every new file so
     # a later UI-scoped release may carry this reviewed policy but cannot edit it.
     "docs/INTEGRATION_RELEASE_REVIEW_20260921.md": {"7ae4207e8b43a6f26ff86e42b75299ec89bf3328"},
