@@ -28,10 +28,14 @@ func TestResolveManualCuratedFields(t *testing.T) {
 		{name: "curated document", payload: types.ManualKnowledgePayload{
 			CuratedSummary: "人工摘要", SkipAutoEnrichment: &trueValue,
 		}, want: "人工摘要", skip: true},
-		{name: "ordinary editor preserves curation", before: previous,
-			payload: types.ManualKnowledgePayload{}, want: "原有人工摘要", skip: true},
-		{name: "explicit opt out", before: previous,
-			payload: types.ManualKnowledgePayload{SkipAutoEnrichment: &falseValue}},
+		{
+			name: "ordinary editor preserves curation", before: previous,
+			payload: types.ManualKnowledgePayload{}, want: "原有人工摘要", skip: true,
+		},
+		{
+			name: "explicit opt out", before: previous,
+			payload: types.ManualKnowledgePayload{SkipAutoEnrichment: &falseValue},
+		},
 		{name: "missing summary", payload: types.ManualKnowledgePayload{
 			SkipAutoEnrichment: &trueValue,
 		}, invalid: true},

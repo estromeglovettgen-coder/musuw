@@ -787,7 +787,8 @@ func (s *knowledgeService) UpdateKnowledge(ctx context.Context, knowledge *types
 		logger.Errorf(ctx, "Failed to update knowledge: %v", err)
 		return err
 	}
-	if metadataChanged && !curatedManual && record.SummaryStatus != "" && record.SummaryStatus != types.SummaryStatusNone {
+	if metadataChanged && !curatedManual && record.SummaryStatus != "" &&
+		record.SummaryStatus != types.SummaryStatusNone {
 		if err := enqueueSummaryRefresh(ctx, s.repo, s.task, s.kbService, s.tracker(), record); err != nil {
 			logger.Warnf(ctx, "Metadata saved but summary refresh enqueue failed for %s: %v", record.ID, err)
 		} else {
