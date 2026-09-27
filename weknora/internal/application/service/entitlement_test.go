@@ -1481,6 +1481,27 @@ func TestEntitlementServiceProvisionsProviderLimitedTenantKey(t *testing.T) {
 	assert.Equal(t, 1, manager.createCalls)
 }
 
+func TestMonthlyPaidFirstModelUseKeepsPaddleCreditBoundary(t *testing.T) {
+	t.Setenv("SYSTEM_AES_KEY", "0123456789abcdef0123456789abcdef")
+	paidPeriodEnd := time.Now().UTC().Add(20 * 24 * time.Hour)
+	repo := &entitlementRepoStub{tenant: &types.Tenant{
+		ID: 7, Plan: types.ConsumerPlanPlus, PlanStatus: "active", PaddleBillingPeriod: "monthly",
+		PaddleCurrentPeriodEnd: &paidPeriodEnd, OpenRouterCreditPeriodEnd: &paidPeriodEnd,
+	}}
+	manager := &keyManagerStub{created: &modelopenrouter.ManagedKey{Key: "sk-child", Hash: "hash-7"}}
+	svc := newEntitlementService(repo, manager)
+	ctx := entitlementContext(7, "user-123")
+
+	_, err := svc.OpenRouterAPIKey(ctx)
+	require.NoError(t, err)
+	current, err := svc.Current(ctx, time.Now().UTC())
+	require.NoError(t, err)
+	require.NotNil(t, current.OpenRouterResetsAt)
+	assert.Equal(t, paidPeriodEnd, current.OpenRouterResetsAt.UTC())
+	require.NotNil(t, repo.tenant.OpenRouterCreditPeriodEnd)
+	assert.Equal(t, paidPeriodEnd, repo.tenant.OpenRouterCreditPeriodEnd.UTC())
+}
+
 func TestEntitlementServiceProvisionsFreeKeyAtNewAllowance(t *testing.T) {
 	t.Setenv("SYSTEM_AES_KEY", "0123456789abcdef0123456789abcdef")
 	repo := &entitlementRepoStub{tenant: &types.Tenant{

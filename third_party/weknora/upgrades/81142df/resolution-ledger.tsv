@@ -744,9 +744,9 @@ internal/application/service/datasource_service_test.go	-	M	100644	f6415771fd577
 internal/application/service/datasource_stream_test.go	-	M	100644	18ebe23cfde54bddfcd5f085c6f68f45ab31509c	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/datasource_sweep_wiring_test.go	-	M	100644	e9ce5bc0a8a0e54777264efe96ff00a7c942d08c	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/embed_webhook.go	M	-	100644	4b12845992700b84585d41e26381161e8eb82b13	preserve-musuw-exact		audited local-only content is byte-identical
-internal/application/service/entitlement.go	A	-	100644	71fc757151fc5185f308e672c545511a306a9509	preserve-musuw-exact		audited local-only content is byte-identical
+internal/application/service/entitlement.go	A	-	100644	d978dd71e99ec855406f92c589e8c06539d85377	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/entitlement_free_allowance_transition_test.go	A	-	100644	2cf1ba94b33a20d2150d50399e74a8b388f81132	preserve-musuw-exact		audited local-only content is byte-identical
-internal/application/service/entitlement_test.go	A	-	100644	c3123e48005094fa4c21f53202eeea7359c979bc	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/application/service/entitlement_test.go	A	-	100644	50adcaee1e4e0e24b6365fbf94114501be16c2f8	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/application/service/extract.go	-	M	100644	3d789d6d2da4d9bb5b2d2a262804c963978e6c39	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/extract_data_table_summary_test.go	-	A	100644	4c059ef7abdcea978048550e99cc6f52d5dceb7f	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/application/service/file/cos.go	-	M	100644	442584f20657b0d6c0e46c8b67914550fb063818	adopt-upstream-exact		fixed-target upstream-only content is byte-identical

@@ -380,7 +380,9 @@ func (s *entitlementService) OpenRouterAPIKey(ctx context.Context) (string, erro
 	}
 
 	limit := types.LimitsForConsumerPlan(plan).MonthlyOpenRouterMicrousd
-	creditPeriodEnd := initialCreditPeriodEnd(tenant, plan, tenant.PaddleBillingPeriod, time.Now().UTC(), nil)
+	creditPeriodEnd := initialCreditPeriodEnd(
+		tenant, plan, tenant.PaddleBillingPeriod, now, tenant.PaddleCurrentPeriodEnd,
+	)
 	if _, active := types.ActiveComplimentaryPlanAt(tenant, time.Now().UTC()); active && tenant.ComplimentaryExpiresAt != nil {
 		creditPeriodEnd = complimentaryPeriodEnd(time.Now().UTC(), tenant.ComplimentaryExpiresAt.UTC())
 	}
