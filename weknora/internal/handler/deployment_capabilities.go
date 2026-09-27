@@ -30,8 +30,9 @@ type DeploymentCapability struct {
 
 // DeploymentCapabilitiesData is returned by GET /system/capabilities.
 type DeploymentCapabilitiesData struct {
-	Edition      string                          `json:"edition"`
-	Capabilities map[string]DeploymentCapability `json:"capabilities"`
+	Edition                string                          `json:"edition"`
+	Capabilities           map[string]DeploymentCapability `json:"capabilities"`
+	CuratedManualPublishV1 bool                            `json:"curated_manual_publish_v1"`
 }
 
 // DeploymentFeatureAvailability mirrors injected backend handlers/services.
@@ -67,7 +68,8 @@ func BuildDeploymentCapabilities(
 	}
 
 	return DeploymentCapabilitiesData{
-		Edition: edition,
+		Edition:                edition,
+		CuratedManualPublishV1: true,
 		Capabilities: map[string]DeploymentCapability{
 			"organizations":        organizations,
 			"agents":               supportedDeploymentCapability(available.Agents),

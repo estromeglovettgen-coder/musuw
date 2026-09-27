@@ -280,21 +280,25 @@ func (k *Knowledge) BeforeCreate(tx *gorm.DB) (err error) {
 
 // ManualKnowledgeMetadata stores metadata for manual Markdown knowledge content.
 type ManualKnowledgeMetadata struct {
-	Content   string `json:"content"`
-	Format    string `json:"format"`
-	Status    string `json:"status"`
-	Version   int    `json:"version"`
-	UpdatedAt string `json:"updated_at"`
+	Content            string `json:"content"`
+	Format             string `json:"format"`
+	Status             string `json:"status"`
+	Version            int    `json:"version"`
+	UpdatedAt          string `json:"updated_at"`
+	CuratedSummary     string `json:"curated_summary,omitempty"`
+	SkipAutoEnrichment bool   `json:"skip_auto_enrichment,omitempty"`
 }
 
 // ManualKnowledgePayload represents the payload for manual knowledge operations.
 type ManualKnowledgePayload struct {
-	Title         string                     `json:"title"`
-	Content       string                     `json:"content"`
-	Status        string                     `json:"status"`
-	TagIDs        []string                   `json:"tag_ids"`
-	Channel       string                     `json:"channel"`
-	ProcessConfig *KnowledgeProcessOverrides `json:"process_config,omitempty"`
+	Title              string                     `json:"title"`
+	Content            string                     `json:"content"`
+	Status             string                     `json:"status"`
+	CuratedSummary     string                     `json:"curated_summary,omitempty"`
+	SkipAutoEnrichment *bool                      `json:"skip_auto_enrichment,omitempty"`
+	TagIDs             []string                   `json:"tag_ids"`
+	Channel            string                     `json:"channel"`
+	ProcessConfig      *KnowledgeProcessOverrides `json:"process_config,omitempty"`
 }
 
 // KnowledgeSearchScope defines a (tenant_id, knowledge_base_id) scope for knowledge search (e.g. own KBs + shared KBs).
