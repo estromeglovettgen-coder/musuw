@@ -13,8 +13,8 @@ test("create knowledge-base action stays a single responsive header CTA", () => 
   assert.match(knowledgeBaseList, /class="visual-kb-list__create"[^>]*@click="handleCreateKnowledgeBase"/);
   assert.doesNotMatch(knowledgeBaseList, /visual-kb-list__create-card/);
   assert.match(knowledgeBaseList, /\.visual-kb-list__create\s*\{[^}]*display:\s*inline-flex[^}]*white-space:\s*nowrap/i);
-  assert.ok(knowledgeBaseList.includes('.visual-kb-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }'));
-  assert.ok(knowledgeBaseList.includes('.visual-kb-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }'));
+  assert.ok(knowledgeBaseList.includes(':deep(.visual-kb-grid) { grid-template-columns: repeat(2,minmax(0,1fr)); }'));
+  assert.ok(knowledgeBaseList.includes(':deep(.visual-kb-grid) { grid-template-columns: repeat(3,minmax(0,1fr)); }'));
 });
 
 test("sidebar enters narrow view collapsed without rewriting desktop preference", () => {

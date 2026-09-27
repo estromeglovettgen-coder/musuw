@@ -9,10 +9,12 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from runpy import run_path
 
 
 SCRIPT = Path(__file__).with_name("verify-ui-release-scope.py")
 SOURCE_ROOT = SCRIPT.resolve().parents[2]
+REVIEWED_UI_CONTENT = run_path(str(SCRIPT))["REVIEWED_UI_CONTENT"]
 
 
 class UiReleaseScopeTest(unittest.TestCase):
@@ -128,7 +130,6 @@ class UiReleaseScopeTest(unittest.TestCase):
             "auth/src/LiquidEther.tsx",
             "auth/e2e/background-stability.spec.ts",
             "e2e/billing-entitlement.spec.ts",
-            "docs/STAGING_OPERATIONS.md",
             "docs/INTEGRATION_RELEASE_REVIEW_20260921.md",
             "scripts/ci/verify-reviewed-integration-release.py",
             "scripts/ci/verify-reviewed-integration-release.test.py",
@@ -149,6 +150,12 @@ class UiReleaseScopeTest(unittest.TestCase):
 
     def test_previously_applied_delivery_policy_is_exactly_pinned(self) -> None:
         historical_sources = {
+            ".github/workflows/deploy-production.yml":
+                "ui-release-reviewed-deploy-production.txt",
+            "docs/DEPLOYMENT.md":
+                "ui-release-reviewed-deployment-docs.txt",
+            "docs/STAGING_OPERATIONS.md":
+                "ui-release-reviewed-staging-operations.txt",
             "scripts/ci/verify-reviewed-model-release.py":
                 "ui-release-reviewed-model-guard.txt",
             "scripts/ci/verify-reviewed-model-release.test.py":
@@ -158,6 +165,7 @@ class UiReleaseScopeTest(unittest.TestCase):
             ".github/workflows/deploy-production.yml",
             ".github/workflows/deploy-storefront.yml",
             "docs/DEPLOYMENT.md",
+            "docs/STAGING_OPERATIONS.md",
             "docs/MODEL_RELEASE_20260919.md", "scripts/ci/validate-workflows.rb",
             "scripts/ci/verify-reviewed-model-release.py",
             "scripts/ci/verify-reviewed-model-release.test.py",
@@ -167,7 +175,7 @@ class UiReleaseScopeTest(unittest.TestCase):
                 source = SOURCE_ROOT / path
                 if path in historical_sources:
                     # Freeze the policy already accepted by the UI allowlist;
-                    # this pending agent exception must not expand that scope.
+                    # later staging/model policy edits must not expand that scope.
                     source = SCRIPT.parent / "fixtures" / historical_sources[path]
                 original = source.read_text(encoding="utf-8")
                 self.write(path, original)
@@ -175,7 +183,7 @@ class UiReleaseScopeTest(unittest.TestCase):
                 self.assert_scope_passes(self.run_scope(self.base, reviewed))
                 if path in historical_sources:
                     self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
-                    current_policy = self.commit("proposed model policy needs separate review")
+                    current_policy = self.commit("updated release policy needs separate review")
                     self.assert_scope_rejects(self.run_scope(reviewed, current_policy))
                 self.write(path, "unreviewed release policy\n")
                 candidate = self.commit("future policy change still requires review")
@@ -231,14 +239,39 @@ class UiReleaseScopeTest(unittest.TestCase):
             "e2e/mobile-layout.md",
         ):
             with self.subTest(path=path):
-                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+                reviewed_content = (SOURCE_ROOT / path).read_text(encoding="utf-8")
+                if path == "weknora/frontend/index.html":
+                    # Reconstruct the historical presentation-only fixture.
+                    # Preserving explicit KB entry is a later behavior change,
+                    # not permission to widen the production UI release gate.
+                    current_guard = "if (path !== '/' && path !== '/platform') return;"
+                    historical_guard = (
+                        "if (path !== '/' && path !== '/platform' "
+                        "&& path !== '/platform/knowledge-bases') return;"
+                    )
+                    self.assertEqual(reviewed_content.count(current_guard), 1)
+                    reviewed_content = reviewed_content.replace(current_guard, historical_guard, 1)
+                    blob = subprocess.run(
+                        ["git", "hash-object", "--stdin"], input=reviewed_content,
+                        text=True, capture_output=True, check=True,
+                    ).stdout.strip()
+                    self.assertIn(blob, REVIEWED_UI_CONTENT[path])
+                self.write(path, reviewed_content)
                 reviewed = self.commit("reviewed mobile presentation")
-                self.assert_scope_passes(self.run_scope(self.base, reviewed))
-                self.write(path, "unreviewed content\n")
-                unreviewed = self.commit("unreviewed change to mobile presentation")
-                self.assert_scope_rejects(self.run_scope(reviewed, unreviewed))
-                self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
-                self.commit("restore reviewed mobile presentation")
+                try:
+                    self.assert_scope_passes(self.run_scope(self.base, reviewed))
+                    self.write(path, "unreviewed content\n")
+                    unreviewed = self.commit("unreviewed change to mobile presentation")
+                    self.assert_scope_rejects(self.run_scope(reviewed, unreviewed))
+                finally:
+                    self.write(path, reviewed_content)
+                    self.commit("restore reviewed mobile presentation")
+
+    def test_explicit_knowledge_base_entry_change_requires_more_than_ui_release_acceptance(self) -> None:
+        path = "weknora/frontend/index.html"
+        self.write(path, (SOURCE_ROOT / path).read_text(encoding="utf-8"))
+        candidate = self.commit("preserve explicit knowledge-base entry")
+        self.assert_scope_rejects(self.run_scope(self.base, candidate))
 
     def test_reviewed_path_still_rejects_symlink(self) -> None:
         link = self.repo / "auth/src/AuthShowcase.tsx"

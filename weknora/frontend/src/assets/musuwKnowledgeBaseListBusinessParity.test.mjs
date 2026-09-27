@@ -17,7 +17,10 @@ test('rebuilt KnowledgeBaseList reuses normalized frozen setup', () => {
   const source = read('../views/knowledge/KnowledgeBaseList.vue')
   assert.match(source, /import LegacyKnowledgeBaseListBusiness from .*KnowledgeBaseList\.pre-view\.vue/)
   assert.match(source, /const legacySetup = legacy\.setup/)
-  assert.match(source, /return \{ \.\.\.state \}/)
+  // The plain object preserves every frozen setup binding while allowing
+  // presentation-only state such as the subscribed-library count.
+  assert.match(source, /return\s*\{\s*\.\.\.state\s*(?:,|\})/)
+  assert.match(source, /return\s*\{\s*\.\.\.state\s*,[^}]*\bmarketLibraryCount\b/)
   assert.match(source, /class="visual-kb-list"/)
   for (const token of [
     'class="kb-list-container"',

@@ -1,4 +1,6 @@
+import { creatorMarketplaceEn } from '../creatorMarketplace'
 export default {
+  creatorMarketplace: creatorMarketplaceEn,
   menu: {
     knowledgeBase: 'Knowledge Base',
     agents: 'Agents',

@@ -347,6 +347,11 @@ func (s *wikiPageService) GetPageBySlug(ctx context.Context, kbID string, slug s
 	if err != nil {
 		return nil, err
 	}
+	pages, err := s.marketplaceWikiPageLinks(ctx, kbID, []*types.WikiPage{page})
+	if err != nil {
+		return nil, err
+	}
+	page = pages[0]
 	stripWikiPageInlineChunkCitations(page)
 	return page, nil
 }
@@ -364,6 +369,10 @@ func (s *wikiPageService) GetPageByID(ctx context.Context, id string) (*types.Wi
 // ListPages lists wiki pages with optional filtering and pagination
 func (s *wikiPageService) ListPages(ctx context.Context, req *types.WikiPageListRequest) (*types.WikiPageListResponse, error) {
 	pages, total, err := s.repo.List(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	pages, err = s.marketplaceWikiPageLinks(ctx, req.KnowledgeBaseID, pages)
 	if err != nil {
 		return nil, err
 	}
@@ -427,6 +436,14 @@ func (s *wikiPageService) GetIndex(ctx context.Context, kbID string) (*types.Wik
 	page, err := s.repo.GetBySlug(ctx, kbID, "index")
 	if err != nil {
 		if errors.Is(err, repository.ErrWikiPageNotFound) {
+			if scope, ok := types.MarketplaceScopeFromContext(ctx); ok {
+				if !scope.AllowsKnowledgeBase(kbID, scope.SourceTenantID()) {
+					return nil, err
+				}
+				// Subscribers can browse the existing directory even before an
+				// index is generated, without creating or publishing source rows.
+				return &types.WikiPage{KnowledgeBaseID: kbID, Slug: "index", PageType: types.WikiPageTypeIndex}, nil
+			}
 			// Create default index page
 			return s.createDefaultPage(ctx, kbID, "index", "Index", types.WikiPageTypeIndex,
 				"# Wiki Index\n\nThis is the index page. It will be automatically updated as pages are added.\n")
@@ -582,7 +599,68 @@ func (s *wikiPageService) GetGraph(ctx context.Context, req *types.WikiGraphRequ
 	if err != nil {
 		return nil, err
 	}
-	return computeGraphSubset(pages, req)
+	return computeGraphSubset(marketplaceWikiVisibleLinks(ctx, pages), req)
+}
+
+// marketplaceWikiVisibleLinks keeps graph statistics and topology confined to
+// the published node set. It does not mutate repository-owned page values.
+func marketplaceWikiVisibleLinks(ctx context.Context, pages []*types.WikiPage) []*types.WikiPage {
+	if _, ok := types.MarketplaceScopeFromContext(ctx); !ok {
+		return pages
+	}
+	visible := make(map[string]bool, len(pages))
+	for _, page := range pages {
+		visible[page.Slug] = true
+	}
+	return filterWikiPageLinks(pages, visible)
+}
+
+func (s *wikiPageService) marketplaceWikiPageLinks(
+	ctx context.Context, kbID string, pages []*types.WikiPage,
+) ([]*types.WikiPage, error) {
+	if _, ok := types.MarketplaceScopeFromContext(ctx); !ok {
+		return pages, nil
+	}
+	targets := make(map[string]bool)
+	for _, page := range pages {
+		for _, slug := range page.InLinks {
+			targets[slug] = true
+		}
+		for _, slug := range page.OutLinks {
+			targets[slug] = true
+		}
+	}
+	if len(targets) == 0 {
+		return pages, nil
+	}
+	slugs := make([]string, 0, len(targets))
+	for slug := range targets {
+		slugs = append(slugs, slug)
+	}
+	visible, err := s.repo.ExistsSlugs(ctx, kbID, slugs)
+	if err != nil {
+		return nil, err
+	}
+	return filterWikiPageLinks(pages, visible), nil
+}
+
+func filterWikiPageLinks(pages []*types.WikiPage, visible map[string]bool) []*types.WikiPage {
+	keep := func(links types.StringArray) types.StringArray {
+		out := make(types.StringArray, 0, len(links))
+		for _, link := range links {
+			if visible[link] {
+				out = append(out, link)
+			}
+		}
+		return out
+	}
+	out := make([]*types.WikiPage, 0, len(pages))
+	for _, page := range pages {
+		clone := *page
+		clone.InLinks, clone.OutLinks = keep(page.InLinks), keep(page.OutLinks)
+		out = append(out, &clone)
+	}
+	return out
 }
 
 // computeGraphSubset is the pure I/O-free core of GetGraph. It takes the
@@ -821,9 +899,13 @@ func (s *wikiPageService) GetStats(ctx context.Context, kbID string) (*types.Wik
 		total += c
 	}
 
-	orphans, err := s.repo.CountOrphans(ctx, kbID)
-	if err != nil {
-		return nil, err
+	_, marketplaceRead := types.MarketplaceScopeFromContext(ctx)
+	var orphans int64
+	if !marketplaceRead {
+		orphans, err = s.repo.CountOrphans(ctx, kbID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Count total links
@@ -831,9 +913,13 @@ func (s *wikiPageService) GetStats(ctx context.Context, kbID string) (*types.Wik
 	if err != nil {
 		return nil, err
 	}
+	pages = marketplaceWikiVisibleLinks(ctx, pages)
 	var totalLinks int64
 	for _, p := range pages {
 		totalLinks += int64(len(p.OutLinks))
+		if marketplaceRead && p.PageType != types.WikiPageTypeIndex && len(p.InLinks) == 0 {
+			orphans++
+		}
 	}
 
 	// Get recent updates (last 10)
@@ -849,15 +935,19 @@ func (s *wikiPageService) GetStats(ctx context.Context, kbID string) (*types.Wik
 		return nil, err
 	}
 
+	recentPages, err = s.marketplaceWikiPageLinks(ctx, kbID, recentPages)
+	if err != nil {
+		return nil, err
+	}
 	var pendingTasks int64
 	var pendingIssues int64
 	var isActive bool
-	if s.taskPendingRepo != nil {
+	if !marketplaceRead && s.taskPendingRepo != nil {
 		// Pending wiki ingest ops live in task_pending_ops keyed by
 		// (task_type="wiki:ingest", scope="knowledge_base", scope_id=kbID).
 		pendingTasks, _ = s.taskPendingRepo.PendingCount(ctx, wikiTaskType, wikiTaskScope, kbID)
 	}
-	if s.redisClient != nil {
+	if !marketplaceRead && s.redisClient != nil {
 		// The "active batch in progress" flag is still a Redis-only
 		// short-lived signal (per-process lock with TTL renew); not
 		// worth migrating since it carries no durable state.
@@ -865,8 +955,10 @@ func (s *wikiPageService) GetStats(ctx context.Context, kbID string) (*types.Wik
 		isActive = activeFlag > 0
 	}
 
-	issues, _ := s.ListIssues(ctx, kbID, "", "pending")
-	pendingIssues = int64(len(issues))
+	if !marketplaceRead {
+		issues, _ := s.ListIssues(ctx, kbID, "", "pending")
+		pendingIssues = int64(len(issues))
+	}
 
 	return &types.WikiStats{
 		TotalPages:    total,
@@ -1019,7 +1111,11 @@ func (s *wikiPageService) CountByType(ctx context.Context, kbID string) (map[str
 
 // SearchPages performs full-text search over wiki pages
 func (s *wikiPageService) SearchPages(ctx context.Context, kbID string, query string, limit int) ([]*types.WikiPage, error) {
-	return s.repo.Search(ctx, kbID, query, limit)
+	pages, err := s.repo.Search(ctx, kbID, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	return s.marketplaceWikiPageLinks(ctx, kbID, pages)
 }
 
 // --- Internal helpers ---
@@ -1430,7 +1526,8 @@ func (s *wikiPageService) ListChildFolders(
 	}
 	recScoped := recursiveFolderCounts(all, scopedDirect)
 	recAll := recursiveFolderCounts(all, allDirect)
-	showEmptyFolders := len(pageTypes) > 1
+	_, marketplaceRead := types.MarketplaceScopeFromContext(ctx)
+	showEmptyFolders := len(pageTypes) > 1 && !marketplaceRead
 	// A folder belongs in this view if it (recursively) contains a page of the
 	// requested types, or — only in the merged knowledge view — if it is a
 	// completely empty container with no pages of any type underneath.

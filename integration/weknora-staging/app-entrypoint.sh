@@ -59,4 +59,14 @@ if [ "${#SYSTEM_AES_KEY}" -ne 32 ]; then
     exit 1
 fi
 
+neo4j_auth="$(read_required_secret /run/secrets/neo4j_auth neo4j-auth)"
+case "$neo4j_auth" in
+    neo4j/?*) export NEO4J_PASSWORD="${neo4j_auth#neo4j/}" ;;
+    *)
+        printf '%s\n' 'required neo4j-auth secret has an invalid account format' >&2
+        exit 1
+        ;;
+esac
+unset neo4j_auth
+
 exec /app/scripts/docker-entrypoint.sh "$@"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useMarketplaceChatStore } from '@/stores/marketplaceChat';
 import { ref, onMounted, onUnmounted, computed, watch, nextTick, h } from "vue";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
@@ -142,6 +143,9 @@ const sceneModelsFor = (scene: ConsumerScene): ModelConfig[] => {
   });
 };
 const sceneManagedByConsumerResolver = computed(() => {
+  // Consumer model access follows the buyer's plan, including owned and
+  // purchased agents; source-agent defaults do not replace this catalog.
+  if (authStore.isLiteMode || settingsStore.settings.marketplaceProductId) return true;
   if (isCustomAgent.value) return false;
   const agentId = settingsStore.selectedAgentId;
   return !agentId || agentId === BUILTIN_QUICK_ANSWER_ID || agentId === BUILTIN_SMART_REASONING_ID;
@@ -153,7 +157,8 @@ const availableModels = computed(() => {
 });
 const { t, locale } = useI18n();
 
-let query = ref("");
+let query = ref(route.name === 'globalCreatChat' ? menuStore.newChatDraft : "");
+watch(query, value => { if (route.name === 'globalCreatChat') menuStore.newChatDraft = value; }, { flush: 'sync' });
 const showKbSelector = ref(false);
 
 // Image upload state
@@ -242,7 +247,17 @@ const selectedAgentId = computed({
   get: () => settingsStore.selectedAgentId || BUILTIN_SMART_REASONING_ID,
   set: (agentId: string) => settingsStore.selectAgent(agentId),
 });
+const marketplaceChat = useMarketplaceChatStore();
+const marketplaceEntryPending = computed(() => route.name === "globalCreatChat"
+  && typeof route.query.marketplace_product === "string" && Boolean(route.query.marketplace_product));
+watch(() => [settingsStore.settings.marketplaceProductId, marketplaceEntryPending.value] as const, ([id, entry]) => {
+  // An explicit product entry owns selection until CreateChat consumes its query.
+  // Restoring the previous product here would supersede that in-flight request.
+  if (id && !entry) void marketplaceChat.load(id).catch(() => undefined);
+}, { immediate: true });
+
 const selectedAgent = computed(() => {
+  if (settingsStore.settings.marketplaceProductId && marketplaceChat.agent) return marketplaceChat.agent;
   // When a shared-agent source tenant is set, resolve from sharedAgents FIRST.
   // Builtin agents (e.g. builtin-smart-reasoning) use the same constant ID across
   // tenants, so falling back to agents.value first would incorrectly return the
@@ -398,6 +413,7 @@ const isKnowledgeBaseDisabledByAgent = computed(() => {
   return agentKBSelectionMode.value === "none";
 });
 const isMentionDisabled = computed(() => {
+  if (settingsStore.settings.marketplaceProductId) return true;
   if (settingsStore.isAgentStreamMode && isKnowledgeBaseDisabledByAgent.value) {
     return agentMCPSelectionMode.value === "none" && agentSkillsSelectionMode.value === "none";
   }
@@ -647,6 +663,9 @@ const fileList = ref<Array<{ id: string; name: string }>>([]);
 
 // 选中的知识库：包含自己的 + 组织共享的 + 共享智能体下的（用于展示已选列表与 org 角标）
 const selectedKbs = computed(() => {
+  if (settingsStore.settings.marketplaceProductId) {
+    return marketplaceChat.knowledgeBases.filter(kb => selectedKbIds.value.includes(kb.id));
+  }
   const own = knowledgeBases.value.filter((kb) => selectedKbIds.value.includes(kb.id));
   const sharedList = orgStore.sharedKnowledgeBases || [];
   const sharedMapped = sharedList
@@ -782,6 +801,7 @@ const allSelectedItems = computed(() => {
 
 // 移除选中项（智能体配置的项也可以移除）
 const removeSelectedItem = (item: MentionItem) => {
+  if (settingsStore.settings.marketplaceProductId) return;
   if (item.type === "kb") {
     settingsStore.removeKnowledgeBase(item.id);
   } else if (item.type === "file") {
@@ -890,6 +910,8 @@ const inputPlaceholder = computed(() => {
 const loadKnowledgeBases = async (force = false) => {
   try {
     await chatResources.ensureKnowledgeBases(force);
+    // Marketplace resources are server-authorized service context, not editable workspace KBs.
+    if (settingsStore.settings.marketplaceProductId) return;
     const validKbs = knowledgeBases.value;
 
     const validKbIds = new Set(validKbs.map((kb: any) => kb.id));
@@ -2119,6 +2141,10 @@ const createSession = async (val: string) => {
   if (props.isReplying) {
     return MessagePlugin.error(t("input.messages.replying"));
   }
+  if (marketplaceEntryPending.value) {
+    MessagePlugin.info(t("creatorMarketplace.openingChat"));
+    return;
+  }
   // Only block while the file is still uploading (no document ID yet). Once
   // uploaded, sending is allowed even if parsing is still in progress: the
   // backend shows a "parsing attachment" step on the timeline and waits.
@@ -2159,6 +2185,11 @@ const createSession = async (val: string) => {
     && !chatResources.isConsumerSceneOptionsFresh(effectiveConsumerScene.value);
   if (!chatResources.isFresh("models") || sceneOptionsStale) {
     await loadChatModels();
+  }
+
+  if (settingsStore.settings.marketplaceProductId && !marketplaceChat.product?.access?.can_chat) {
+    MessagePlugin.warning(t("creatorMarketplace.noAccess"));
+    return;
   }
 
   // 发送前校验当前选中的智能体（含默认快速问答）是否已配置完成
@@ -2269,7 +2300,9 @@ const handleSelectAgent = async (agent: CustomAgent, sourceTenantId?: string) =>
   // 同步模型（选中的对话模型随智能体切换，含共享智能体）。
   // 网络搜索已由 selectAgent 重置为关闭，智能体配置只控制该开关是否可用。
   const agentModel = agent.config?.model_id;
-  if (agentModel && agentModel.trim() !== "") {
+  if (authStore.isLiteMode) {
+    ensureModelSelection();
+  } else if (agentModel && agentModel.trim() !== "") {
     selectedModelId.value = agentModel;
   } else {
     const lastPick = readLastChatModelID();
@@ -2453,15 +2486,20 @@ const collectAgentNotReadyReasons = (
   isAgentMode: boolean,
   sourceTenantId?: string,
 ): { keys: AgentNotReadyReasonKey[]; labels: string[] } => {
+  // Purchased delivery resources are validated by the server. The buyer does
+  // not own, configure, or receive their internal rerank/tool configuration.
+  if (settingsStore.settings.marketplaceProductId && agent.id === marketplaceChat.agent?.id) return { keys: [], labels: [] };
   const isSharedAgent = !!sourceTenantId;
   const isPlatformAnswerMode =
     !isSharedAgent &&
     agent.is_builtin &&
     (agent.id === BUILTIN_QUICK_ANSWER_ID || agent.id === BUILTIN_SMART_REASONING_ID);
-  const keys = getAgentNotReadyReasonKeys(agent.config, allModels.value, {
+  const useRuntimeChatModel = isPlatformAnswerMode || (authStore.isLiteMode && !isSharedAgent);
+  const readinessModels = useRuntimeChatModel ? [...allModels.value, ...availableModels.value] : allModels.value;
+  const keys = getAgentNotReadyReasonKeys(agent.config, readinessModels, {
     isAgentMode,
     isSharedAgent,
-    runtimeChatModelID: isPlatformAnswerMode ? selectedModelId.value : undefined,
+    runtimeChatModelID: useRuntimeChatModel ? selectedModelId.value : undefined,
   });
   return {
     keys,
@@ -2633,6 +2671,8 @@ const handleStop = async () => {
 };
 
 onBeforeRouteUpdate((to, from, next) => {
+  // Consuming the market entry parameter is not a conversation change.
+  if (to.path === from.path && (to.query.marketplace_product || from.query.marketplace_product)) { next(); return; }
   clearvalue();
   clearPendingUploads();
   next();

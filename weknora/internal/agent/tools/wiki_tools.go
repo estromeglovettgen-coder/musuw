@@ -735,15 +735,21 @@ func (t *wikiReadPageTool) Execute(ctx context.Context, args json.RawMessage) (*
 		}
 	}
 
+	data := map[string]interface{}{
+		"found_kbs":       foundKBs,
+		"ambiguous_slugs": ambiguous,
+		"truncated_slugs": truncatedSlugs,
+		"omitted_slugs":   omittedSlugs,
+	}
+	if _, marketplace := types.MarketplaceScopeFromContext(ctx); marketplace {
+		// Reuse native presentation sanitization: the model reads the page,
+		// while stream/history keep only its routing metadata and progress.
+		data["display_type"] = "wiki_pages"
+	}
 	return &types.ToolResult{
 		Success: true,
 		Output:  finalOutput,
-		Data: map[string]interface{}{
-			"found_kbs":       foundKBs,
-			"ambiguous_slugs": ambiguous,
-			"truncated_slugs": truncatedSlugs,
-			"omitted_slugs":   omittedSlugs,
-		},
+		Data:    data,
 	}, nil
 }
 

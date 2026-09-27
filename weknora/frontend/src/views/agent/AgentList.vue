@@ -1,5 +1,5 @@
 <template>
-  <div class="agent-list-container">
+  <div class="agent-list-container" :class="{ 'is-lite': authStore.isLiteMode }">
     <ListSpaceSidebar v-if="!authStore.isLiteMode" v-model="spaceSelection" :count-all="allAgentsCount"
       :count-mine="agents.length" :count-by-org="effectiveSharedCountByOrg" :count-favorites="agentFavoritesCount"
       :count-recents="agentRecentsCount" />
@@ -32,6 +32,16 @@
         </div>
       </div>
       <div class="agent-list-main">
+        <div v-if="authStore.isLiteMode" class="visual-knowledge-tabs agent-source-filters" role="tablist"
+          :aria-label="$t('creatorMarketplace.libraryFilterLabel')">
+          <button v-for="source in liteSources" :key="source.value" type="button" role="tab"
+            :class="{ 'is-active': liteSourceFilter === source.value }"
+            :aria-selected="liteSourceFilter === source.value" @click="liteSourceFilter = source.value">
+            {{ $t(source.label) }}
+          </button>
+        </div>
+        <template v-if="showNativeAgents">
+        <h2 v-if="authStore.isLiteMode" class="agent-library-heading">{{ $t('creatorMarketplace.agentLibraryMineTitle') }}</h2>
         <!-- creator filter removed; see KnowledgeBaseList for rationale.
              Card-level creator display + URL-state field are retained. -->
 
@@ -57,7 +67,7 @@
 
         <!-- 全部 / 收藏 / 最近：共用同一份卡片模板 -->
         <div
-          v-if="(spaceSelection === 'all' || spaceSelection === 'favorites' || spaceSelection === 'recents') && filteredAgents.length > 0"
+          v-if="!authStore.isLiteMode && (spaceSelection === 'all' || spaceSelection === 'favorites' || spaceSelection === 'recents') && filteredAgents.length > 0"
           class="agent-card-wrap">
           <template v-for="(agent, index) in filteredAgents"
             :key="agent.isMine ? agent.id : `shared-${agent.share_id}`">
@@ -267,7 +277,7 @@
         </div>
 
         <!-- 我的智能体 -->
-        <div v-if="spaceSelection === 'mine' && sortedMineAgents.length > 0" class="agent-card-wrap">
+        <div v-if="(authStore.isLiteMode || spaceSelection === 'mine') && sortedMineAgents.length > 0" class="agent-card-wrap">
           <template v-for="(agent, index) in sortedMineAgents" :key="agent.id">
             <!-- 内置：始终置顶。sortedMineAgents 已按 内置→我→同事 排序。 -->
             <div v-if="showShareGroupHeaders
@@ -554,7 +564,7 @@
         </div>
 
         <!-- 空状态：全部（保留创建 CTA） -->
-        <div v-if="spaceSelection === 'all' && filteredAgents.length === 0 && !loading" class="empty-state">
+        <div v-if="!authStore.isLiteMode && spaceSelection === 'all' && filteredAgents.length === 0 && !loading" class="empty-state">
           <img class="empty-img" src="@/assets/img/upload.svg" alt="">
           <span class="empty-txt">{{ $t('agent.empty.title') }}</span>
           <span class="empty-desc">{{ $t('agent.empty.description') }}</span>
@@ -579,7 +589,7 @@
           <span class="empty-desc">{{ $t('agent.empty.recentsDescription') }}</span>
         </div>
         <!-- 空状态：我的 -->
-        <div v-if="spaceSelection === 'mine' && agents.length === 0 && !loading" class="empty-state">
+        <div v-if="(authStore.isLiteMode ? sortedMineAgents.length === 0 : spaceSelection === 'mine' && agents.length === 0) && !loading" class="empty-state">
           <img class="empty-img" src="@/assets/img/upload.svg" alt="">
           <span class="empty-txt">{{ $t('agent.empty.title') }}</span>
           <span class="empty-desc">{{ $t('agent.empty.description') }}</span>
@@ -597,6 +607,10 @@
           <span class="empty-txt">{{ $t('agent.empty.sharedTitle') }}</span>
           <span class="empty-desc">{{ $t('agent.empty.sharedDescription') }}</span>
         </div>
+        </template>
+        <MarketplaceAgentCards v-if="showSubscribedAgents" :entries="marketplaceEntries"
+          :loading="marketplaceLoading" :failed="marketplaceFailed" :search-query="agentSearchQuery"
+          @retry="loadMarketplaceLibrary" />
       </div>
     </div>
 
@@ -723,6 +737,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useListUrlState } from '@/composables/useListUrlState'
 import { useResourcePins } from '@/composables/useResourcePins'
 import { integrationSectionKey } from '@/config/settingsRoute'
+import { useMarketplaceLibrary } from '@/composables/useMarketplaceLibrary'
+import MarketplaceAgentCards from '@/views/marketplace/MarketplaceAgentCards.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -732,6 +748,17 @@ const uiStore = useUIStore()
 const orgStore = useOrganizationStore()
 const chatResources = useChatResourcesStore()
 const { loaded: modelsReadyLoaded, isReadyForAgent } = useTenantModelReadiness()
+const { entries: marketplaceEntries, loading: marketplaceLoading, failed: marketplaceFailed, load: loadMarketplaceLibrary } = useMarketplaceLibrary()
+const liteSources = [
+  { value: 'all', label: 'creatorMarketplace.libraryFilterAll' },
+  { value: 'mine', label: 'creatorMarketplace.libraryFilterMine' },
+  { value: 'subscribed', label: 'creatorMarketplace.libraryFilterSubscribed' },
+] as const
+const liteSourceFilter = ref<'all' | 'mine' | 'subscribed'>('all')
+const showNativeAgents = computed(() => !authStore.isLiteMode || liteSourceFilter.value !== 'subscribed')
+const showSubscribedAgents = computed(() => authStore.isLiteMode
+  ? liteSourceFilter.value !== 'mine'
+  : spaceSelection.value === 'all' || spaceSelection.value === 'mine')
 
 interface AgentWithUI extends CustomAgent {
   showMore?: boolean
@@ -976,6 +1003,7 @@ const editorInitialHighlightField = ref<string>('')
 const openMoreAgentId = ref<string | null>(null)
 
 const showAgentListEmpty = computed(() => {
+  if (!showNativeAgents.value) return false
   if (loading.value) return false
   if (!authStore.hasRole('contributor')) return false
   if (spaceSelection.value === 'all' && filteredAgents.value.length === 0) return true
@@ -1419,6 +1447,13 @@ defineExpose({
 </script>
 
 <style scoped lang="less">
+@import '../knowledge/components/knowledge-base-layout.less';
+
+.agent-source-filters { width: fit-content; max-width: 100%; box-sizing: border-box; margin: 16px 0; }
+.agent-list-container.is-lite .agent-list-main { padding-top: 0 !important; }
+.agent-list-container.is-lite .agent-source-filters { margin-top: 0; }
+.agent-library-heading { margin: 16px 0 12px; font-size: 15px; }
+
 .agent-list-container {
   margin: 0;
   height: 100%;

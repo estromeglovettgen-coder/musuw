@@ -56,7 +56,10 @@ unit is a configuration error.
    The hosted build receives no production or staging secret and no SSH input.
    The workflow then runs `staging-only` through the independent GitHub
    `staging` Environment and restricted staging SSH gate. `workflow_run` is
-   staging-only by default; it never promotes production.
+   staging-only by default; it never promotes production. A manual `staging-only`
+   dispatch may also select an allowed feature branch, provided `immutable_ref`
+   matches that branch HEAD and the exact SHA has successful PR CI. Promotion
+   still requires canonical `origin/main`.
 5. Operators complete the full Paddle Sandbox billing/entitlement acceptance
    in [`STAGING_OPERATIONS.md`](STAGING_OPERATIONS.md), including purchase,
    upgrade, cancellation/expiry, recovery, signed webhook retry/idempotency and

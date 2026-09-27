@@ -430,6 +430,9 @@ func (h *Handler) writeAgentQueryEvent(
 	agentQueryEvent := createAgentQueryEvent(
 		sessionID, assistantMessageID, userMessageID, userCreatedAt, assistantCreatedAt,
 	)
+	if assistantMessage != nil && assistantMessage.ExecutionContext.MarketplaceProductID != "" {
+		agentQueryEvent.Data["marketplace_product_id"] = assistantMessage.ExecutionContext.MarketplaceProductID
+	}
 	if err := h.streamManager.AppendEvent(ctx, sessionID, assistantMessageID, agentQueryEvent); err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
 			"session_id": sessionID,

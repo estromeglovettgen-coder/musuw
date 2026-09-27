@@ -12,6 +12,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/application/service"
 	"github.com/Tencent/WeKnora/internal/common"
+	"github.com/Tencent/WeKnora/internal/handler"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/middleware/asynqdl"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
@@ -39,6 +40,7 @@ type AsynqTaskParams struct {
 	TagService              interfaces.KnowledgeTagService
 	DataSourceService       interfaces.DataSourceService
 	EntitlementService      interfaces.EntitlementService
+	MarketplaceService      interfaces.MarketplaceService
 	PaddleBillingOperations interfaces.PaddleBillingOperationRepository
 	AccountErasure          interfaces.AccountErasureService
 	ChunkExtractor          interfaces.TaskHandler `name:"chunkExtractor"`
@@ -331,7 +333,14 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 
 	// Paddle HTTP handlers enqueue only the canonical secret-free projection;
 	// this worker performs the existing idempotent entitlement mutation.
-	mux.HandleFunc(types.TypePaddleWebhook, NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle)
+	mux.HandleFunc(
+		types.TypePaddleWebhook,
+		NewPaddleWebhookTaskHandler(params.EntitlementService, params.PaddleBillingOperations).Handle,
+	)
+	mux.HandleFunc(
+		types.TypeMarketplaceWebhook,
+		handler.NewMarketplaceWebhookTaskHandler(params.MarketplaceService).Handle,
+	)
 	// Register long-term memory distillation handler
 	mux.HandleFunc(types.TypeMemoryExtract, params.MemoryService.Handle)
 

@@ -227,6 +227,7 @@ const authStore = useAuthStore();
 let parentMd = ref()
 const { float: citationFloat, rebind: rebindCitations, cancelClose: cancelCitationClose, scheduleClose: scheduleCitationClose } = useChatCitationPopover(parentMd, {
     getKnowledgeReferences: () => props.session?.knowledge_references,
+    marketplaceProductId: () => props.session?.marketplace_product_id,
     sessionId: () => props.sessionId,
 });
 let reviewUrl = ref('')

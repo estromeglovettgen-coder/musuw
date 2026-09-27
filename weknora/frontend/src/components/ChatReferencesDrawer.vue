@@ -36,7 +36,7 @@
                     <div class="visual-reference-item__title-row">
                       <span class="visual-reference-document__icon" aria-hidden="true"><t-icon name="file" /></span>
                       <h5>{{ item.title }}</h5>
-                      <a v-if="item.knowledgeBaseId && !embeddedMode" class="visual-reference-item__open" :href="getDocumentHref(item)" target="_blank" rel="noopener noreferrer" :aria-label="t('chat.navigateToDocument')" :title="t('chat.navigateToDocument')" @click.stop><t-icon name="jump" /></a>
+                      <a v-if="item.knowledgeBaseId && !embeddedMode && !marketplaceActive" class="visual-reference-item__open" :href="getDocumentHref(item)" target="_blank" rel="noopener noreferrer" :aria-label="t('chat.navigateToDocument')" :title="t('chat.navigateToDocument')" @click.stop><t-icon name="jump" /></a>
                     </div>
                     <p v-if="item.snippet && !expandedKeys.has(item.key)" class="visual-reference-item__snippet">{{ formatReferenceSnippet(item.snippet) }}</p>
                     <div v-if="expandedKeys.has(item.key)" class="visual-reference-item__content">{{ formatReferenceSnippet(item.content) }}</div>
@@ -77,6 +77,7 @@ const props = defineProps<{ embeddedMode?: boolean; overlayBreakpoint?: number }
 const { t } = useI18n()
 const router = useRouter()
 const drawer = useChatReferencesDrawer()
+const marketplaceActive = computed(() => Boolean(drawer?.marketplaceProductId.value))
 const listElement = ref<HTMLElement | null>(null)
 const itemElements = new Map<string, HTMLElement>()
 const expandedKeys = reactive(new Set<string>())

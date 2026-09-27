@@ -11,9 +11,10 @@ const { outputText } = ts.transpileModule(read('./menu.ts'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
 });
 const menuExports = {};
+const draftAuth = require('vue').reactive({ isLiteMode: true, currentUserId: 'draft-owner', effectiveTenantId: 'workspace-a' });
 runInThisContext(`(function(exports, require) {${outputText}\n})`)(menuExports, (name) => {
   if (name === '@/i18n') return { global: { t: (key) => key, locale: { value: 'zh-CN' } } };
-  if (name === '@/stores/auth') return { useAuthStore: () => ({ isLiteMode: true }) };
+  if (name === '@/stores/auth') return { useAuthStore: () => draftAuth };
   if (name === '@/stores/deploymentCapabilities') return { useDeploymentCapabilitiesStore: () => ({ isSupported: () => true }) };
   return require(name);
 });
@@ -39,4 +40,15 @@ test('homepage and chat parent forward the first message depth without an unrela
   }
   assert.match(chat, /sendMsg\(firstQuery\.value,[^;]+firstThinking\.value, firstReasoningEffort\.value\)/);
   assert.doesNotMatch(chat, /reasoningEffort = [^\n]+\|\| 'high'/);
+});
+
+
+test('the unsent homepage draft is isolated to its account and workspace', () => {
+  const store = menuExports.useMenuStore(require('pinia').createPinia());
+  store.newChatDraft = 'private draft';
+  draftAuth.currentUserId = 'another-account';
+  assert.equal(store.newChatDraft, '');
+  store.newChatDraft = 'workspace-specific draft';
+  draftAuth.effectiveTenantId = 'workspace-b';
+  assert.equal(store.newChatDraft, '');
 });

@@ -291,10 +291,25 @@ func (r *wikiPageRepository) GetByID(ctx context.Context, id string) (*types.Wik
 	return &page, nil
 }
 
+// marketplaceWikiReadScope restricts the native read queries without changing
+// tenant identity or granting access to unrelated source libraries.
+func marketplaceWikiReadScope(ctx context.Context, kbID string) func(*gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		scope, ok := types.MarketplaceScopeFromContext(ctx)
+		if !ok {
+			return db
+		}
+		if !scope.AllowsKnowledgeBase(kbID, scope.SourceTenantID()) {
+			return db.Where("1 = 0")
+		}
+		return db.Where("tenant_id = ? AND status = ?", scope.SourceTenantID(), types.WikiPageStatusPublished)
+	}
+}
+
 // GetBySlug retrieves a wiki page by slug within a knowledge base
 func (r *wikiPageRepository) GetBySlug(ctx context.Context, kbID string, slug string) (*types.WikiPage, error) {
 	var page types.WikiPage
-	if err := r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).Scopes(marketplaceWikiReadScope(ctx, kbID)).
 		Where("knowledge_base_id = ? AND slug = ?", kbID, slug).
 		First(&page).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -307,7 +322,7 @@ func (r *wikiPageRepository) GetBySlug(ctx context.Context, kbID string, slug st
 
 // List retrieves wiki pages with filtering and pagination
 func (r *wikiPageRepository) List(ctx context.Context, req *types.WikiPageListRequest) ([]*types.WikiPage, int64, error) {
-	query := r.db.WithContext(ctx).Model(&types.WikiPage{}).
+	query := r.db.WithContext(ctx).Scopes(marketplaceWikiReadScope(ctx, req.KnowledgeBaseID)).Model(&types.WikiPage{}).
 		Where("knowledge_base_id = ?", req.KnowledgeBaseID)
 
 	if pageTypes := types.SplitWikiPageTypes(req.PageType); len(pageTypes) == 1 {
@@ -432,7 +447,7 @@ func (r *wikiPageRepository) ListByTypeLight(
 		offset = 0
 	}
 
-	base := r.db.WithContext(ctx).
+	base := r.db.WithContext(ctx).Scopes(marketplaceWikiReadScope(ctx, kbID)).
 		Model(&types.WikiPage{}).
 		Where("knowledge_base_id = ? AND page_type = ? AND status <> ?",
 			kbID, pageType, types.WikiPageStatusArchived)
@@ -745,7 +760,7 @@ func (r *wikiPageRepository) CountPagesByFolder(
 		Cnt      int64
 	}
 	var rows []folderCount
-	q := r.db.WithContext(ctx).
+	q := r.db.WithContext(ctx).Scopes(marketplaceWikiReadScope(ctx, kbID)).
 		Model(&types.WikiPage{}).
 		Select("folder_id, COUNT(*) as cnt").
 		Where("knowledge_base_id = ? AND status <> ?", kbID, types.WikiPageStatusArchived)
@@ -895,7 +910,7 @@ func (r *wikiPageRepository) ExistsSlugs(
 		return nil, nil
 	}
 	var live []string
-	if err := r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).Scopes(marketplaceWikiReadScope(ctx, kbID)).
 		Model(&types.WikiPage{}).
 		Where("knowledge_base_id = ? AND slug IN ? AND status <> ?",
 			kbID, slugs, types.WikiPageStatusArchived).
@@ -1155,7 +1170,7 @@ func (r *wikiPageRepository) FindPagesByNormalizedTitles(
 // ListAll retrieves all non-archived wiki pages in a knowledge base.
 func (r *wikiPageRepository) ListAll(ctx context.Context, kbID string) ([]*types.WikiPage, error) {
 	var pages []*types.WikiPage
-	if err := r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).Scopes(marketplaceWikiReadScope(ctx, kbID)).
 		Where("knowledge_base_id = ? AND status <> ?", kbID, types.WikiPageStatusArchived).
 		Order("page_type ASC, title ASC").
 		Find(&pages).Error; err != nil {
@@ -1267,7 +1282,7 @@ func (r *wikiPageRepository) Search(ctx context.Context, kbID string, query stri
 		"ELSE 0 END AS match_rank"
 
 	var pages []*types.WikiPage
-	if err := r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).Scopes(marketplaceWikiReadScope(ctx, kbID)).
 		Select("*, "+rankExpr, query, query, query, query).
 		Where("knowledge_base_id = ? AND (title ~* ? OR content ~* ? OR summary ~* ? OR slug ~* ?)",
 			kbID, query, query, query, query).
@@ -1287,7 +1302,7 @@ func (r *wikiPageRepository) CountByType(ctx context.Context, kbID string) (map[
 		Count    int64
 	}
 	var results []result
-	if err := r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).Scopes(marketplaceWikiReadScope(ctx, kbID)).
 		Model(&types.WikiPage{}).
 		Select("page_type, count(*) as count").
 		Where("knowledge_base_id = ? AND status <> ?", kbID, types.WikiPageStatusArchived).
@@ -1306,7 +1321,7 @@ func (r *wikiPageRepository) CountByType(ctx context.Context, kbID string) (map[
 // CountOrphans returns the number of pages with no inbound links
 func (r *wikiPageRepository) CountOrphans(ctx context.Context, kbID string) (int64, error) {
 	var count int64
-	if err := r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).Scopes(marketplaceWikiReadScope(ctx, kbID)).
 		Model(&types.WikiPage{}).
 		Where("knowledge_base_id = ? AND status <> ?", kbID, types.WikiPageStatusArchived).
 		Where(r.wikiEmptyInLinksPredicate()).

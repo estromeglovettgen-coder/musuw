@@ -75,7 +75,9 @@ grep -Fq 'weknora/docker/searxng/settings.yml' "$script_dir/source-manifest.sh" 
 grep -Fq 'integration/weknora-production/searxng-entrypoint.sh' "$script_dir/source-manifest.sh" || fail 'staging source manifest omits the reused SearXNG entrypoint'
 grep -Fq 'S3_BUCKET_NAME: ${MUSUW_STAGING_R2_BUCKET:?set MUSUW_STAGING_R2_BUCKET}' "$staging_root/compose.yaml" || fail 'staging R2 bucket is not runtime-selected'
 grep -Fq 'WEKNORA_REDIS_NAMESPACE: weknora-v072-staging' "$staging_root/compose.yaml" || fail 'staging Redis namespace is not isolated'
-grep -Fq 'NEO4J_ENABLE: "false"' "$staging_root/compose.yaml" || fail 'staging must disable Neo4j'
+grep -Fq 'NEO4J_ENABLE: "true"' "$staging_root/compose.yaml" || fail 'staging must enable its isolated Neo4j'
+grep -Fq 'integration/weknora-production/neo4j-entrypoint.sh' "$script_dir/source-manifest.sh" || fail 'staging source manifest omits the reused Neo4j entrypoint'
+grep -Fq 'neo4j_auth' "$staging_root/app-entrypoint.sh" || fail 'staging app does not read file-backed Neo4j auth'
 grep -Fq 'MUSUW_STAGING_SECRET_DIR' "$staging_root/compose.yaml" || fail 'staging secret root is not explicit'
 grep -Fq '/opt/weknora/staging-runtime/secrets' "$staging_root/compose.yaml" || fail 'staging secret root is not the fixed server path'
 grep -Fq 'file: ${MUSUW_STAGING_SECRET_DIR:?set MUSUW_STAGING_SECRET_DIR}/searxng_secret' "$staging_root/compose.yaml" || fail 'staging SearXNG secret is not file-backed'
@@ -117,7 +119,7 @@ if grep -Eq '^\s+build:' "$staging_root/compose.yaml" &&
     fail 'staging overlay still permits a server-side build'
 fi
 
-for service in frontend app postgres redis docreader searxng-init searxng; do
+for service in frontend app postgres redis docreader searxng-init searxng neo4j; do
     grep -A160 -E "^  ${service}:" "$staging_root/compose.yaml" | grep -Eq 'cpus:|mem_limit:|pids_limit:' ||
         fail "staging ${service} does not declare CPU/memory/pids limits"
 done
@@ -143,7 +145,7 @@ grep -Fq 'musnow-production_edge' "$staging_root/compose.edge.yaml" || fail 'sta
 grep -Fq 'noindex' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not enforce noindex'
 grep -Fq 'staging-searxng' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not assert SearXNG topology'
 grep -Fq '/search?q=musuw-staging-health' "$script_dir/verify-deployed.sh" || fail 'staging deployed verification does not probe SearXNG search'
-grep -Fq 'searxng-init searxng app frontend' "$script_dir/release-ci.sh" || fail 'staging release helper does not start SearXNG'
+grep -Fq 'searxng-init searxng neo4j app frontend' "$script_dir/release-ci.sh" || fail 'staging release helper does not start SearXNG'
 grep -Fq 'latest_migration_version' "$script_dir/release-ci.sh" || fail 'staging release helper does not resolve the latest schema migration'
 grep -Fq 'docker exec weknora-v072-staging-app bash -o pipefail -ec' "$script_dir/release-ci.sh" || fail 'staging release helper does not fail closed when the app migration inventory command fails'
 grep -Fq '[ -n "$latest_migration_version" ]' "$script_dir/release-ci.sh" "$script_dir/verify-deployed.sh" || fail 'staging migration gate does not fail closed on an empty app migration inventory'
