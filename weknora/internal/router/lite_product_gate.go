@@ -726,15 +726,15 @@ func liteProductRouteBlocked(method, path string) bool {
 		return true
 	}
 
-	// System settings/admin probes are hidden. These three read-only endpoints
-	// are retained because the KB document workflow uses them for parser/storage
-	// availability and the app uses system info for edition detection.
+	// System settings/admin probes are hidden. These read-only endpoints
+	// support capability, parser/storage, and edition discovery in Lite.
 	if path == "/api/v1/system" || strings.HasPrefix(path, "/api/v1/system/") {
 		if method != http.MethodGet {
 			return true
 		}
 		switch path {
-		case "/api/v1/system/info",
+		case "/api/v1/system/capabilities",
+			"/api/v1/system/info",
 			"/api/v1/system/parser-engines",
 			"/api/v1/system/storage-engine-status":
 			return false

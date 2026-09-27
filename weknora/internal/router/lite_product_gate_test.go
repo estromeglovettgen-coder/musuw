@@ -74,6 +74,8 @@ func TestLiteProductRouteBlocked(t *testing.T) {
 		{name: "kb initialize", method: "POST", path: "/api/v1/initialization/initialize/1", blocked: true},
 		{name: "parser catalog", method: "GET", path: "/api/v1/system/parser-engines", blocked: false},
 		{name: "storage status", method: "GET", path: "/api/v1/system/storage-engine-status", blocked: false},
+		{name: "capability discovery", method: "GET", path: "/api/v1/system/capabilities", blocked: false},
+		{name: "capability discovery is read-only", method: "POST", path: "/api/v1/system/capabilities", blocked: true},
 		{name: "system info", method: "GET", path: "/api/v1/system/info", blocked: false},
 		{name: "organization list hidden", method: "GET", path: "/api/v1/organizations", blocked: true},
 		{name: "organization read hidden", method: "GET", path: "/api/v1/organizations/3", blocked: true},
