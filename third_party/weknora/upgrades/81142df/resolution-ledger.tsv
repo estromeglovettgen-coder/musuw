@@ -129,7 +129,7 @@ docs/wiki/核心功能/Agent技能系统.md	-	M	100644	1327ec6564daa8f98e5b1f10e
 docs/wiki/核心功能/知识图谱.md	-	M	100644	5c8bea6bfaf15c6ebe27291f05faacdc8afcfd73	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/docker-entrypoint.sh	M	M	100644	e2fae3e58ad2b1c4e2c0237923c5d072f5703400	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/embed.html	M	-	100644	de977639553792698cc7279fd460b950fe324cd7	preserve-musuw-exact		audited local-only content is byte-identical
-frontend/index.html	M	-	100644	7806948d1d8e541bacef5ea5ec70106790137d51	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+frontend/index.html	M	-	100644	f00a5e0ef20ba4362327d80acf1a4c89a719710d	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 frontend/nginx.conf	M	-	100644	f78be4c3509a18328f5d85f61fd0d8b49d1ca37f	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/operations.html	A	-	100644	39a0cceaf770893a1d1f58d11656a663a0caafef	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/package-lock.json	M	M	100644	1c19e6f7eb4f7cc8e59bb7f4b8b1a8fd3624faaf	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner

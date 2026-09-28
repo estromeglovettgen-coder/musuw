@@ -120,7 +120,14 @@
   }
   var slowTimer = setTimeout(function () { show(1); }, 10000);
   function failed(event) {
-    if (event.type === 'error' && event.target !== window && event.target.tagName !== 'SCRIPT') return;
+    if (event.type === 'error' && event.target !== window) {
+      var script = event.target;
+      if (script.tagName !== 'SCRIPT' || !script.getAttribute('src')) return;
+      var source;
+      try { source = new URL(script.src, location.href); } catch (_) { return; }
+      // Optional analytics or icon scripts cannot decide whether the app loads.
+      if (source.origin !== location.origin || (source.pathname !== '/config.js' && script !== document.querySelector('script[type="module"][src]'))) return;
+    }
     clearTimeout(slowTimer);
     show(2);
   }

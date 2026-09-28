@@ -52,6 +52,31 @@ for (const [name, entry] of [['workspace', 'weknora/frontend/index.html'], ['sig
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true)
   })
 
+  test(`${name}: optional script failures do not misreport startup failure, but config failure does`, async ({ page }) => {
+    await fixture(page, 'module-pending')
+    await page.route('**/optional-startup.js', route => route.abort('failed'))
+    await page.goto('http://musuw-startup.test/', { waitUntil: 'commit' })
+    await expect(page.getByText('正在打开 Musuw…')).toBeVisible()
+    for (const source of ['https://static.cloudflareinsights.com/optional-startup.js', '/optional-startup.js']) {
+      await page.evaluate(source => new Promise<void>(resolve => {
+        const script = document.createElement('script')
+        script.src = source
+        script.onerror = () => resolve()
+        document.body.append(script)
+      }), source)
+      await expect(page.getByText('正在打开 Musuw…')).toBeVisible()
+      await expect(page.getByRole('button', { name: '重试' })).toBeHidden()
+    }
+    await page.route('**/config.js?failure=1', route => route.abort('failed'))
+    await page.evaluate(() => {
+      const script = document.createElement('script')
+      script.src = '/config.js?failure=1'
+      document.body.append(script)
+    })
+    await expect(page.getByText('页面未能加载，请检查网络后重试。')).toBeVisible()
+    await expect(page.getByRole('button', { name: '重试' })).toBeVisible()
+  })
+
   test(`${name}: slow module gives a retry without declaring the session invalid`, async ({ page }) => {
     await page.clock.install()
     await fixture(page, 'module-pending')
