@@ -16,6 +16,7 @@ on:
       - 'playwright.marketplace.config.ts'
       - 'playwright.operations*.config.ts'
       - 'playwright.startup-feedback.config.ts'
+      - 'playwright.production-bundle.config.ts'
       - 'scripts/**'
       - 'scripts/weknora-staging/**'
       - 'scripts/weknora-staging-deploy.sh'
@@ -50,6 +51,7 @@ on:
       - 'playwright.marketplace.config.ts'
       - 'playwright.operations*.config.ts'
       - 'playwright.startup-feedback.config.ts'
+      - 'playwright.production-bundle.config.ts'
       - 'scripts/**'
       - 'scripts/weknora-staging/**'
       - 'scripts/weknora-staging-deploy.sh'
@@ -153,6 +155,12 @@ jobs:
         run: npm run admin:e2e:recovery
       - name: Exercise startup feedback and recovery without external services
         run: npx playwright test --config=playwright.startup-feedback.config.ts --project=chromium
+      - name: Build real production modules for route acceptance
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npm --prefix weknora/frontend run build
+      - name: Exercise production knowledge, Wiki and graph module navigation
+        run: npx playwright test --config=playwright.production-bundle.config.ts
       - name: Preserve browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
@@ -165,6 +173,7 @@ jobs:
             test-results/creator-marketplace
             test-results/operations-recovery
             test-results/startup-feedback
+            test-results/production-bundle
           retention-days: 7
 
   auth:

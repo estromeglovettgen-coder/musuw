@@ -605,6 +605,11 @@ router.beforeEach(async (to, from, next) => {
   next()
 })
 
+router.onError((error) => {
+  console.error(error)
+  MessagePlugin.error(i18n.global.t('common.pageLoadFailed'))
+})
+
 router.afterEach((to) => {
   if (!isLiteEdition(useAuthStore())) return
   if (to.path === '/login') return

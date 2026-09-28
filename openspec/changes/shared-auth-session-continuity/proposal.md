@@ -20,4 +20,6 @@ None in the consolidated spec store. This supersedes the session-only identity d
 
 ## Impact
 
-Musuw auth shell, its tests and release evidence only. No database migration, dependency, paid service, native WeKnora auth change or new authentication protocol. Private incident records stay outside the repository.
+Musuw auth shell, its tests and release evidence. No database migration, dependency, paid service, native WeKnora auth change or new authentication protocol. Private incident records stay outside the repository.
+
+Before production promotion, a reported knowledge-card navigation failure revealed a current release blocker in the existing frontend chunk policy. The same release must correct the overbroad Dagre chunk assignment, provide route-load failure feedback, and exercise actual production bundles through documents, Wiki and graph. This restores existing navigation without changing knowledge-base behavior.

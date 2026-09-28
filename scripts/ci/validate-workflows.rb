@@ -86,7 +86,7 @@ ci_on = root_key(ci, "on")
 fail_contract "ci.yml must run on pull requests" unless ci_on.key?("pull_request")
 fail_contract "ci.yml must run on pushes to main" unless ci_on.dig("push", "branches") == ["main"]
 fail_contract "ci.yml must cancel superseded runs" unless ci.dig("concurrency", "cancel-in-progress") == true
-required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SOURCE_MANIFEST* *PROVENANCE* docs/DEPLOYMENT.md integration/weknora-staging/** scripts/weknora-staging/** scripts/weknora-staging-deploy.sh integration/operations/** playwright.operations*.config.ts shared/** playwright.startup-feedback.config.ts]
+required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SOURCE_MANIFEST* *PROVENANCE* docs/DEPLOYMENT.md integration/weknora-staging/** scripts/weknora-staging/** scripts/weknora-staging-deploy.sh integration/operations/** playwright.operations*.config.ts shared/** playwright.startup-feedback.config.ts playwright.production-bundle.config.ts]
 %w[pull_request push].each do |trigger|
   configured = Array(ci_on.dig(trigger, "paths"))
   missing = required_ci_paths.reject { |path| configured.include?(path) }
@@ -97,6 +97,11 @@ frontend_steps = Array(ci.dig("jobs", "frontend", "steps"))
 frontend_build = frontend_steps.find { |step| step.is_a?(Hash) && step["name"] == "Build frontend" }
 fail_contract "frontend build must pin NODE_OPTIONS to a 4096 MiB heap" unless frontend_build&.dig("env", "NODE_OPTIONS") == "--max-old-space-size=4096"
 fail_contract "frontend tests must not inherit the build-only NODE_OPTIONS override" if ci.dig("jobs", "frontend", "env", "NODE_OPTIONS")
+browser_steps = Array(ci.dig("jobs", "session-batch-browser", "steps"))
+production_build_index = browser_steps.index { |step| step["run"] == "npm --prefix weknora/frontend run build" }
+production_browser_index = browser_steps.index { |step| step["run"] == "npx playwright test --config=playwright.production-bundle.config.ts" }
+fail_contract "production route browser acceptance must consume a fresh production build" unless production_build_index && production_browser_index && production_build_index < production_browser_index
+fail_contract "production browser build must pin NODE_OPTIONS to a 4096 MiB heap" unless browser_steps[production_build_index].dig("env", "NODE_OPTIONS") == "--max-old-space-size=4096"
 
 expected_npm_cache_policy = "npm"
 {

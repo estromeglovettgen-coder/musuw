@@ -2283,6 +2283,7 @@ export default {
     }
   },
   common: {
+    pageLoadFailed: 'Unable to load this page. Please refresh and try again.',
     add: 'Add',
     search: 'Search',
     me: 'Me',

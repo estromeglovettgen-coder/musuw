@@ -186,7 +186,7 @@ export default defineConfig({
         onlyExplicitManualChunks: true,
         manualChunks(id) {
           if (!id.includes('node_modules')) return
-          if (id.includes('mermaid') || id.includes('/dagre') || id.includes('cytoscape')) {
+          if (id.includes('mermaid') || id.includes('cytoscape')) {
             return 'vendor-mermaid'
           }
           if (id.includes('marked') || id.includes('katex')) {
