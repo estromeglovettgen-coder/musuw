@@ -14,5 +14,5 @@
 
 - [x] 3.1 Verify normal, interrupted, slow, unavailable and recovered login with real modules and browser navigation fixtures; test privacy rejection and backward compatibility.
 - [x] 3.2 Run affected frontend/auth/backend tests, typechecks/builds, strict specification validation and one consolidated adversarial review.
-- [ ] 3.3 Build in GitHub, verify exact staged images and live diagnostic consumption, record scoped release evidence and promote the same digests.
-- [ ] 3.4 Verify production health, login UI, diagnostic acceptance/persistence and give the user a precise mobile recheck path; state the remaining real-browser evidence requirement honestly.
+- [x] 3.3 Build in GitHub, verify exact staged images and live diagnostic consumption, record scoped release evidence and promote the same digests.
+- [x] 3.4 Verify production health, login UI, diagnostic acceptance/persistence and give the user a precise mobile recheck path; state the remaining real-browser evidence requirement honestly.
