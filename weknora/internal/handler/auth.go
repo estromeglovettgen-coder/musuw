@@ -8,7 +8,9 @@ import (
 	stderrors "errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -296,9 +298,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Failure      403           {object}  errors.AppError  "OIDC未启用"
 // @Router       /auth/oidc/url [get]
 func (h *AuthHandler) GetOIDCAuthorizationURL(c *gin.Context) {
+	started := time.Now()
+	outcome, reason := "error", "start_failed"
+	defer func() { logOIDCDiagnostic(c, "oidc.start", outcome, reason, started) }()
 	ctx := c.Request.Context()
 	redirectURI := strings.TrimSpace(c.Query("redirect_uri"))
 	if redirectURI == "" {
+		reason = "invalid_request"
 		appErr := errors.NewValidationError("redirect_uri is required")
 		c.Error(appErr)
 		return
@@ -306,7 +312,6 @@ func (h *AuthHandler) GetOIDCAuthorizationURL(c *gin.Context) {
 
 	resp, err := h.userService.GetOIDCAuthorizationURL(ctx, redirectURI)
 	if err != nil {
-		logger.Errorf(ctx, "Failed to generate OIDC authorization URL: %v", err)
 		appErr := errors.NewForbiddenError("OIDC authorization unavailable").WithDetails(err.Error())
 		c.Error(appErr)
 		return
@@ -316,13 +321,14 @@ func (h *AuthHandler) GetOIDCAuthorizationURL(c *gin.Context) {
 	// Neither value is serialized into the response body or authorization URL.
 	binding, err := encodeOIDCBrowserBinding(resp.Nonce, resp.CodeVerifier)
 	if err != nil {
-		logger.Errorf(ctx, "Failed to encode OIDC browser binding: %v", err)
+		reason = "binding_invalid"
 		c.Error(errors.NewInternalServerError("OIDC authorization unavailable"))
 		return
 	}
 	setOIDCBrowserBinding(c, binding, oidcBindingCookieMaxAge)
 	setOIDCNonceCookie(c, resp.Nonce)
 
+	outcome, reason = "ok", "success"
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -364,10 +370,12 @@ func oidcCallbackURL(c *gin.Context) string {
 // @Success      302
 // @Router       /auth/oidc/start [get]
 func (h *AuthHandler) OIDCStart(c *gin.Context) {
+	started := time.Now()
+	outcome, reason := "error", "start_failed"
+	defer func() { logOIDCDiagnostic(c, "oidc.start", outcome, reason, started) }()
 	ctx := c.Request.Context()
 	resp, err := h.userService.GetOIDCAuthorizationURL(ctx, oidcCallbackURL(c))
 	if err != nil {
-		logger.Errorf(ctx, "Failed to generate OIDC authorization URL: %v", err)
 		appErr := errors.NewForbiddenError("OIDC authorization unavailable").WithDetails(err.Error())
 		c.Error(appErr)
 		return
@@ -380,6 +388,7 @@ func (h *AuthHandler) OIDCStart(c *gin.Context) {
 		setOIDCBrowserBinding(c, binding, oidcBindingCookieMaxAge)
 	}
 	setOIDCNonceCookie(c, resp.Nonce)
+	outcome, reason = "ok", "success"
 	c.Redirect(http.StatusFound, resp.AuthorizationURL)
 }
 
@@ -419,10 +428,14 @@ func (h *AuthHandler) GetOIDCConfig(c *gin.Context) {
 // @Success      302
 // @Router       /auth/oidc/callback [get]
 func (h *AuthHandler) OIDCRedirectCallback(c *gin.Context) {
+	started := time.Now()
+	outcome, reason := "error", "invalid_state"
+	defer func() { logOIDCDiagnostic(c, "oidc.callback", outcome, reason, started) }()
 	ctx := c.Request.Context()
 	frontendRedirectURI := "/"
 
 	if providerError := strings.TrimSpace(c.Query("error")); providerError != "" {
+		reason = "provider_error"
 		// A cancelled or rejected authorization must not leave a reusable
 		// browser binding behind.
 		setOIDCBrowserBinding(c, "", -1)
@@ -435,7 +448,11 @@ func (h *AuthHandler) OIDCRedirectCallback(c *gin.Context) {
 	state := strings.TrimSpace(c.Query("state"))
 	decodedState, err := decodeOIDCState(state, c.Request)
 	if err != nil {
-		logger.Errorf(ctx, "Failed to decode OIDC state: %v", err)
+		// Preserve the original verification order; classify only its known
+		// missing-binding error, never the untrusted state or cookie values.
+		if err.Error() == errors.NewValidationError("oidc browser binding cookie missing").Error() {
+			reason = "cookie_missing"
+		}
 		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape("invalid_state"))
 		return
 	}
@@ -445,6 +462,7 @@ func (h *AuthHandler) OIDCRedirectCallback(c *gin.Context) {
 
 	code := strings.TrimSpace(c.Query("code"))
 	if code == "" {
+		reason = "missing_code"
 		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape("missing_code"))
 		return
 	}
@@ -457,24 +475,66 @@ func (h *AuthHandler) OIDCRedirectCallback(c *gin.Context) {
 		h.resolveOIDCProvisioningMode(ctx),
 	)
 	if err != nil {
-		logger.Errorf(ctx, "Failed to complete OIDC login via redirect callback: %v", err)
+		reason = "exchange_failed"
 		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape("login_failed"))
 		return
 	}
 	if !resp.Success {
-		logger.Warnf(ctx, "OIDC login rejected by service: %s", resp.Message)
+		reason = "exchange_failed"
 		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape("login_failed"))
 		return
 	}
 
 	payload, err := encodeOIDCCallbackPayload(resp)
 	if err != nil {
-		logger.Errorf(ctx, "Failed to encode OIDC callback payload: %v", err)
+		reason = "payload_encode_failed"
 		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape("payload_encode_failed"))
 		return
 	}
 
+	outcome, reason = "ok", "success"
 	c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_result="+urlQueryEscape(payload))
+}
+
+// The journey cookie is only an untrusted, short-lived diagnostic correlator.
+// It never participates in state/nonce/PKCE checks or grants authentication.
+func diagnosticJourneyID(c *gin.Context, now time.Time) string {
+	raw, err := c.Cookie("musuw_diagnostic_journey")
+	if err != nil {
+		return ""
+	}
+	id, issued, ok := strings.Cut(raw, ".")
+	if !ok || !validDiagnosticUUID(id) || len(issued) != 13 {
+		return ""
+	}
+	millis, err := strconv.ParseInt(issued, 10, 64)
+	if err != nil {
+		return ""
+	}
+	age := now.UnixMilli() - millis
+	if age < -60000 || age > 600000 {
+		return ""
+	}
+	return id
+}
+
+func logOIDCDiagnostic(c *gin.Context, phase, outcome, reason string, started time.Time) {
+	duration := time.Since(started).Milliseconds()
+	if duration < 0 {
+		duration = 0
+	}
+	if duration > 120000 {
+		duration = 120000
+	}
+	fields := logger.Fields{"phase": phase, "outcome": outcome, "reason": reason, "duration_ms": duration}
+	if requestID := c.GetString(types.RequestIDContextKey.String()); clientDiagnosticRequestID.MatchString(requestID) {
+		fields["request_id"] = requestID
+	}
+	if journey := diagnosticJourneyID(c, time.Now()); journey != "" {
+		fields["journey_id"] = journey
+	}
+	// Do not inherit request headers, cookies, IPs or authenticated user context.
+	logger.GetLogger(context.Background()).WithFields(fields).Info("auth_diagnostic")
 }
 
 func encodeOIDCCallbackPayload(resp *types.OIDCCallbackResponse) (string, error) {

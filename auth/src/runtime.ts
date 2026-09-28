@@ -147,7 +147,7 @@ type ExpectedWeKnoraAuthorization = Readonly<{
 export type EmailOtpSendView =
   | Readonly<{ email: string; state: "email_otp_sent" }>
   | Readonly<{
-      code: "email_invalid" | "email_send_failed" | "identity_network_error";
+      code: "email_invalid" | "email_send_failed" | "identity_network_error" | "rate_limited";
       state: "email_otp_error";
     }>;
 
@@ -186,6 +186,7 @@ export type PasswordResetRequestView =
 export type AuthorizationContinuationView =
   | Readonly<{ state: "authorization_complete" }>
   | Readonly<{ state: "authorization_login_required" }>
+  | Readonly<{ state: "authorization_unavailable" }>
   | Readonly<{
       code:
         | "authorization_invalid"
@@ -205,7 +206,7 @@ export type AuthStartView =
   | Readonly<{ state: "start_complete" }>
   | Readonly<{ state: "start_login_required" }>
   | Readonly<{
-      code: "native_oidc_unavailable" | "native_session_unavailable";
+      code: "native_oidc_unavailable" | "native_session_unavailable" | "identity_session_unavailable";
       state: "start_error";
     }>;
 
@@ -533,14 +534,21 @@ export function createAuthRuntime(options: RuntimeOptions) {
     return parseLoginFlow(parsed, timestamp);
   };
 
-  const currentIdentitySession = async (): Promise<IdentitySession | null> => {
+  const recordState = (phase: DiagnosticPhase, reason: NonNullable<DiagnosticEvent["reason"]>, outcome: DiagnosticEvent["outcome"] = "ok"): void => {
+    try { options.onDiagnostic?.({ phase, reason, outcome, duration_ms: 0 }); }
+    catch { /* Operational reporting cannot change authentication. */ }
+  };
+
+  const currentIdentitySession = async (): Promise<"present" | "missing" | "unavailable"> => {
+    let state: "present" | "missing" | "unavailable";
     try {
       const current = await withinRequestDeadline(identity().getSession(), "auth.session");
-      const session = current.error === null ? current.data.session : null;
-      return session?.access_token.trim() === "" ? null : session;
+      state = current.error !== null ? "unavailable" : validSession(current.data.session) ? "present" : "missing";
     } catch {
-      return null;
+      state = "unavailable";
     }
+    recordState("auth.session_state", `session_${state}`, state === "unavailable" ? "error" : "ok");
+    return state;
   };
 
   const clearRecoveryMarker = (): void => {
@@ -554,7 +562,9 @@ export function createAuthRuntime(options: RuntimeOptions) {
       if (!isObject(value)) return null;
       return validCreatedAt(value["createdAt"], now()) === null ? null : value;
     });
-    if (marker === null || await currentIdentitySession() === null) {
+    const session = marker === null ? "missing" : await currentIdentitySession();
+    if (session === "unavailable") return false;
+    if (marker === null || session === "missing") {
       clearRecoveryMarker();
       return false;
     }
@@ -794,6 +804,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
           state: authorizationURL.state,
         } satisfies ExpectedWeKnoraAuthorization),
       );
+      recordState("auth.navigation", "oidc_start");
       location.assign(authorizationURL.url);
       return { state: "identity_complete" };
     } catch {
@@ -806,6 +817,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
     if (pending !== null) {
       const consentURL = new URL("/oauth/consent", location.origin);
       consentURL.searchParams.set("authorization_id", pending.authorizationId);
+      recordState("auth.navigation", "consent_resume");
       location.assign(consentURL.toString());
       return { state: "identity_complete" };
     }
@@ -835,14 +847,21 @@ export function createAuthRuntime(options: RuntimeOptions) {
           return { state: "start_login_required" };
         }
 
-        if (await currentIdentitySession() === null) {
+        const session = await currentIdentitySession();
+        if (session === "unavailable") {
+          return { code: "identity_session_unavailable", state: "start_error" };
+        }
+        if (session === "missing") {
           return { state: "start_login_required" };
         }
         const continuation = await startWeKnoraOIDC();
         return continuation.state === "identity_complete"
           ? { state: "start_complete" }
           : { code: "native_oidc_unavailable", state: "start_error" };
-      })();
+      })().then(result => {
+        if (result.state === "start_error") startOperation = null;
+        return result;
+      }, error => { startOperation = null; throw error; });
       return startOperation;
     },
 
@@ -919,7 +938,9 @@ export function createAuthRuntime(options: RuntimeOptions) {
         if (authorizationId === null) {
           return { code: "authorization_invalid", state: "authorization_error" };
         }
-        if (await currentIdentitySession() === null) {
+        const session = await currentIdentitySession();
+        if (session === "unavailable") return { state: "authorization_unavailable" };
+        if (session === "missing") {
           options.storage.setItem(
             pendingAuthorizationKey,
             JSON.stringify({ authorizationId, createdAt: now() } satisfies PendingAuthorization),
@@ -948,6 +969,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
               return { code: "oauth_continuation_invalid", state: "authorization_error" };
             }
             clearContinuation();
+            recordState("auth.navigation", "native_callback");
             location.assign(redirectURL);
             return { state: "authorization_complete" };
           }
@@ -986,13 +1008,21 @@ export function createAuthRuntime(options: RuntimeOptions) {
             return { code: "oauth_request_invalid", state: "authorization_error" };
           }
           clearContinuation();
+          recordState("auth.navigation", "native_callback");
           location.assign(redirectURL);
           return { state: "authorization_complete" };
         } catch {
           clearContinuation();
           return { code: "oauth_request_invalid", state: "authorization_error" };
         }
-      })();
+      })().then(result => {
+        const reason = result.state === "authorization_unavailable" ? "session_unavailable"
+          : result.state === "authorization_login_required" ? "login_required"
+            : result.state === "authorization_complete" ? "authorization_complete" : "authorization_invalid";
+        recordState("auth.continuation", reason, result.state === "authorization_unavailable" || result.state === "authorization_error" ? "error" : "ok");
+        if (result.state === "authorization_unavailable") authorizationOperation = null;
+        return result;
+      }, error => { authorizationOperation = null; throw error; });
       return authorizationOperation;
     },
 
@@ -1108,7 +1138,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
         );
         return result.error === null
           ? { email, state: "email_otp_sent" }
-          : { code: "email_send_failed", state: "email_otp_error" };
+          : { code: result.error.code === "rate_limited" ? "rate_limited" : "email_send_failed", state: "email_otp_error" };
       } catch {
         return { code: "identity_network_error", state: "email_otp_error" };
       }
@@ -1162,7 +1192,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
           "auth.otp_verify",
         );
         if (result.error !== null || !validSession(result.data.session)) {
-          return { code: "email_code_invalid", state: "identity_error" };
+          return { code: result.error?.code === "rate_limited" ? "rate_limited" : "email_code_invalid", state: "identity_error" };
         }
         return resumeAfterIdentity();
       } catch {
@@ -1181,7 +1211,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
           "auth.otp_verify",
         );
         if (result.error !== null || !validSession(result.data.session)) {
-          return { code: "email_code_invalid", state: "identity_error" };
+          return { code: result.error?.code === "rate_limited" ? "rate_limited" : "email_code_invalid", state: "identity_error" };
         }
         removeFlowFromAllStores();
         return resumeAfterIdentity();

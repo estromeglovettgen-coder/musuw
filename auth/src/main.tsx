@@ -1,5 +1,6 @@
 import { reportDiagnostic } from "../../shared/client-diagnostics";
-import { StrictMode } from "react";
+import { startStartupMetrics } from "../../shared/browser-startup-metrics";
+import { StrictMode, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AuthApp, getAuthCopy } from "./AuthApp";
@@ -9,9 +10,11 @@ import { createAuthRuntime, isLocalMusuwAuthEnabled } from "./runtime";
 import { createSupabaseIdentityClient } from "./supabase";
 import "./styles.css";
 
+const startupMetrics = startStartupMetrics('auth');
 const root = document.getElementById("root");
 
 if (root === null) {
+  startupMetrics.failed();
   throw new Error("Auth shell root is missing");
 }
 
@@ -41,6 +44,7 @@ try {
   });
   content = <AuthApp runtime={runtime} />;
 } catch {
+  startupMetrics.failed();
   const copy = getAuthCopy(getInitialAuthLocale());
   content = (
     <main className="auth-page">
@@ -49,4 +53,9 @@ try {
   );
 }
 
-createRoot(root).render(<StrictMode>{content}</StrictMode>);
+function StartupCommit() {
+  useLayoutEffect(() => { startupMetrics.mounted(); }, []);
+  return null;
+}
+startupMetrics.mountStart();
+createRoot(root).render(<StrictMode>{content}<StartupCommit /></StrictMode>);

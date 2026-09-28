@@ -4,6 +4,7 @@ import { stripTypeScriptTypes } from 'node:module'
 import test from 'node:test'
 
 import { hasPendingOIDCCallback, isDefinitiveNativeSessionFailure } from './utils/nativeAuthHandoff.ts'
+import { startStartupMetrics } from '../../../shared/browser-startup-metrics.ts'
 
 // Exercise the real startup and HTTP failure handling together: App.vue cannot
 // consume a new OIDC callback until startup mounts it. Framework mounting and
@@ -15,7 +16,7 @@ assert.ok(startupStart >= 0 && startupEnd > startupStart)
 const startup = mainSource.slice(startupStart, startupEnd)
 const createBootstrap = new Function(
   'createApp', 'App', 'TDesign', 'createPinia', 'useAuthStore', 'localStorage',
-  'router', 'i18n', 'installAutofillGuard', 'window', 'hasPendingOIDCCallback',
+  'router', 'i18n', 'installAutofillGuard', 'window', 'hasPendingOIDCCallback', 'startupMetrics',
   `${startup}; return bootstrap;`,
 )
 
@@ -68,7 +69,10 @@ async function startPage({ hash = '', status = 200, refreshStatus } = {}) {
   const bootstrap = createBootstrap(
     () => app, {}, {}, () => ({}), () => authStore, storage,
     { async isReady() { events.push('router-ready') } }, {}, () => {}, window,
-    hasPendingOIDCCallback,
+    hasPendingOIDCCallback, startStartupMetrics('app', {
+      performance: { now: () => 0, getEntriesByType: () => [] },
+      origin: 'https://app.example.test', report() {},
+    }),
   )
   await bootstrap()
   return { events, token: storage.getItem('weknora_token') }

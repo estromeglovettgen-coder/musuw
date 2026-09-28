@@ -24,6 +24,7 @@ type Screen =
   | "email_entry"
   | "email_code"
   | "identity_pending"
+  | "session_retry"
   | "password_recovery"
   | "password_reset_request"
   | "password_reset_requested"
@@ -113,6 +114,7 @@ export type AuthCopy = Readonly<{
   forgotPasswordIntro: string;
   successTitle: string;
   tryAgain: string;
+  retryIn: (seconds: number) => string;
   sendResetLink: string;
   resetLinkSent: (email: string) => string;
   registrationConfirmation: (email: string) => string;
@@ -142,6 +144,7 @@ export type AuthCopy = Readonly<{
   }>;
   errors: Readonly<{
     unavailable: string;
+    sessionUnavailable: string;
     oauthNotAllowed: string;
     authorization: string;
     invalidCode: string;
@@ -193,6 +196,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     forgotPasswordIntro: "输入邮箱，我们会发送重置密码的链接。",
     successTitle: "成功",
     tryAgain: "重试",
+    retryIn: (seconds) => `${seconds} 秒后重试`,
     sendResetLink: "发送重置链接",
     resetLinkSent: (email) => `如果 ${email} 已注册，你会收到重置密码的邮件。`,
     registrationConfirmation: (email) => `请检查 ${email} 的收件箱，输入六位验证码或打开确认链接后即可登录。`,
@@ -222,6 +226,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     },
     errors: {
       unavailable: "登录暂不可用，请重试。",
+      sessionUnavailable: "暂时无法确认登录状态，请检查网络后重试，无需重新获取验证码。",
       oauthNotAllowed: "此应用未获允许，无法继续授权。",
       authorization: "无法继续授权，请重新开始。",
       invalidCode: "验证码无效，请重新输入。",
@@ -271,6 +276,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     forgotPasswordIntro: "Enter your email and we’ll send a password reset link.",
     successTitle: "Success",
     tryAgain: "Try again",
+    retryIn: (seconds) => `Try again in ${seconds}s`,
     sendResetLink: "Send reset link",
     resetLinkSent: (email) => `If ${email} is registered, you’ll receive a password reset email.`,
     registrationConfirmation: (email) => `Check ${email} for a six-digit code or confirmation link before signing in.`,
@@ -300,6 +306,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     },
     errors: {
       unavailable: "Sign-in is temporarily unavailable. Please try again.",
+      sessionUnavailable: "We could not check your sign-in status. Check your connection and retry; you do not need another code.",
       oauthNotAllowed: "This app is not allowed to continue.",
       authorization: "Unable to continue authorization. Please start again.",
       invalidCode: "Invalid code. Please try again.",
@@ -354,6 +361,7 @@ function failureMessage(
     result.state === "registration_confirmation" ||
     result.state === "password_recovery_ready"
   ) return null;
+  if (result.state === "authorization_unavailable") return copy.errors.sessionUnavailable;
   if (result.state === "authorization_error") {
     return result.code === "oauth_client_not_allowed"
       ? copy.errors.oauthNotAllowed
@@ -399,7 +407,7 @@ function failureMessage(
   }
   return result.code === "email_invalid"
     ? copy.errors.invalidEmail
-    : copy.errors.emailSend;
+    : result.code === "rate_limited" ? copy.errors.rateLimited : copy.errors.emailSend;
 }
 
 function passwordResetMessage(result: PasswordResetRequestView, copy: AuthCopy): string | null {
@@ -429,6 +437,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
   const [resendSeconds, setResendSeconds] = useState(0);
+  const [otpRateLimited, setOtpRateLimited] = useState(false);
   const [error, setError] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return initialAuthErrorForPathname(window.location.pathname, locale);
@@ -469,11 +478,13 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   const showLogin = useCallback(() => {
     clearPasswordFields();
     setVerificationCode("");
-    setResendAvailableAt(null);
-    setResendSeconds(0);
+    if (!otpRateLimited) {
+      setResendAvailableAt(null);
+      setResendSeconds(0);
+    }
     setError(null);
     setScreen("login");
-  }, [clearPasswordFields]);
+  }, [clearPasswordFields, otpRateLimited]);
 
   const showEmailEntry = useCallback(() => {
     if (isSubmitting) return;
@@ -493,7 +504,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     const updateCountdown = () => {
       const remaining = Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1_000));
       setResendSeconds(remaining);
-      if (remaining === 0) setResendAvailableAt(null);
+      if (remaining === 0) { setResendAvailableAt(null); setOtpRateLimited(false); }
     };
 
     updateCountdown();
@@ -534,13 +545,14 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
           }
           const message = startFailureMessage(result, copy);
           if (message !== null) {
-            setError(message);
-            setScreen("login");
+            setError(result.state === "start_error" && result.code === "identity_session_unavailable"
+              ? copy.errors.sessionUnavailable : message);
+            setScreen("session_retry");
           }
         },
         () => {
           setError(copy.errors.unavailable);
-          setScreen("login");
+          setScreen("session_retry");
         },
       );
       return;
@@ -572,12 +584,12 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
           const message = failureMessage(result, copy);
           if (message !== null) {
             setError(message);
-            setScreen("login");
+            setScreen(result.state === "authorization_unavailable" ? "session_retry" : "login");
           }
         },
         () => {
-          setError(copy.errors.authorization);
-          setScreen("login");
+          setError(copy.errors.unavailable);
+          setScreen("session_retry");
         },
       );
       return;
@@ -730,12 +742,19 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     setScreen("email_entry");
   }, [clearPasswordFields, isSubmitting]);
 
+  const startOtpCooldown = useCallback((rateLimited = false) => {
+    setResendAvailableAt(Date.now() + EMAIL_CODE_COOLDOWN_SECONDS * 1_000);
+    setResendSeconds(EMAIL_CODE_COOLDOWN_SECONDS);
+    setOtpRateLimited(rateLimited);
+  }, []);
+
   const sendEmailCode = useCallback(async () => {
-    if (isSubmitting) return;
+    if (isSubmitting || resendSeconds > 0) return;
     setError(null);
     setIsSubmitting(true);
     try {
       const result = await runtime.requestEmailOtp(email);
+      if (result.state === "email_otp_error" && result.code === "rate_limited") startOtpCooldown(true);
       const message = failureMessage(result, copy);
       if (message !== null) {
         setError(message);
@@ -744,8 +763,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       if (result.state === "email_otp_sent") {
         setEmail(result.email);
         setVerificationCode("");
-        setResendAvailableAt(Date.now() + EMAIL_CODE_COOLDOWN_SECONDS * 1_000);
-        setResendSeconds(EMAIL_CODE_COOLDOWN_SECONDS);
+        startOtpCooldown();
         setScreen("email_code");
       }
     } catch {
@@ -753,7 +771,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [copy, email, isSubmitting, runtime]);
+  }, [copy, email, isSubmitting, resendSeconds, runtime, startOtpCooldown]);
 
   const requestEmailCode = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -771,12 +789,13 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   const verifyEmailCode = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (isSubmitting) return;
+      if (isSubmitting || (otpRateLimited && resendSeconds > 0)) return;
       setError(null);
       setScreen("identity_pending");
       setIsSubmitting(true);
       try {
         const result = await runtime.verifyEmailOtp(email, verificationCode);
+        if (result.state === "identity_error" && result.code === "rate_limited") startOtpCooldown(true);
         const message = failureMessage(result, copy);
         if (message !== null) {
           setError(message);
@@ -791,18 +810,19 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         setIsSubmitting(false);
       }
     },
-    [applyIdentityCompletion, copy, email, isSubmitting, runtime, verificationCode],
+    [applyIdentityCompletion, copy, email, isSubmitting, otpRateLimited, resendSeconds, runtime, startOtpCooldown, verificationCode],
   );
 
   const verifySignupCode = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (isSubmitting) return;
+      if (isSubmitting || (otpRateLimited && resendSeconds > 0)) return;
       setError(null);
       setIsSubmitting(true);
       setScreen("identity_pending");
       try {
         const result = await runtime.verifySignupOtp(email, verificationCode);
+        if (result.state === "identity_error" && result.code === "rate_limited") startOtpCooldown(true);
         const message = failureMessage(result, copy);
         if (message !== null) {
           setError(message);
@@ -817,7 +837,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         setIsSubmitting(false);
       }
     },
-    [applyIdentityCompletion, copy, email, isSubmitting, runtime, verificationCode],
+    [applyIdentityCompletion, copy, email, isSubmitting, otpRateLimited, resendSeconds, runtime, startOtpCooldown, verificationCode],
   );
 
   const isPendingScreen =
@@ -914,7 +934,13 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
                   {intro !== null ? <p className="auth-intro">{intro}</p> : null}
                   {error !== null ? <p className="auth-error" id="auth-error" role="alert">{error}</p> : null}
 
-        {screen === "email_code" ? (
+        {screen === "session_retry" ? (
+          <button className="auth-result-primary" type="button" onClick={() => {
+            handledRoute.current = null;
+            setError(null);
+            setScreen(window.location.pathname === "/oauth/consent" ? "consent_pending" : "start_pending");
+          }}>{copy.tryAgain}</button>
+        ) : screen === "email_code" ? (
           <form
             className="auth-form"
             key="email-code"
@@ -939,8 +965,8 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
               required
               value={verificationCode}
             />
-            <button disabled={isSubmitting || verificationCode.length !== 6} type="submit">
-              {copy.verifyCode}
+            <button disabled={isSubmitting || verificationCode.length !== 6 || (otpRateLimited && resendSeconds > 0)} type="submit">
+              {otpRateLimited && resendSeconds > 0 ? copy.retryIn(resendSeconds) : copy.verifyCode}
             </button>
             <div className="auth-form-actions">
               <button
@@ -1221,8 +1247,8 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
               required
               value={verificationCode}
             />
-            <button disabled={isSubmitting || verificationCode.length !== 6} type="submit">
-              {isSubmitting ? copy.confirmingEmail : copy.confirmEmail}
+            <button disabled={isSubmitting || verificationCode.length !== 6 || (otpRateLimited && resendSeconds > 0)} type="submit">
+              {isSubmitting ? copy.confirmingEmail : otpRateLimited && resendSeconds > 0 ? copy.retryIn(resendSeconds) : copy.confirmEmail}
             </button>
             <button className="auth-link" disabled={isSubmitting} onClick={showLogin} type="button">
               {copy.backToSignIn}
@@ -1257,8 +1283,8 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
               type="email"
               value={email}
             />
-            <button disabled={isSubmitting} type="submit">
-              {isSubmitting ? copy.sendingCode : copy.sendCode}
+            <button disabled={isSubmitting || resendSeconds > 0} type="submit">
+              {isSubmitting ? copy.sendingCode : resendSeconds > 0 ? copy.resendIn(resendSeconds) : copy.sendCode}
             </button>
             <button className="auth-link" disabled={isSubmitting} onClick={showLogin} type="button">
               {copy.backToSignIn}

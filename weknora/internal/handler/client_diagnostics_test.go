@@ -21,6 +21,36 @@ import (
 const validClientDiagnostic = `{"phase":"auth.otp_verify","outcome":"timeout","duration_ms":12000,` +
 	`"flow_id":"d3815104-c538-4a5f-9246-322140b46513","request_id":"req_safe-1","status":0}`
 
+const expandedClientDiagnostic = `{"phase":"app.navigation","outcome":"ok","duration_ms":22316,` +
+	`"flow_id":"d3815104-c538-4a5f-9246-322140b46513",` +
+	`"journey_id":"84f4edc5-d014-40ad-b086-546a9891a21b",` +
+	`"document_id":"e74c229b-2461-4884-9c84-895af0e99bd5",` +
+	`"page":"app","browser_kind":"quark","platform_kind":"mobile","viewport_width":430,` +
+	`"storage_status":"session_available","reason":"native_callback",` +
+	`"timings":{"ttfb_ms":90,"download_ms":400},` +
+	`"resources":[{"name":"index-ABcd_123.js","duration_ms":2000,"ttfb_ms":900,"download_ms":1100}]}`
+
+// Public diagnostic ingestion is the privacy boundary: accept measured,
+// bounded navigation evidence without accepting arbitrary browser contents.
+func TestClientDiagnosticsAcceptsBoundedNavigationEvidence(t *testing.T) {
+	var logs bytes.Buffer
+	diagnosticLogs(t, &logs)
+	w := postDiagnostic(diagnosticTestRouter(), expandedClientDiagnostic, "?code=secret-code")
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status=%d, want204", w.Code)
+	}
+	for _, want := range []string{"journey_id=84f4edc5-d014-40ad-b086-546a9891a21b", "browser_kind=quark", "phase=app.navigation", "index-ABcd_123.js"} {
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("missing bounded evidence %q", want)
+		}
+	}
+	for _, secret := range []string{"secret-code", "never-log", "user@example", "client_ip", "request_body", "path="} {
+		if strings.Contains(logs.String(), secret) {
+			t.Errorf("unexpected private value %q", secret)
+		}
+	}
+}
+
 func diagnosticTestRouter() *gin.Engine {
 	r := gin.New()
 	r.Use(middleware.RequestID(), middleware.Logger())
@@ -93,7 +123,7 @@ func TestClientDiagnosticsRejectsMalformedOrPrivatePayloadsWithoutLogging(t *tes
 		"unknown field":    strings.TrimSuffix(validClientDiagnostic, "}") + `,"email":"user@example.test"}`,
 		"trailing object":  validClientDiagnostic + ` {"token":"secret"}`,
 		"trailing garbage": validClientDiagnostic + ` private-content`,
-		"oversized":        validClientDiagnostic + strings.Repeat(" ", 1024),
+		"oversized":        validClientDiagnostic + strings.Repeat(" ", 2048),
 		"array":            "[" + validClientDiagnostic + "]",
 		"null":             "null",
 	}
@@ -170,7 +200,7 @@ func TestClientDiagnosticsDoesNotReadUnboundedBodyBeforeLimit(t *testing.T) {
 	if w.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("status=%d", w.Code)
 	}
-	if reader.read > 1025 {
+	if reader.read > 2049 {
 		t.Errorf("middleware/handler read %d bytes before rejecting oversized body", reader.read)
 	}
 }
@@ -199,6 +229,7 @@ func TestClientDiagnosticsAcceptsContractEnumsAndBoundaryValues(t *testing.T) {
 	for _, phase := range []string{
 		"auth.session", "auth.exchange", "auth.authorize", "auth.password", "auth.otp_send", "auth.otp_verify",
 		"auth.native_session", "auth.oidc_start", "auth.other", "app.startup", "api.auth", "api.documents", "api.other",
+		"auth.session_state", "auth.continuation", "auth.navigation", "app.navigation", "app.entry", "app.bootstrap", "app.router", "app.mount", "auth.entry", "auth.startup", "auth.mount",
 	} {
 		for _, outcome := range []string{"ok", "network", "timeout", "http", "identity", "error"} {
 			body, _ := json.Marshal(map[string]any{
@@ -248,5 +279,93 @@ func TestClientDiagnosticsGlobalBudgetHoldsUnderConcurrentRequests(t *testing.T)
 			"concurrent counts accepted=%d rejected=%d unexpected=%d",
 			accepted.Load(), rejected.Load(), unexpected.Load(),
 		)
+	}
+}
+
+func TestClientDiagnosticsRejectsPrivateOrMalformedNavigationEvidence(t *testing.T) {
+	var logs bytes.Buffer
+	diagnosticLogs(t, &logs)
+	cases := map[string]func(map[string]any){
+		"journey not random":  func(m map[string]any) { m["journey_id"] = "00000000-0000-0000-0000-000000000000" },
+		"document private":    func(m map[string]any) { m["document_id"] = "user@example.test" },
+		"raw ua":              func(m map[string]any) { m["browser_kind"] = "Mozilla/private" },
+		"unknown platform":    func(m map[string]any) { m["platform_kind"] = "iPhone-secret" },
+		"private reason":      func(m map[string]any) { m["reason"] = "private-token" },
+		"unknown flow status": func(m map[string]any) { m["flow_status"] = "private" },
+		"unknown navigation":  func(m map[string]any) { m["navigation_type"] = "private" },
+		"unknown visibility":  func(m map[string]any) { m["visibility"] = "private" },
+		"viewport overflow":   func(m map[string]any) { m["viewport_width"] = 10001 },
+		"viewport negative":   func(m map[string]any) { m["viewport_width"] = -1 },
+		"viewport fraction":   func(m map[string]any) { m["viewport_width"] = 1.5 },
+		"null timings":        func(m map[string]any) { m["timings"] = nil },
+		"missing download":    func(m map[string]any) { m["timings"] = map[string]any{"ttfb_ms": 1} },
+		"nested private":      func(m map[string]any) { m["timings"].(map[string]any)["url"] = "https://private.test?token=secret" },
+		"nested case":         func(m map[string]any) { m["timings"] = map[string]any{"TTFB_ms": 1, "download_ms": 1} },
+		"nested null":         func(m map[string]any) { m["timings"].(map[string]any)["ttfb_ms"] = nil },
+		"timing overflow":     func(m map[string]any) { m["timings"].(map[string]any)["ttfb_ms"] = 120001 },
+		"timing fraction":     func(m map[string]any) { m["timings"].(map[string]any)["download_ms"] = 0.5 },
+		"resource url": func(m map[string]any) {
+			m["resources"].([]any)[0].(map[string]any)["name"] = "https://private.test/index-ABcd_123.js"
+		},
+		"resource query": func(m map[string]any) {
+			m["resources"].([]any)[0].(map[string]any)["name"] = "index-ABcd_123.js?code=secret"
+		},
+		"resource name too long": func(m map[string]any) {
+			m["resources"].([]any)[0].(map[string]any)["name"] = strings.Repeat("a", 101) + "-ABcd_123.js"
+		},
+		"resource missing duration": func(m map[string]any) { delete(m["resources"].([]any)[0].(map[string]any), "duration_ms") },
+		"resource null":             func(m map[string]any) { m["resources"] = []any{nil} },
+		"resource unknown":          func(m map[string]any) { m["resources"].([]any)[0].(map[string]any)["body"] = "secret" },
+		"resource key case": func(m map[string]any) {
+			r := m["resources"].([]any)[0].(map[string]any)
+			r["Name"] = r["name"]
+			delete(r, "name")
+		},
+		"too many resources": func(m map[string]any) { r := m["resources"].([]any)[0]; m["resources"] = []any{r, r, r, r} },
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			var input map[string]any
+			_ = json.Unmarshal([]byte(expandedClientDiagnostic), &input)
+			mutate(input)
+			body, _ := json.Marshal(input)
+			logs.Reset()
+			w := postDiagnostic(diagnosticTestRouter(), string(body), "")
+			if w.Code != 400 {
+				t.Errorf("status=%d, want400", w.Code)
+			}
+			if logs.Len() != 0 {
+				t.Errorf("rejected evidence reached logs: %s", logs.String())
+			}
+		})
+	}
+	for _, invalid := range []string{"NaN", "Infinity", "1e9999"} {
+		logs.Reset()
+		body := strings.Replace(expandedClientDiagnostic, `"ttfb_ms":90`, `"ttfb_ms":`+invalid, 1)
+		if w := postDiagnostic(diagnosticTestRouter(), body, ""); w.Code != 400 {
+			t.Errorf("nonfinite %s status=%d", invalid, w.Code)
+		}
+		if logs.Len() != 0 {
+			t.Fatal("nonfinite payload logged")
+		}
+	}
+}
+
+func TestClientDiagnosticsAcceptsExpandedBoundaryPayload(t *testing.T) {
+	diagnosticLogs(t, io.Discard)
+	var input map[string]any
+	_ = json.Unmarshal([]byte(expandedClientDiagnostic), &input)
+	input["viewport_width"] = 10000
+	input["flow_status"] = "restored"
+	input["navigation_type"] = "reload"
+	input["visibility"] = "visible"
+	resource := map[string]any{"name": strings.Repeat("a", 100) + "-12345678.css", "duration_ms": 120000, "ttfb_ms": 0, "download_ms": 120000}
+	input["resources"] = []any{resource, resource, resource}
+	body, _ := json.Marshal(input)
+	if len(body) <= 1024 || len(body) > 2048 {
+		t.Fatalf("test must demonstrate 2KiB need, bytes%d", len(body))
+	}
+	if w := postDiagnostic(diagnosticTestRouter(), string(body), ""); w.Code != 204 {
+		t.Fatalf("valid expanded boundary status%d", w.Code)
 	}
 }

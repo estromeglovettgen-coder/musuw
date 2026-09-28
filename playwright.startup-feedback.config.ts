@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: 'startup-feedback.spec.ts',
+  testMatch: ['startup-feedback.spec.ts', 'startup-diagnostics.spec.ts'],
   outputDir: 'test-results/startup-feedback',
   reporter: [['list']],
   workers: 2,

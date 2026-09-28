@@ -1,4 +1,4 @@
-import { reportDiagnostic } from "../../../shared/client-diagnostics";
+import { startStartupMetrics } from "../../../shared/browser-startup-metrics";
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
@@ -23,6 +23,8 @@ import { installAutofillGuard } from "@/utils/disable-autofill";
 import { installReferenceTextareaAutosize } from "@/utils/referenceTextareaAutosize";
 import { useAuthStore } from "@/stores/auth";
 import { hasPendingOIDCCallback } from "@/utils/nativeAuthHandoff";
+
+const startupMetrics = startStartupMetrics('app');
 
 // 必须在 Vue 组件挂载之前执行，避免 tdesign-icons 运行时请求 tdesign.gtimg.com
 installTDesignIconOfflineGuard();
@@ -56,18 +58,21 @@ app.config.errorHandler = (err, instance, info) => {
     }
   }
 
+  startupMetrics.routerStart();
   app.use(router);
   app.use(i18n);
 
   // 等首屏路由（含导航守卫、Lite 自动登录）完成后再挂载，避免先闪默认页再跳转
   await router.isReady();
+  startupMetrics.routerReady();
+  startupMetrics.mountStart();
   app.mount("#app");
   installAutofillGuard();
 }
 
 bootstrap().then(() => {
-  reportDiagnostic({ phase: 'app.startup', outcome: 'ok', duration_ms: Math.min(120_000, Math.round(performance.now())) });
+  startupMetrics.mounted();
 }, error => {
-  reportDiagnostic({ phase: 'app.startup', outcome: 'error', duration_ms: Math.min(120_000, Math.round(performance.now())) });
+  startupMetrics.failed();
   throw error; // Keep the entry shell's existing startup-failure feedback.
 });

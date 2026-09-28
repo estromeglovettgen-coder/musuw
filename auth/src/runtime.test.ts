@@ -1151,3 +1151,60 @@ describe('bounded auth phase diagnostics', () => {
     expect(JSON.stringify(events)).not.toContain('sensitive')
   })
 })
+
+describe("recoverable identity-session continuity", () => {
+  for (const failure of ["provider", "network", "deadline"] as const) {
+    it(`keeps consent retryable after a ${failure} session failure without asking for OTP again`, async () => {
+      const store = storage();
+      const assigned = vi.fn();
+      const events: unknown[] = [];
+      const getSession = vi.fn<IdentityClient["getSession"]>()
+        .mockImplementationOnce(() => failure === "provider"
+          ? Promise.resolve({ data: { session: null }, error: { code: "unavailable" } })
+          : failure === "network" ? Promise.reject(new Error("private provider detail"))
+            : new Promise(() => {}))
+        .mockResolvedValue({ data: { session: { access_token: "session-token" } }, error: null });
+      const client = identity({ getSession });
+      const runtime = createAuthRuntime({
+        config: { publicOrigin: "https://app.musuw.com", publishableKey: "test", supabaseUrl: "https://identity.example", weknoraOAuthClientId: "weknora-client" },
+        createIdentityClient: () => client, storage: store, nativeStorage: storage(),
+        location: { assign: assigned, origin: "https://app.musuw.com" }, requestTimeoutMs: 10,
+        onDiagnostic: event => events.push(event),
+      });
+      store.setItem("musnow.auth.pending-authorization", JSON.stringify({ authorizationId: "authorization_1", createdAt: Date.now() }));
+      const before = store.getItem("musnow.auth.pending-authorization");
+      await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({ state: "authorization_unavailable" });
+      expect(assigned).not.toHaveBeenCalled();
+      expect(client.oauth.getAuthorizationDetails).not.toHaveBeenCalled();
+      expect(store.getItem("musnow.auth.pending-authorization")).toBe(before);
+      await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({ state: "authorization_complete" });
+      expect(assigned).toHaveBeenCalledWith(expect.stringContaining("/api/v1/auth/oidc/callback?"));
+      expect(events).toEqual(expect.arrayContaining([
+        expect.objectContaining({ phase: "auth.session_state", reason: "session_unavailable" }),
+        expect.objectContaining({ phase: "auth.session_state", reason: "session_present" }),
+      ]));
+      expect(JSON.stringify(events)).not.toMatch(/session-token|private provider detail/);
+    });
+  }
+  it("keeps the start route retryable when identity service is unavailable", async () => {
+    const client = identity({ getSession: vi.fn<IdentityClient["getSession"]>()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue({ data: { session: { access_token: "token" } }, error: null }) });
+    const { runtime } = runtimeFor(client);
+    await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_error", code: "identity_session_unavailable" });
+    await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_complete" });
+  });
+  it("keeps truly missing sessions distinct from failures", async () => {
+    const { runtime } = runtimeFor(identity({ getSession: async () => ({ data: { session: null }, error: null }) }));
+    await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({ state: "authorization_login_required" });
+  });
+  it("reports rate limiting accurately for both sending and verifying OTP", async () => {
+    const { runtime } = runtimeFor(identity({
+      signInWithOtp: async () => ({ error: { code: "rate_limited" } }),
+      verifyOtp: async () => ({ data: { session: null }, error: { code: "rate_limited" } }),
+    }));
+    await expect(runtime.requestEmailOtp("person@example.test")).resolves.toEqual({ state: "email_otp_error", code: "rate_limited" });
+    await expect(runtime.verifyEmailOtp("person@example.test", "123456")).resolves.toEqual({ state: "identity_error", code: "rate_limited" });
+    await expect(runtime.verifySignupOtp("person@example.test", "123456")).resolves.toEqual({ state: "identity_error", code: "rate_limited" });
+  });
+});
