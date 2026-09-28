@@ -751,9 +751,70 @@ describe("Supabase to WeKnora authorization continuation", () => {
     expect(client.signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(store.values.size).toBe(0);
   });
+
+  it("clears shared identity after a hung logout deadline without touching unrelated storage", async () => {
+    const shared = storage();
+    const tab = storage();
+    const client = identity({ signOut: vi.fn(() => new Promise<{ error: null }>(() => {})) });
+    shared.setItem("musnow.supabase.pkce", "shared-session");
+    shared.setItem("musuw.theme", "dark");
+    tab.setItem("musnow.supabase.pkce", "legacy-tab-session");
+    const runtime = createAuthRuntime({
+      config: { publicOrigin: "https://app.musuw.com", publishableKey: "synthetic", supabaseUrl: "https://identity.example", weknoraOAuthClientId: "weknora-client" },
+      createIdentityClient: () => client, nativeStorage: shared, sharedStorage: shared,
+      storage: tab, requestTimeoutMs: 5,
+      location: { assign: vi.fn(), origin: "https://app.musuw.com" },
+    });
+    await runtime.signOut();
+    expect(shared.getItem("musnow.supabase.pkce")).toBeNull();
+    expect(tab.getItem("musnow.supabase.pkce")).toBeNull();
+    expect(shared.getItem("musuw.theme")).toBe("dark");
+  });
+
+  it("does not clear a newer shared login when an older logout reaches its deadline", async () => {
+    const shared = storage();
+    shared.setItem("musnow.supabase.pkce", "old-session");
+    const client = identity({ signOut: vi.fn(() => {
+      shared.setItem("musnow.supabase.pkce", "new-session");
+      return new Promise<{ error: null }>(() => {});
+    }) });
+    const runtime = createAuthRuntime({
+      config: { publicOrigin: "https://app.musuw.com", publishableKey: "synthetic", supabaseUrl: "https://identity.example", weknoraOAuthClientId: "weknora-client" },
+      createIdentityClient: () => client, nativeStorage: shared, sharedStorage: shared,
+      storage: storage(), requestTimeoutMs: 5,
+      location: { assign: vi.fn(), origin: "https://app.musuw.com" },
+    });
+    await runtime.signOut();
+    expect(shared.getItem("musnow.supabase.pkce")).toBe("new-session");
+  });
 });
 
 describe("password identity continuation", () => {
+  it("rejects a password update without a live recovery grant", async () => {
+    const client = identity();
+    const { runtime, assigned } = runtimeFor(client);
+    await expect(runtime.updatePassword("new-password", "new-password")).resolves.toEqual({
+      code: "password_recovery_failed", state: "identity_error",
+    });
+    expect(client.updateUser).not.toHaveBeenCalled();
+    expect(assigned).not.toHaveBeenCalled();
+  });
+
+  it("rejects an old recovery page after another tab changes the shared identity", async () => {
+    const client = identity();
+    const { runtime, store } = runtimeFor(client);
+    await runtime.requestPasswordReset("user@example.com");
+    await runtime.completeCallback("?flow=flow_1&code=recovery-code&sb_flow_id=0123456789abcdef0123456789abcdef");
+    vi.mocked(client.getSession).mockResolvedValue({
+      data: { session: { access_token: "different-account-session" } }, error: null,
+    });
+    await expect(runtime.updatePassword("new-password", "new-password")).resolves.toEqual({
+      code: "password_recovery_failed", state: "identity_error",
+    });
+    expect(client.updateUser).not.toHaveBeenCalled();
+    expect(store.getItem("musnow.auth.password-recovery")).toBeNull();
+  });
+
   it("keeps local Musuw auth restricted to an explicit loopback development switch", () => {
     expect(isLocalMusuwAuthEnabled(true, "true", "localhost")).toBe(true);
     expect(isLocalMusuwAuthEnabled(true, "true", "127.0.0.1")).toBe(true);
@@ -971,7 +1032,10 @@ describe("password identity continuation", () => {
         updatePassword(password: string, confirmation: string): Promise<unknown>;
       }).updatePassword("new correct horse battery staple", "new correct horse battery staple"),
     ).resolves.toEqual({ state: "identity_complete" });
-    expect(client.updateUser).toHaveBeenCalledWith({ password: "new correct horse battery staple" });
+    expect(client.updateUser).toHaveBeenCalledWith(
+      { password: "new correct horse battery staple" },
+      { expectedAccessToken: "supabase-access-token" },
+    );
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining("/api/v1/auth/oidc/url?"),
       expect.objectContaining({ credentials: "same-origin" }),
@@ -1064,6 +1128,7 @@ describe("password identity continuation", () => {
       first.runtime.completeCallback("?flow=flow_1&code=recovery-code&sb_flow_id=0123456789abcdef0123456789abcdef"),
     ).resolves.toEqual({ state: "password_recovery_ready" });
     expect(session.getItem("musnow.auth.password-recovery")).toContain('"createdAt":1');
+    expect(session.getItem("musnow.auth.password-recovery")).not.toContain("supabase-access-token");
 
     const refreshed = runtimeFor(client, session);
     await expect(refreshed.runtime.completeCallback("?flow=flow_1")).resolves.toEqual({
@@ -1075,6 +1140,10 @@ describe("password identity continuation", () => {
       code: "callback_expired_or_used",
       state: "identity_error",
     });
+    await expect(expired.runtime.updatePassword("new-password", "new-password")).resolves.toEqual({
+      code: "password_recovery_failed", state: "identity_error",
+    });
+    expect(client.updateUser).not.toHaveBeenCalled();
   });
 
   it("treats a legacy flow without kind as the existing OAuth flow", async () => {

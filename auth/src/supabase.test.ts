@@ -51,6 +51,44 @@ const config: AuthConfig = {
   weknoraOAuthClientId: "weknora-client",
 };
 
+async function realSdkFixture() {
+  const { createClient } = await vi.importActual<typeof import("@supabase/supabase-js")>(
+    "@supabase/supabase-js",
+  );
+  const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+  const user = { id: "00000000-0000-4000-8000-000000000001", aud: "authenticated" };
+  const accessToken = (subject: string) => [
+    Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url"),
+    Buffer.from(JSON.stringify({ sub: subject, exp: expiresAt })).toString("base64url"),
+    Buffer.from("synthetic-signature").toString("base64url"),
+  ].join(".");
+  const session = {
+    access_token: accessToken(user.id),
+    refresh_token: "synthetic-refresh-token",
+    token_type: "bearer",
+    expires_in: 3600,
+    expires_at: expiresAt,
+    user,
+  };
+  const secondUser = { ...user, id: "00000000-0000-4000-8000-000000000002" };
+  const secondSession = { ...session, access_token: accessToken(secondUser.id), refresh_token: "second-synthetic-refresh", user: secondUser };
+  const provider = vi.fn<typeof fetch>(async (input, options) => {
+    const url = String(input);
+    if (url.endsWith("/token?grant_type=password")) {
+      return Response.json(session);
+    }
+    if (url.endsWith("/user")) {
+      return Response.json(new Headers(options?.headers).get("authorization") === `Bearer ${secondSession.access_token}` ? secondUser : user);
+    }
+    if (url.endsWith("/logout?scope=local")) return new Response(null, { status: 204 });
+    throw new Error("Unexpected synthetic provider request");
+  });
+  mocked.createClient.mockImplementation((url, key, options) =>
+    createClient(url, key, { ...options, global: { fetch: provider } }),
+  );
+  return { provider, session, secondSession };
+}
+
 describe("Supabase identity adapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,6 +123,185 @@ describe("Supabase identity adapter", () => {
       email: "user@example.com",
       password: "secret",
     });
+  });
+
+  it("revokes the current SDK session before clearing shared and legacy tab sessions", async () => {
+    const { provider, session } = await realSdkFixture();
+    const shared = sharedStorage();
+    const legacyTab = storage();
+    legacyTab.setItem("musnow.supabase.pkce", '{"access_token":"old-tab-token"}');
+    shared.setItem("musuw.theme", "dark");
+    const client = createSupabaseIdentityClient(config, shared, legacyTab);
+    await client.signInWithPassword({ email: "synthetic@example.test", password: "synthetic-password" });
+
+    await expect(client.signOut({ scope: "local" })).resolves.toEqual({ error: null });
+
+    const logout = provider.mock.calls.find(([input]) => String(input).endsWith("/logout?scope=local"));
+    expect(logout).toBeDefined();
+    expect(new Headers(logout?.[1]?.headers).get("authorization")).toBe(`Bearer ${session.access_token}`);
+    expect(shared.getItem("musnow.supabase.pkce")).toBeNull();
+    expect(legacyTab.getItem("musnow.supabase.pkce")).toBeNull();
+    expect(shared.getItem("musuw.theme")).toBe("dark");
+  });
+
+  it("restores the same identity in a second client without migrating or preferring old tab tokens", async () => {
+    const { provider, session } = await realSdkFixture();
+    const shared = sharedStorage();
+    const firstTab = storage();
+    const secondTab = storage();
+    secondTab.setItem("musnow.supabase.pkce", JSON.stringify({ ...session, access_token: "old-tab-token" }));
+    firstTab.setItem("musnow.auth.flow", "first-tab-only");
+    const first = createSupabaseIdentityClient(config, shared, firstTab);
+    await first.signInWithPassword({ email: "synthetic@example.test", password: "synthetic-password" });
+    const second = createSupabaseIdentityClient(config, shared, secondTab);
+
+    await expect(second.getSession()).resolves.toEqual({
+      data: { session: { access_token: session.access_token } }, error: null,
+    });
+    expect(provider).toHaveBeenCalledTimes(1);
+    expect(shared.getItem("musnow.auth.flow")).toBeNull();
+    expect(secondTab.getItem("musnow.auth.flow")).toBeNull();
+
+    shared.removeItem("musnow.supabase.pkce");
+    const afterSharedLogout = createSupabaseIdentityClient(config, shared, secondTab);
+    await expect(afterSharedLogout.getSession()).resolves.toEqual({ data: { session: null }, error: null });
+    expect(shared.getItem("musnow.supabase.pkce")).toBeNull();
+    expect(secondTab.getItem("musnow.supabase.pkce")).toContain("old-tab-token");
+  });
+
+  it("clears both session media after provider logout fails and cannot restore a stale identity", async () => {
+    const { provider } = await realSdkFixture();
+    const shared = sharedStorage();
+    const legacyTab = storage();
+    const client = createSupabaseIdentityClient(config, shared, legacyTab);
+    await client.signInWithPassword({ email: "synthetic@example.test", password: "synthetic-password" });
+    legacyTab.setItem("musnow.supabase.pkce", '{"access_token":"old-tab-token"}');
+    provider.mockResolvedValueOnce(Response.json({ code: "unexpected_failure", message: "synthetic failure" }, { status: 500 }));
+
+    await expect(client.signOut({ scope: "local" })).resolves.toEqual({ error: { code: "unavailable" } });
+    expect(shared.getItem("musnow.supabase.pkce")).toBeNull();
+    expect(legacyTab.getItem("musnow.supabase.pkce")).toBeNull();
+    await expect(createSupabaseIdentityClient(config, shared, legacyTab).getSession()).resolves.toEqual({
+      data: { session: null }, error: null,
+    });
+  });
+
+  it("cannot clear a newly signed-in account when an older logout finishes later", async () => {
+    const { provider, session, secondSession } = await realSdkFixture();
+    const shared = sharedStorage();
+    const first = createSupabaseIdentityClient(config, shared, storage());
+    await first.signInWithPassword({ email: "synthetic@example.test", password: "synthetic-password" });
+    let release!: () => void;
+    let started!: () => void;
+    const inFlight = new Promise<void>(resolve => { started = resolve; });
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    provider.mockImplementationOnce(async () => { started(); await hold; return new Response(null, { status: 204 }); });
+    const pending = first.signOut({ scope: "local" });
+    await inFlight;
+    const second = createSupabaseIdentityClient(config, shared, storage());
+    provider.mockResolvedValueOnce(Response.json(secondSession));
+    await second.signInWithPassword({ email: "second@example.test", password: "synthetic-password" });
+    release();
+
+    await expect(pending).resolves.toEqual({ error: null });
+    await expect(second.getSession()).resolves.toEqual({ data: { session: { access_token: secondSession.access_token } }, error: null });
+    const logout = provider.mock.calls.find(([input]) => String(input).endsWith("/logout?scope=local"));
+    expect(new Headers(logout?.[1]?.headers).get("authorization")).toBe(`Bearer ${session.access_token}`);
+  });
+
+  it("surfaces blocked shared storage instead of silently using the old tab identity", async () => {
+    const { provider, session } = await realSdkFixture();
+    const legacyTab = storage();
+    legacyTab.setItem("musnow.supabase.pkce", JSON.stringify(session));
+    const blocked: SessionStorageLike = {
+      getItem() { throw new Error("shared storage unavailable"); },
+      setItem() { throw new Error("shared storage unavailable"); },
+      removeItem() { throw new Error("shared storage unavailable"); },
+    };
+    expect(() => createSupabaseIdentityClient(config, blocked, legacyTab)).toThrow("shared storage unavailable");
+    expect(provider).not.toHaveBeenCalled();
+    expect(legacyTab.getItem("musnow.supabase.pkce")).toContain(session.access_token);
+  });
+
+  it("reports persistence failure after provider sign-in without falling back to tab storage", async () => {
+    await realSdkFixture();
+    const legacyTab = storage();
+    const readOnlyShared: SessionStorageLike = {
+      getItem() { return null; },
+      setItem() { throw new Error("shared storage write unavailable"); },
+      removeItem() {},
+    };
+    const client = createSupabaseIdentityClient(config, readOnlyShared, legacyTab);
+    await expect(client.signInWithPassword({ email: "synthetic@example.test", password: "synthetic-password" }))
+      .rejects.toThrow("shared storage write unavailable");
+    expect(legacyTab.getItem("musnow.supabase.pkce")).toBeNull();
+    await expect(client.getSession()).resolves.toEqual({ data: { session: null }, error: null });
+  });
+
+  it("rejects a password update if the shared account switched before submission", async () => {
+    const { provider, session, secondSession } = await realSdkFixture();
+    const shared = sharedStorage();
+    const client = createSupabaseIdentityClient(config, shared);
+    await client.signInWithPassword({ email: "synthetic@example.test", password: "synthetic-password" });
+    shared.setItem("musnow.supabase.pkce", JSON.stringify(secondSession));
+
+    await expect(client.updateUser({ password: "changed-password" }, { expectedAccessToken: session.access_token }))
+      .resolves.toEqual({ data: { session: null }, error: { code: "unavailable" } });
+    expect(provider.mock.calls.filter(([, options]) => options?.method === "PUT")).toHaveLength(0);
+    expect(JSON.parse(shared.getItem("musnow.supabase.pkce")!).access_token).toBe(secondSession.access_token);
+  });
+
+  it("pins the password request bearer and cannot overwrite an account switch while the request is in flight", async () => {
+    const { provider, session, secondSession } = await realSdkFixture();
+    const shared = sharedStorage();
+    const client = createSupabaseIdentityClient(config, shared);
+    await client.signInWithPassword({ email: "synthetic@example.test", password: "synthetic-password" });
+    let release!: () => void;
+    let started!: () => void;
+    const inFlight = new Promise<void>(resolve => { started = resolve; });
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const respond = provider.getMockImplementation()!;
+    provider.mockImplementation(async (input, options) => {
+      if (options?.method === "PUT") { started(); await hold; }
+      return respond(input, options);
+    });
+    const pending = client.updateUser({ password: "changed-password" }, { expectedAccessToken: session.access_token });
+    await inFlight;
+    shared.setItem("musnow.supabase.pkce", JSON.stringify(secondSession));
+    release();
+
+    await expect(pending).resolves.toEqual({ data: { session: null }, error: { code: "unavailable" } });
+    const request = provider.mock.calls.find(([, options]) => options?.method === "PUT");
+    expect(new Headers(request?.[1]?.headers).get("authorization")).toBe(`Bearer ${session.access_token}`);
+    expect(JSON.parse(shared.getItem("musnow.supabase.pkce")!).access_token).toBe(secondSession.access_token);
+  });
+
+  it("updates a bound recovery identity through the SDK without persisting its isolated session", async () => {
+    const { session, provider } = await realSdkFixture();
+    const shared = sharedStorage();
+    const client = createSupabaseIdentityClient(config, shared);
+    await client.signInWithPassword({ email: "synthetic@example.test", password: "synthetic-password" });
+    const before = shared.getItem("musnow.supabase.pkce");
+
+    await expect(client.updateUser({ password: "changed-password" }, { expectedAccessToken: session.access_token }))
+      .resolves.toEqual({ data: { session: { access_token: session.access_token } }, error: null });
+    expect(shared.getItem("musnow.supabase.pkce")).toBe(before);
+    const request = provider.mock.calls.find(([, options]) => options?.method === "PUT");
+    expect(new Headers(request?.[1]?.headers).get("authorization")).toBe(`Bearer ${session.access_token}`);
+    expect(JSON.parse(String(request?.[1]?.body)).password).toBe("changed-password");
+  });
+
+  it("rejects missing or expired recovery sessions before creating a password request", async () => {
+    const client = createSupabaseIdentityClient(config, storage());
+    const binding = { expectedAccessToken: "access-token" };
+    for (const session of [null, { access_token: "access-token", refresh_token: "synthetic-refresh", expires_at: 1 }]) {
+      mocked.auth.getSession.mockResolvedValue({ data: { session }, error: null });
+      await expect(client.updateUser({ password: "changed-password" }, binding))
+        .resolves.toEqual({ data: { session: null }, error: { code: "unavailable" } });
+    }
+    await expect(client.updateUser({ password: "changed-password" }, { expectedAccessToken: "" }))
+      .resolves.toEqual({ data: { session: null }, error: { code: "unavailable" } });
+    expect(mocked.auth.updateUser).not.toHaveBeenCalled();
   });
 
   it("keeps existing-account signup errors bounded without exposing account existence to UI", async () => {
@@ -170,17 +387,12 @@ describe("Supabase identity adapter", () => {
       error: null,
     });
     mocked.auth.resetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
-    mocked.auth.updateUser.mockResolvedValue({
-      data: { user: { id: "secret-user-id" }, session: { access_token: "access-token" } },
-      error: null,
-    });
 
     const client = createSupabaseIdentityClient(config, storage()) as ReturnType<
       typeof createSupabaseIdentityClient
     > & {
       signUp(input: unknown): Promise<unknown>;
       resetPasswordForEmail(email: string, options: unknown): Promise<unknown>;
-      updateUser(input: unknown): Promise<unknown>;
     };
 
     await expect(
@@ -198,14 +410,9 @@ describe("Supabase identity adapter", () => {
         redirectTo: "https://app.musuw.com/auth/callback?flow=recovery",
       }),
     ).resolves.toEqual({ error: null });
-    await expect(client.updateUser({ password: "new-secret" })).resolves.toEqual({
-      data: { session: { access_token: "access-token" } },
-      error: null,
-    });
     expect(mocked.auth.resetPasswordForEmail).toHaveBeenCalledWith("user@example.com", {
       redirectTo: "https://app.musuw.com/auth/callback?flow=recovery",
     });
-    expect(mocked.auth.updateUser).toHaveBeenCalledWith({ password: "new-secret" });
   });
 
   it("shares only short-lived PKCE verifier slots and the opaque auth flow across tabs", () => {

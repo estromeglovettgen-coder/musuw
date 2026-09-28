@@ -14,21 +14,24 @@ const bundle = buildSync({
     import {createAuthRuntime} from './src/runtime';
     import {createSupabaseIdentityClient} from './src/supabase';
     const config = {publicOrigin:'https://app.musuw.com', publishableKey:'fixture-public-key', supabaseUrl:'https://identity.example', weknoraOAuthClientId:'weknora-client'};
-    const client = createSupabaseIdentityClient(config, sessionStorage, localStorage);
+    let client;
     let sessionChecks = 0;
     const runtime = createAuthRuntime({config, nativeStorage:localStorage, storage:sessionStorage,
       sharedStorage:localStorage,
-      createIdentityClient:()=>({...client, getSession: async()=>{
-        const failure = new URLSearchParams(location.search).get('fail_session');
-        if(failure && sessionChecks++ === 0) {
-          if(failure === 'timeout') {
-            window.__sessionCheckStarted = true;
-            await new Promise(() => {});
+      createIdentityClient:()=>{
+        client ??= createSupabaseIdentityClient(config, localStorage, sessionStorage);
+        return {...client, getSession: async()=>{
+          const failure = new URLSearchParams(location.search).get('fail_session');
+          if(failure && sessionChecks++ === 0) {
+            if(failure === 'timeout') {
+              window.__sessionCheckStarted = true;
+              await new Promise(() => {});
+            }
+            else throw Error('synthetic offline');
           }
-          else throw Error('synthetic offline');
-        }
-        return client.getSession();
-      }}),
+          return client.getSession();
+        }};
+      },
       onDiagnostic: event => {window.__diagnostics ??= []; window.__diagnostics.push(event)}
     });
     createRoot(document.getElementById('root')).render(createElement(AuthApp,{runtime}));
@@ -40,16 +43,22 @@ const html = `<html><head><meta charset="utf-8"><meta name="viewport" content="w
 const token = `${Buffer.from('{"alg":"HS256"}').toString('base64url')}.${Buffer.from(JSON.stringify({ sub: 'test-user', exp: 4102444800, role: 'authenticated' })).toString('base64url')}.fixture`;
 const session = { access_token: token, refresh_token: 'fixture-refresh', expires_in: 3600, expires_at: 4102444800, token_type: 'bearer', user: { id: 'test-user', aud: 'authenticated', role: 'authenticated', email: 'fixture@example.test', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' } };
 
-async function fixture(page: Page, seedSession = true, rateLimited = false, authorizationDelayMs = 0) {
+async function fixture(page: Page, seedSession = true, rateLimited = false, authorizationDelayMs = 0, blockStorage = false) {
   let authorizationCalls = 0;
   let otpCalls = 0;
-  await page.addInitScript(({ session, seedSession }) => {
+  await page.addInitScript(({ session, seedSession, blockStorage }) => {
     localStorage.setItem('locale', 'zh-CN');
-    if (seedSession && !sessionStorage.getItem('fixture-seeded')) {
-      sessionStorage.setItem('musnow.supabase.pkce', JSON.stringify(session));
-      sessionStorage.setItem('fixture-seeded', '1');
+    if (seedSession && !localStorage.getItem('fixture-seeded')) {
+      localStorage.setItem('musnow.supabase.pkce', JSON.stringify(session));
+      localStorage.setItem('fixture-seeded', '1');
     }
-  }, { session, seedSession });
+    if (blockStorage) {
+      const blocked = () => { throw new DOMException('Fixture storage blocked', 'SecurityError'); };
+      Storage.prototype.getItem = blocked;
+      Storage.prototype.setItem = blocked;
+      Storage.prototype.removeItem = blocked;
+    }
+  }, { session, seedSession, blockStorage });
   await page.route('**/*', async route => {
     const path = new URL(route.request().url()).pathname;
     const json = (value: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
@@ -117,8 +126,8 @@ test('OTP rate limit shows accurate feedback and disables repeated sends', async
   await expect(page.getByRole('button', { name: /^发送验证码/ })).toBeEnabled();
 });
 
-for (const preserve of [true, false]) {
-  test(`real SDK tab session ${preserve ? 'preserved' : 'lost'} after document navigation`, async ({ page }) => {
+for (const loseTabStorage of [false, true]) {
+  test(`real SDK completes OTP login after document navigation with tab storage ${loseTabStorage ? 'lost' : 'preserved'}`, async ({ page }) => {
     const network = await fixture(page, false);
     await page.goto('https://app.musuw.com/login');
     await page.getByRole('button', { name: '邮箱验证码登录' }).click();
@@ -128,17 +137,41 @@ for (const preserve of [true, false]) {
     await page.getByRole('button', { name: /^验证并继续/ }).click();
     await expect(page.getByText('Provider reached')).toBeVisible();
     await page.goto('https://app.musuw.com/fixture-transition');
-    expect(await page.evaluate(() => sessionStorage.getItem('musnow.supabase.pkce') !== null)).toBe(true);
-    if (!preserve) await page.evaluate(() => sessionStorage.clear());
+    expect(await page.evaluate(() => localStorage.getItem('musnow.supabase.pkce') !== null)).toBe(true);
+    expect(await page.evaluate(() => sessionStorage.getItem('musnow.supabase.pkce'))).toBeNull();
+    if (loseTabStorage) await page.evaluate(() => sessionStorage.clear());
     await page.goto('https://app.musuw.com/oauth/consent?authorization_id=authorization_1');
-    if (preserve) {
-      await expect(page.getByText('Callback reached')).toBeVisible();
-      expect(network.authorizationCalls()).toBe(1);
-    } else {
-      await expect(page.locator('input[name="password"]')).toBeVisible();
-      expect(network.authorizationCalls()).toBe(0);
-      const events = await page.evaluate(() => (window as any).__diagnostics);
-      expect(events).toEqual(expect.arrayContaining([expect.objectContaining({ phase: 'auth.session_state', reason: 'session_missing' })]));
-    }
+    await expect(page.getByText('Callback reached')).toBeVisible();
+    expect(network.authorizationCalls()).toBe(1);
+    expect(network.otpCalls()).toBe(1);
   });
 }
+
+for (const legacySession of [false, true]) {
+  test(`missing shared session requires login even when legacy tab session is ${legacySession ? 'present' : 'absent'}`, async ({ page }) => {
+    const network = await fixture(page, false);
+    if (legacySession) {
+      await page.addInitScript(session => sessionStorage.setItem('musnow.supabase.pkce', JSON.stringify(session)), session);
+    }
+    await page.goto('https://app.musuw.com/oauth/consent?authorization_id=authorization_1');
+    await expect(page.locator('input[name="password"]')).toBeVisible();
+    expect(network.authorizationCalls()).toBe(0);
+    expect(network.otpCalls()).toBe(0);
+    expect(await page.evaluate(() => (window as any).__diagnostics)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ phase: 'auth.session_state', reason: 'session_missing' }),
+    ]));
+    expect(await page.evaluate(() => localStorage.getItem('musnow.supabase.pkce'))).toBeNull();
+  });
+}
+
+test('blocked browser storage reports unavailable without authorizing or silently using another identity', async ({ page }) => {
+  const network = await fixture(page, false, false, 0, true);
+  await page.goto('https://app.musuw.com/oauth/consent?authorization_id=authorization_1');
+  await expect(page.getByRole('alert')).toContainText('暂时无法确认登录状态');
+  await expect(page.locator('input[name="password"]')).toHaveCount(0);
+  expect(network.authorizationCalls()).toBe(0);
+  expect(network.otpCalls()).toBe(0);
+  expect(await page.evaluate(() => (window as any).__diagnostics)).toEqual(expect.arrayContaining([
+    expect.objectContaining({ phase: 'auth.session_state', reason: 'session_unavailable' }),
+  ]));
+});

@@ -32,7 +32,7 @@ try {
     config,
     onDiagnostic: reportDiagnostic,
     createIdentityClient: (identityConfig) =>
-      createSupabaseIdentityClient(identityConfig, window.sessionStorage, window.localStorage),
+      createSupabaseIdentityClient(identityConfig, window.localStorage, window.sessionStorage),
     localMusuwPasswordAuth: isLocalMusuwAuthEnabled(
       import.meta.env.DEV,
       import.meta.env["VITE_MUSUW_DEV_LOCAL_AUTH"],

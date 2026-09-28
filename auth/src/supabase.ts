@@ -62,9 +62,9 @@ function storageKeys(storage: EnumeratedStorage): string[] {
 }
 
 /**
- * PKCE verifier storage is the only cross-tab state. Session and refresh
- * tokens remain in the tab's sessionStorage. Values in the shared medium are
- * short-lived envelopes and are removed on read or any subsequent write.
+ * PKCE verifier values use short-lived envelopes. The caller chooses the
+ * identity session medium separately from the runtime's tab-local flow state.
+ * Expired verifier envelopes are removed on read or any subsequent write.
  */
 export function createAuthStorage(
   sessionStorage: SessionStorageLike,
@@ -183,10 +183,13 @@ function projectSession(session: unknown): { access_token: string } | null {
  */
 export function createSupabaseIdentityClient(
   config: AuthConfig,
-  storage: SessionStorageLike,
-  sharedPkceStorage?: SessionStorageLike,
+  sharedSessionStorage: SessionStorageLike,
+  legacyTabStorage?: SessionStorageLike,
 ): IdentityClient {
-  const authStorage = createAuthStorage(storage, sharedPkceStorage);
+  // Fail through the caller before SDK initialization starts background reads.
+  // A blocked shared medium must not revive a tab-local identity.
+  sharedSessionStorage.getItem(supabaseStorageKey);
+  const authStorage = createAuthStorage(sharedSessionStorage);
   const client = createClient(config.supabaseUrl, config.publishableKey, {
     auth: {
       autoRefreshToken: false,
@@ -267,23 +270,63 @@ export function createSupabaseIdentityClient(
       return { error: boundedIdentityError(result.error) };
     },
     async signOut(input: Parameters<IdentityClient["signOut"]>[0]) {
-      storage.removeItem(supabaseStorageKey);
+      const legacySnapshot = legacyTabStorage?.getItem(supabaseStorageKey);
+      let revocation: Promise<{ error: IdentityError }> | undefined;
       try {
-        const result = await client.auth.signOut(input);
-        return { error: boundedIdentityError(result.error) };
+        const snapshot = sharedSessionStorage.getItem(supabaseStorageKey);
+        let session: ReturnType<typeof projectSession> = null;
+        try { session = snapshot === null ? null : projectSession(JSON.parse(snapshot)); } catch { /* Corrupt local state still needs removal. */ }
+        if (session !== null) {
+          // Use the SDK's fixed-bearer revocation API. Normal signOut would
+          // remove whichever shared account exists when its request returns.
+          revocation = client.auth.admin.signOut(session.access_token, input.scope).then(
+            result => ({ error: boundedIdentityError(result.error) }),
+            error => ({ error: boundedIdentityError(error) }),
+          );
+        }
+        if (snapshot !== null && sharedSessionStorage.getItem(supabaseStorageKey) === snapshot) {
+          sharedSessionStorage.removeItem(supabaseStorageKey);
+        }
       } finally {
-        storage.removeItem(supabaseStorageKey);
+        if (legacySnapshot != null && legacyTabStorage?.getItem(supabaseStorageKey) === legacySnapshot) {
+          legacyTabStorage.removeItem(supabaseStorageKey);
+        }
       }
+      return revocation === undefined ? { error: null } : await revocation;
     },
-    async updateUser(input: Parameters<IdentityClient["updateUser"]>[0]) {
-      const result = await client.auth.updateUser(input);
+    async updateUser(
+      input: Parameters<IdentityClient["updateUser"]>[0],
+      binding: Parameters<IdentityClient["updateUser"]>[1],
+    ) {
+      const unavailable = { data: { session: null }, error: { code: "unavailable" as const } };
+      if (typeof binding?.expectedAccessToken !== "string" || binding.expectedAccessToken === "") return unavailable;
+      const captured = await client.auth.getSession();
+      const session = captured.data.session;
+      if (captured.error !== null || session === null ||
+          session.access_token !== binding.expectedAccessToken ||
+          typeof session.expires_at !== "number" || !Number.isFinite(session.expires_at) ||
+          session.expires_at <= Date.now() / 1000) return unavailable;
+
+      // Password recovery must use its captured identity even if another tab
+      // signs in while the request is pending. This client never writes shared storage.
+      const recoveryClient = createClient(config.supabaseUrl, config.publishableKey, {
+        auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+      });
+      const initialized = await recoveryClient.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+      if (initialized.error !== null) return { data: { session: null }, error: boundedIdentityError(initialized.error) };
+      if (initialized.data.session?.access_token !== binding.expectedAccessToken) return unavailable;
+      const result = await recoveryClient.auth.updateUser(input);
       if (result.error !== null) {
         return { data: { session: null }, error: boundedIdentityError(result.error) };
       }
-      const session = await client.auth.getSession();
+      const current = await client.auth.getSession();
+      if (current.error !== null || current.data.session?.access_token !== binding.expectedAccessToken) return unavailable;
       return {
-        data: { session: projectSession(session.data.session) },
-        error: boundedIdentityError(session.error),
+        data: { session: projectSession(current.data.session) },
+        error: null,
       };
     },
     async verifyOtp(input: Parameters<IdentityClient["verifyOtp"]>[0]) {

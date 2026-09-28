@@ -98,7 +98,7 @@ export interface IdentityClient {
     current_password?: string;
     nonce?: string;
     password: string;
-  }): Promise<{
+  }, options: { expectedAccessToken: string }): Promise<{
     data: { session: IdentitySession | null };
     error: IdentityError;
   }>;
@@ -555,20 +555,38 @@ export function createAuthRuntime(options: RuntimeOptions) {
     options.storage.removeItem(recoveryMarkerKey);
   };
 
-  const recoveryMarkerIsReady = async (): Promise<boolean> => {
+  const sessionFingerprint = async (accessToken: string): Promise<string> => {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(accessToken));
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  };
+
+  // A marker proves which recovery session the page belongs to, not authentication.
+  // Keep only its fingerprint in tab storage, never a second copy of credentials.
+  const recoverySession = async (): Promise<IdentitySession | null> => {
     const raw = options.storage.getItem(recoveryMarkerKey);
-    if (raw === null) return false;
+    if (raw === null) return null;
     const marker = jsonOf(raw, (value) => {
-      if (!isObject(value)) return null;
+      if (!isObject(value) || typeof value["sessionFingerprint"] !== "string" ||
+          !/^[a-f0-9]{64}$/.test(value["sessionFingerprint"])) return null;
       return validCreatedAt(value["createdAt"], now()) === null ? null : value;
     });
-    const session = marker === null ? "missing" : await currentIdentitySession();
-    if (session === "unavailable") return false;
-    if (marker === null || session === "missing") {
+    if (marker === null) {
       clearRecoveryMarker();
-      return false;
+      return null;
     }
-    return true;
+    try {
+      const current = await withinRequestDeadline(identity().getSession(), "auth.session");
+      if (current.error !== null) return null;
+      const session = current.data.session;
+      if (session === null || !validSession(session) ||
+          await sessionFingerprint(session.access_token) !== marker["sessionFingerprint"]) {
+        clearRecoveryMarker();
+        return null;
+      }
+      return session;
+    } catch {
+      return null;
+    }
   };
 
   const withinRequestDeadline = <T>(request: Promise<T>, phase?: DiagnosticPhase): Promise<T> =>
@@ -876,7 +894,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
         }
         const flow = consumeFlow(flowId);
         if (flow === null) {
-          if (await recoveryMarkerIsReady()) return { state: "password_recovery_ready" };
+          if (await recoverySession()) return { state: "password_recovery_ready" };
           return { code: "callback_expired_or_used", state: "identity_error" };
         }
         const rawSupabaseFlowId = parameters.get("sb_flow_id");
@@ -911,7 +929,10 @@ export function createAuthRuntime(options: RuntimeOptions) {
               : { code: "identity_exchange_failed", state: "identity_error" };
           }
           if (flow.kind === "recovery") {
-            options.storage.setItem(recoveryMarkerKey, JSON.stringify({ createdAt: now() }));
+            options.storage.setItem(recoveryMarkerKey, JSON.stringify({
+              createdAt: now(),
+              sessionFingerprint: await sessionFingerprint(result.data.session!.access_token),
+            }));
             return { state: "password_recovery_ready" };
           }
           return resumeAfterIdentity();
@@ -926,7 +947,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
     },
 
     async resumePasswordRecovery(): Promise<IdentityCompletionView> {
-      return (await recoveryMarkerIsReady())
+      return (await recoverySession())
         ? { state: "password_recovery_ready" }
         : { code: "password_recovery_failed", state: "identity_error" };
     },
@@ -1117,7 +1138,11 @@ export function createAuthRuntime(options: RuntimeOptions) {
       if (password.length < 8) return identityError("password_too_short");
       if (password !== confirmation) return identityError("password_mismatch");
       try {
-        const result = await withinRequestDeadline(identity().updateUser({ password }));
+        const session = await recoverySession();
+        if (session === null) return identityError("password_recovery_failed");
+        const result = await withinRequestDeadline(identity().updateUser({ password }, {
+          expectedAccessToken: session.access_token,
+        }));
         if (result.error !== null) return identityError(identityErrorCode(result.error));
         if (!validSession(result.data.session)) return identityError("unavailable");
         removeFlowFromAllStores();
@@ -1145,6 +1170,8 @@ export function createAuthRuntime(options: RuntimeOptions) {
     },
 
     async signOut(): Promise<void> {
+      const sharedSession = sharedStorage.getItem(supabaseStorageKey);
+      const tabSession = options.storage.getItem(supabaseStorageKey);
       removeFlowFromAllStores();
       clearRecoveryMarker();
       clearContinuation();
@@ -1154,7 +1181,15 @@ export function createAuthRuntime(options: RuntimeOptions) {
       } catch {
         // Local removal is still required even if Auth's network acknowledgement is unavailable.
       } finally {
-        options.storage.removeItem(supabaseStorageKey);
+        try {
+          if (sharedStorage.getItem(supabaseStorageKey) === sharedSession) {
+            sharedStorage.removeItem(supabaseStorageKey);
+          }
+        } finally {
+          if (options.storage.getItem(supabaseStorageKey) === tabSession) {
+            options.storage.removeItem(supabaseStorageKey);
+          }
+        }
       }
     },
 
