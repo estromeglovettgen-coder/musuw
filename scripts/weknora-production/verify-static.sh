@@ -440,6 +440,12 @@ if ! grep -Fq 'listen 8080;' "$nginx_template" ||
     exit 1
 fi
 
+if ! sed -n '/^    location = \/api\/v1\/client-diagnostics {$/,/^    }$/p' "$nginx_template" |
+   grep -Fq 'client_max_body_size 2k;'; then
+    printf '%s\n' 'diagnostic Nginx body limit must match the 2048-byte client and handler contract' >&2
+    exit 1
+fi
+
 if grep -Eq '^COPY[[:space:]].*(legacy/|backend/|web/)' "$repo_root/integration/weknora-production/Dockerfile.frontend"; then
     printf '%s\n' 'production frontend Dockerfile contains a legacy business asset' >&2
     exit 1

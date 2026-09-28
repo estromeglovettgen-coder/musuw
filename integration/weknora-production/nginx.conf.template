@@ -152,7 +152,7 @@ server {
         # application handler is the only diagnostic event log.
         error_log /dev/null;
         client_body_timeout 5s;
-        client_max_body_size 1k;
+        client_max_body_size 2k;
         proxy_pass ${APP_SCHEME}://${APP_HOST}:${APP_PORT};
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
