@@ -334,7 +334,7 @@ frontend/src/i18n/locales/zh-CN.ts	M	M	100755	22f10ffecf930f1318ed276a46c60f1191
 frontend/src/i18n/memoryKeyReferences.test.ts	-	A	100644	c5f17c520826e8338bf9ac647e096cd87d1fdc2a	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/i18n/resolveDefaultLocale.test.ts	-	A	100644	b5f456010f1e5c9a8f7f5d0cfa558b8e11c7a7f3	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 frontend/src/i18n/resolveDefaultLocale.ts	-	A	100644	808495f57a0dd98ef5af65512e1c746b042828aa	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-frontend/src/main.ts	M	M	100644	10e81652c0c1ef089278093e64a3531ae33d46d2	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+frontend/src/main.ts	M	M	100644	ceaf44d7f4c954f13819304f2949fdd6fd3b6706	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 frontend/src/operations-main.ts	A	-	100644	33bbafbe83a1a73811cc60248736168a91af9543	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/operations/AccountErasureOperations.test.mjs	A	-	100644	37d5131db2fc7cacb89505878be20ace36bc9fc9	preserve-musuw-exact		audited local-only content is byte-identical
 frontend/src/operations/ComplimentaryPlanOperations.test.mjs	A	-	100644	3d6904657898adb6496b4edcaf9a93959e76715c	preserve-musuw-exact		audited local-only content is byte-identical
