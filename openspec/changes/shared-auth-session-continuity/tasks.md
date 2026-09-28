@@ -11,3 +11,10 @@
 - [x] 2.2a Correct the discovered production chunk cycle and verify actual knowledge-card navigation, Wiki, graph and route-load failure feedback before promotion.
 - [x] 2.3 Pass exact-candidate CI, immutable staging acceptance and production promotion.
 - [x] 2.4 Verify delivered production assets and diagnostics; report the real-phone verification boundary.
+
+## 3. Concurrent callback follow-up
+
+- [x] 3.1 Correlate the new real incident, distinguish verified facts from redacted evidence, and reproduce the concurrent callback failure.
+- [x] 3.2 Coalesce only identical validated in-flight exchanges; preserve cancellation isolation and privacy-bounded diagnostics.
+- [x] 3.3 Verify successful duplicates, validation/key isolation, cancellation, normal errors and completed replay; complete consolidated review.
+- [ ] 3.4 Pass candidate CI, immutable staging acceptance and production promotion, then verify delivered behavior and request a real-phone retest.

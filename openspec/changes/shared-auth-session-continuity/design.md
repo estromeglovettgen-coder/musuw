@@ -26,3 +26,11 @@ The auth shell stored the SDK session in tab storage while native app tokens alr
 ## Migration Plan
 
 No schema migration. Run runtime, real-SDK and browser regressions, typecheck/build, then one consolidated adversarial review. Build in GitHub, accept immutable images on staging, promote the same digests, and verify production assets. Rollback uses the previous image pair. No secret or real-user trace enters source control.
+
+## Concurrent callback follow-up
+
+A subsequent real login passed verification and identity continuity, then produced three overlapping native callbacks in the same anonymous journey: one successful exchange and two `invalid_grant` responses. They have distinct edge requests and no origin-proxy retry. Existing query logs redact codes/state, so their equality cannot be established retrospectively; neither the browser nor edge replay mechanism is proven.
+
+The handler regression reproduces the observed success/error race with identical concurrent callbacks. Only after the existing signed-state, cookie/nonce and PKCE-binding checks, use the existing singleflight dependency to share the in-flight exchange keyed by a SHA-256 digest of signed state, verified verifier and code. Each request still consumes its cookie and receives the existing callback format. A bounded one-minute context isolates the exchange from an abandoned duplicate; each waiter can exit on its own cancellation. There is no completed-result cache or token retention, new service, database change or authorization bypass. This process-local correction matches the current single application instance; it is not a distributed deduplication mechanism.
+
+Callbacks carry `Cache-Control: no-store`. A truncated digest is recorded as `callback_id` after validation, without raw credentials or identity, so a later real-phone check can distinguish identical exchanges. Nonoverlapping replay remains rejected; successful synthetic regression does not establish the unobserved browser mechanism or eliminate all possible login errors.

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -101,6 +102,13 @@ func TestOIDCCallbackDiagnosticsBoundedReasonsAndPrivacy(t *testing.T) {
 			r.ServeHTTP(w, req)
 			if w.Code != 302 || !strings.Contains(w.Header().Get("Location"), tc.fragment) {
 				t.Fatalf("changed callback outcome: status%d", w.Code)
+			}
+			if w.Header().Get("Cache-Control") != "no-store" {
+				t.Error("callback response must never be cached")
+			}
+			hasCallbackID := regexp.MustCompile(`\bcallback_id=[0-9a-f]{32}\b`).MatchString(logs.String())
+			if hasCallbackID != (tc.reason == "success" || tc.reason == "exchange_failed") {
+				t.Error("only validated exchanges must carry a bounded callback digest")
 			}
 			for _, want := range []string{
 				"auth_diagnostic", "phase=oidc.callback", "reason=" + tc.reason,

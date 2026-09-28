@@ -3,7 +3,9 @@ package handler
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/Tencent/WeKnora/internal/application/service"
 	"github.com/Tencent/WeKnora/internal/config"
@@ -38,6 +41,7 @@ const oidcNonceCookieMaxAge = 600
 // Provides functionality for user registration, login, logout, and token management
 // through the REST API endpoints
 type AuthHandler struct {
+	oidcCallbacks    singleflight.Group
 	userService      interfaces.UserService
 	tenantService    interfaces.TenantService
 	configInfo       *config.Config
@@ -430,7 +434,9 @@ func (h *AuthHandler) GetOIDCConfig(c *gin.Context) {
 func (h *AuthHandler) OIDCRedirectCallback(c *gin.Context) {
 	started := time.Now()
 	outcome, reason := "error", "invalid_state"
-	defer func() { logOIDCDiagnostic(c, "oidc.callback", outcome, reason, started) }()
+	callbackID := ""
+	defer func() { logOIDCDiagnostic(c, "oidc.callback", outcome, reason, started, callbackID) }()
+	c.Header("Cache-Control", "no-store")
 	ctx := c.Request.Context()
 	frontendRedirectURI := "/"
 
@@ -467,19 +473,35 @@ func (h *AuthHandler) OIDCRedirectCallback(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.userService.LoginWithOIDC(
-		ctx,
-		code,
-		strings.TrimSpace(decodedState.RedirectURI),
-		decodedState.CodeVerifier,
-		h.resolveOIDCProvisioningMode(ctx),
-	)
-	if err != nil {
+	// Only already-validated, identical callbacks may share an in-flight
+	// exchange. Keep the verifier in the key so a different browser binding
+	// cannot join it. Never retain completed results or reusable tokens.
+	keyMaterial, _ := json.Marshal([]string{state, decodedState.CodeVerifier, code})
+	key := sha256.Sum256(keyMaterial)
+	callbackID = hex.EncodeToString(key[:16])
+	provisioning := h.resolveOIDCProvisioningMode(ctx)
+	result := h.oidcCallbacks.DoChan(hex.EncodeToString(key[:]), func() (any, error) {
+		// An abandoned duplicate must not cancel another browser request that
+		// is still waiting. Bound both existing provider calls to one minute.
+		exchangeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+		defer cancel()
+		return h.userService.LoginWithOIDC(exchangeCtx, code,
+			strings.TrimSpace(decodedState.RedirectURI), decodedState.CodeVerifier, provisioning)
+	})
+	var exchange singleflight.Result
+	select {
+	case exchange = <-result:
+	case <-ctx.Done():
+		reason = "exchange_failed"
+		return
+	}
+	if exchange.Err != nil {
 		reason = "exchange_failed"
 		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape("login_failed"))
 		return
 	}
-	if !resp.Success {
+	resp, ok := exchange.Val.(*types.OIDCCallbackResponse)
+	if !ok || resp == nil || !resp.Success {
 		reason = "exchange_failed"
 		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape("login_failed"))
 		return
@@ -518,7 +540,7 @@ func diagnosticJourneyID(c *gin.Context, now time.Time) string {
 	return id
 }
 
-func logOIDCDiagnostic(c *gin.Context, phase, outcome, reason string, started time.Time) {
+func logOIDCDiagnostic(c *gin.Context, phase, outcome, reason string, started time.Time, callbackID ...string) {
 	duration := time.Since(started).Milliseconds()
 	if duration < 0 {
 		duration = 0
@@ -527,6 +549,11 @@ func logOIDCDiagnostic(c *gin.Context, phase, outcome, reason string, started ti
 		duration = 120000
 	}
 	fields := logger.Fields{"phase": phase, "outcome": outcome, "reason": reason, "duration_ms": duration}
+	if len(callbackID) == 1 && len(callbackID[0]) == 32 {
+		if _, err := hex.DecodeString(callbackID[0]); err == nil {
+			fields["callback_id"] = callbackID[0]
+		}
+	}
 	if requestID := c.GetString(types.RequestIDContextKey.String()); clientDiagnosticRequestID.MatchString(requestID) {
 		fields["request_id"] = requestID
 	}

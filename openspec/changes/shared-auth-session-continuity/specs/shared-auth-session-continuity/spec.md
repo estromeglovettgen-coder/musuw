@@ -1,5 +1,20 @@
 ## ADDED Requirements
 
+### Requirement: Identical concurrent callbacks share one exchange
+The native callback SHALL preserve signed-state, browser-binding and PKCE verification for every request and SHALL exchange identical overlapping authorization attempts only once per application instance.
+
+#### Scenario: Duplicate requests arrive during exchange
+- **WHEN** concurrently arriving callbacks pass all existing checks with identical signed state, verified PKCE verifier and authorization code
+- **THEN** they SHALL share the existing exchange result and successful requests SHALL receive the same native session instead of a duplicate-code error.
+
+#### Scenario: Initiating request is abandoned
+- **WHEN** one callback disconnects while a valid identical callback is still waiting
+- **THEN** its cancellation SHALL NOT abort the shared exchange; the operation SHALL retain a finite deadline.
+
+#### Scenario: Validation differs or a completed attempt is replayed
+- **WHEN** a callback lacks a valid binding, has different exchange material, or arrives after the shared exchange has completed
+- **THEN** it SHALL NOT obtain a cached successful result or bypass the existing checks.
+
 ### Requirement: Identity continuity across documents
 The auth shell SHALL use one shared same-origin SDK identity session while retaining standard OAuth validation and short-lived PKCE state.
 
