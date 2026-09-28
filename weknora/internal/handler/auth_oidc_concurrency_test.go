@@ -59,11 +59,12 @@ type singleUseOIDCGrant struct {
 // and native persistence are separately exercised by staging acceptance.
 type singleUseOIDCService struct {
 	interfaces.UserService
-	mu      sync.Mutex
-	grants  map[string]*singleUseOIDCGrant
-	calls   int
-	entered chan struct{}
-	release <-chan struct{}
+	mu          sync.Mutex
+	grants      map[string]*singleUseOIDCGrant
+	calls       int
+	entered     chan struct{}
+	release     <-chan struct{}
+	exchangeCtx context.Context
 }
 
 func (s *singleUseOIDCService) LoginWithOIDC(ctx context.Context, code, redirect, verifier string,
@@ -77,6 +78,7 @@ func (s *singleUseOIDCService) LoginWithOIDC(ctx context.Context, code, redirect
 	if valid {
 		grant.used = true
 		token = grant.token
+		s.exchangeCtx = ctx
 	}
 	s.mu.Unlock()
 	select {
@@ -100,6 +102,12 @@ func (s *singleUseOIDCService) callCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.calls
+}
+
+func (s *singleUseOIDCService) receivedExchangeContext() context.Context {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.exchangeCtx
 }
 
 func concurrentOIDCAttempt(t *testing.T, nonce, verifier string) (state, binding string) {
@@ -279,6 +287,16 @@ func TestOIDCRedirectCallbackConcurrentDuplicateSurvivesLeaderCancellation(t *te
 	awaitOIDCWaiter(t, leaderWaiter)
 	awaitOIDCWaiter(t, followerWaiter)
 	cancelLeader()
+	// Assert isolation before releasing the provider. Otherwise a broken
+	// inherited context could randomly select the ready success channel even
+	// though the leader also canceled its exchange context.
+	exchangeCtx := service.receivedExchangeContext()
+	if err := exchangeCtx.Err(); err != nil {
+		t.Errorf("leader cancellation reached the shared provider exchange: %v", err)
+	}
+	if deadline, ok := exchangeCtx.Deadline(); !ok || time.Until(deadline) <= 0 || time.Until(deadline) > time.Minute {
+		t.Error("shared provider exchange must retain a live, bounded deadline")
+	}
 	close(release)
 	// A browser may cancel an earlier duplicate navigation. The legitimate
 	// remaining navigation must still receive its one completed exchange.
