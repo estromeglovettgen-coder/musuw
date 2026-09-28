@@ -8,13 +8,13 @@ This guard does not assert full Paddle Sandbox lifecycle acceptance.
 import sys
 
 
-# Fill candidate and staging run only after the targeted acceptance recorded in
-# docs/LOGIN_PERFORMANCE_RELEASE_REVIEW_20260928.md has passed. None cannot match
-# a command-line argument, so the pending record rejects every promotion.
+# Exact candidate and successful staging run from the completed targeted
+# acceptance in docs/LOGIN_PERFORMANCE_RELEASE_REVIEW_20260928.md.
+# This permission cannot be reused for a different release or baseline.
 REVIEWED_RELEASE: tuple[str | None, str, str | None] = (
-    None,
+    "9ce4918f4e4ec75fd5f37c4bc95d4f6ca2518939",
     "19faaa073c1018ab8ebf699b841585feed38f728",
-    None,
+    "36441630014",
 )
 
 

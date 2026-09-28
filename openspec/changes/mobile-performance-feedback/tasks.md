@@ -10,5 +10,5 @@
 
 ## 3. Verification and release
 - [x] 3.1 Run affected tests, types, builds, provenance checks and a consolidated review.
-- [ ] 3.2 Deploy an immutable staging candidate and verify focused mobile/auth/diagnostic acceptance.
+- [x] 3.2 Deploy an immutable staging candidate and verify focused mobile/auth/diagnostic acceptance.
 - [ ] 3.3 Promote the accepted digests, verify production and record remaining network limitations.
