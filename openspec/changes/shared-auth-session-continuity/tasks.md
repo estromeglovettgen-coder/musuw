@@ -9,5 +9,5 @@
 - [x] 2.1 Pass runtime, real-SDK, mobile browser regressions, typecheck and build.
 - [x] 2.2 Complete consolidated adversarial review and resolve current blockers.
 - [x] 2.2a Correct the discovered production chunk cycle and verify actual knowledge-card navigation, Wiki, graph and route-load failure feedback before promotion.
-- [ ] 2.3 Pass exact-candidate CI, immutable staging acceptance and production promotion.
-- [ ] 2.4 Verify delivered production assets and diagnostics; report the real-phone verification boundary.
+- [x] 2.3 Pass exact-candidate CI, immutable staging acceptance and production promotion.
+- [x] 2.4 Verify delivered production assets and diagnostics; report the real-phone verification boundary.
