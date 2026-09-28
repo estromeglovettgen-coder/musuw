@@ -170,6 +170,14 @@ function boundedIdentityError(error: unknown): IdentityError {
   return { code: bounded };
 }
 
+function boundedAuthorizationError(error: unknown): IdentityError {
+  if (error === null || error === undefined) return null;
+  const status = providerErrorStatus(error);
+  const temporary = status === 0 || status === 408 || status === 429 ||
+    (status !== null && status >= 500 && status <= 599);
+  return { code: temporary ? "unavailable" : "authorization_invalid" };
+}
+
 function projectSession(session: unknown): { access_token: string } | null {
   if (!isRecord(session) || typeof session["access_token"] !== "string") return null;
   const accessToken = session["access_token"].trim();
@@ -232,12 +240,12 @@ export function createSupabaseIdentityClient(
         const result = await client.auth.oauth.approveAuthorization(authorizationId, options);
         return {
           data: result.data === null ? null : { redirect_url: result.data.redirect_url },
-          error: boundedIdentityError(result.error),
+          error: boundedAuthorizationError(result.error),
         };
       },
       async getAuthorizationDetails(authorizationId: string) {
         const result = await client.auth.oauth.getAuthorizationDetails(authorizationId);
-        return { data: result.data, error: boundedIdentityError(result.error) };
+        return { data: result.data, error: boundedAuthorizationError(result.error) };
       },
     }),
     async signInWithOAuth(input: Parameters<IdentityClient["signInWithOAuth"]>[0]) {

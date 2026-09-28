@@ -125,6 +125,35 @@ describe("Supabase identity adapter", () => {
     });
   });
 
+  for (const method of ["details", "approve"] as const) {
+    for (const [status, expected] of [
+      [503, "unavailable"], [408, "unavailable"], [429, "unavailable"],
+      [400, "authorization_invalid"], [401, "authorization_invalid"],
+      [403, "authorization_invalid"], [404, "authorization_invalid"],
+    ] as const) {
+      it(`classifies OAuth ${method} HTTP ${status} without treating invalid authorization as retryable`, async () => {
+        const { provider } = await realSdkFixture();
+        const client = createSupabaseIdentityClient(config, sharedStorage());
+        await client.signInWithPassword({ email: "synthetic@example.test", password: "synthetic-password" });
+        provider.mockResolvedValueOnce(Response.json({ code: "synthetic_provider_detail" }, { status }));
+        const result = method === "details"
+          ? await client.oauth.getAuthorizationDetails("authorization_1")
+          : await client.oauth.approveAuthorization("authorization_1", { skipBrowserRedirect: true });
+        expect(result).toEqual({ data: null, error: { code: expected } });
+      });
+    }
+    it(`keeps an OAuth ${method} network failure retryable through the actual SDK`, async () => {
+      const { provider } = await realSdkFixture();
+      const client = createSupabaseIdentityClient(config, sharedStorage());
+      await client.signInWithPassword({ email: "synthetic@example.test", password: "synthetic-password" });
+      provider.mockRejectedValueOnce(new TypeError("Synthetic offline"));
+      const result = method === "details"
+        ? await client.oauth.getAuthorizationDetails("authorization_1")
+        : await client.oauth.approveAuthorization("authorization_1", { skipBrowserRedirect: true });
+      expect(result).toEqual({ data: null, error: { code: "unavailable" } });
+    });
+  }
+
   it("revokes the current SDK session before clearing shared and legacy tab sessions", async () => {
     const { provider, session } = await realSdkFixture();
     const shared = sharedStorage();

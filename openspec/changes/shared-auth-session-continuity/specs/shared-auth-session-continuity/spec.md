@@ -40,6 +40,35 @@ Logout SHALL attempt provider revocation with the current session and SHALL clea
 - **WHEN** revocation fails or times out
 - **THEN** both shared and legacy tab identity sessions SHALL be removed, unrelated storage SHALL remain, and old tab tokens SHALL NOT restore login.
 
+### Requirement: Verified identity can retry a failed workspace handoff
+The auth shell SHALL preserve the distinction between failed identity verification and a temporary failure to continue an already verified identity into the workspace.
+
+#### Scenario: Workspace authorization fails after successful verification
+- **WHEN** password or email-code verification succeeds but the native OIDC start request fails
+- **THEN** the shell SHALL show an explicit continuation retry and reuse the existing verified session through the normal authorization flow, without resending or reverifying the consumed code or asking for the password again.
+- **AND** a prior login-required result SHALL NOT prevent a fresh session check after verification.
+
+#### Scenario: Another tab left an older native account session
+- **WHEN** the current tab verifies a new identity, its handoff fails, and another account's native session remains in shared storage
+- **THEN** verified-identity retry SHALL recheck the current SDK identity and continue its normal authorization; it SHALL NOT use the older native session as a shortcut into the workspace.
+- **AND** a missing identity SHALL require login, while an unavailable identity check SHALL remain recoverable without granting access.
+
+#### Scenario: Verification itself fails
+- **WHEN** a code or password is rejected before identity verification succeeds
+- **THEN** the existing credential error and correction form SHALL remain; the shell SHALL NOT treat this as a verified continuation.
+
+#### Scenario: Authorization service has a temporary failure
+- **WHEN** the verified session's authorization-details or approval request encounters a network failure, timeout or temporary server failure
+- **THEN** the existing same-page retry SHALL retain the valid continuation and retry authorization without asking for credentials again.
+- **AND** a definite expired/invalid authorization or a failed client/redirect/state validation SHALL remain rejected.
+
+### Requirement: Automatic authorization hops do not remain in browser history
+The auth shell SHALL replace automatic one-time authorization transitions while preserving user-initiated external sign-in navigation.
+
+#### Scenario: Back after a completed sign-in
+- **WHEN** the user enters sign-in from a normal source page, completes authorization and then goes back
+- **THEN** the browser SHALL return to the source page instead of replaying a consumed consent request or showing a stale login failure.
+
 ### Requirement: Recovery remains bound to the verified session
 A password reset SHALL require an unexpired recovery marker bound to the exchanged identity session and SHALL never modify an account selected by a later cross-tab switch.
 

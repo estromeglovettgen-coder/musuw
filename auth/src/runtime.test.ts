@@ -97,7 +97,7 @@ function identity(
 function runtimeFor(
   client: IdentityClient,
   store = storage(),
-  assigned = vi.fn(),
+  navigated = vi.fn(),
   fetch = vi.fn<typeof globalThis.fetch>(async () =>
     response({
       authorization_url:
@@ -119,7 +119,7 @@ function runtimeFor(
     },
     createIdentityClient: () => client,
     fetch,
-    location: { assign: assigned, origin: "https://app.musuw.com" },
+    location: { assign: navigated, replace: navigated, origin: "https://app.musuw.com" },
     localMusuwPasswordAuth,
     nativeStorage: nativeStore,
     nextFlowId: () => "flow_1",
@@ -128,7 +128,7 @@ function runtimeFor(
     ...(sharedStore === undefined ? {} : { sharedStorage: sharedStore }),
   };
   return {
-    assigned,
+    navigated,
     fetch,
     runtime: createAuthRuntime(runtimeOptions),
     nativeStore,
@@ -137,9 +137,27 @@ function runtimeFor(
 }
 
 describe("Supabase to WeKnora authorization continuation", () => {
+  it("keeps the user-triggered Google departure in history and replaces automatic callback navigation", async () => {
+    const assign = vi.fn();
+    const replace = vi.fn();
+    const runtime = createAuthRuntime({
+      config: { publicOrigin: "https://app.musuw.com", publishableKey: "test", supabaseUrl: "https://identity.example", weknoraOAuthClientId: "weknora-client" },
+      createIdentityClient: () => identity(), storage: storage(), nativeStorage: storage(),
+      nextFlowId: () => "flow_1", now: () => 1,
+      location: { assign, replace, origin: "https://app.musuw.com" },
+      fetch: vi.fn(async () => response({ success: true, authorization_url: "https://identity.example/authorize?state=fixture-state" })),
+    });
+    await runtime.startGoogle();
+    expect(assign).toHaveBeenCalledWith("https://identity.example/authorize");
+    expect(replace).not.toHaveBeenCalled();
+    await expect(runtime.completeCallback("?flow=flow_1&code=google-code")).resolves.toEqual({ state: "identity_complete" });
+    expect(replace).toHaveBeenCalledWith("https://identity.example/authorize?state=fixture-state");
+    expect(assign).toHaveBeenCalledOnce();
+  });
+
   it("automatically resumes native OIDC from the start route when Supabase is already signed in", async () => {
     const client = identity();
-    const { assigned, fetch, runtime } = runtimeFor(client);
+    const { navigated, fetch, runtime } = runtimeFor(client);
 
     await expect(
       (runtime as typeof runtime & { resumeStart(): Promise<unknown> }).resumeStart(),
@@ -150,7 +168,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       expect.stringContaining("/api/v1/auth/oidc/url?"),
       expect.objectContaining({ credentials: "same-origin" }),
     );
-    expect(assigned).toHaveBeenLastCalledWith(
+    expect(navigated).toHaveBeenLastCalledWith(
       "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
     );
   });
@@ -166,7 +184,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       }
       return response({ success: false }, 500);
     });
-    const { assigned, runtime } = runtimeFor(client, storage(), vi.fn(), fetch, nativeStore);
+    const { navigated, runtime } = runtimeFor(client, storage(), vi.fn(), fetch, nativeStore);
 
     await expect(runtime.resumeStart("/?plan=max&period=yearly")).resolves.toEqual({ state: "start_complete" });
 
@@ -181,7 +199,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       }),
     );
     expect(client.getSession).not.toHaveBeenCalled();
-    expect(assigned).toHaveBeenLastCalledWith("https://app.musuw.com/?plan=max&period=yearly");
+    expect(navigated).toHaveBeenLastCalledWith("https://app.musuw.com/?plan=max&period=yearly");
   });
 
   it("clears a stale native session before it resumes a valid Supabase session", async () => {
@@ -200,14 +218,14 @@ describe("Supabase to WeKnora authorization continuation", () => {
         success: true,
       });
     });
-    const { assigned, runtime } = runtimeFor(client, storage(), vi.fn(), fetch, nativeStore);
+    const { navigated, runtime } = runtimeFor(client, storage(), vi.fn(), fetch, nativeStore);
 
     await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_complete" });
 
     expect(nativeStore.getItem("weknora_token")).toBeNull();
     expect(nativeStore.getItem("weknora_refresh_token")).toBeNull();
     expect(client.getSession).toHaveBeenCalledOnce();
-    expect(assigned).toHaveBeenLastCalledWith(
+    expect(navigated).toHaveBeenLastCalledWith(
       "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
     );
   });
@@ -217,7 +235,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
     const nativeStore = storage();
     nativeStore.setItem("weknora_token", "native-session-token");
     const fetch = vi.fn<typeof globalThis.fetch>(async () => response({ success: false }, 503));
-    const { assigned, runtime } = runtimeFor(client, storage(), vi.fn(), fetch, nativeStore);
+    const { navigated, runtime } = runtimeFor(client, storage(), vi.fn(), fetch, nativeStore);
 
     await expect(runtime.resumeStart()).resolves.toEqual({
       code: "native_session_unavailable",
@@ -226,7 +244,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
 
     expect(nativeStore.getItem("weknora_token")).toBe("native-session-token");
     expect(client.getSession).not.toHaveBeenCalled();
-    expect(assigned).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
   });
 
   it("keeps a native session when its validation response is malformed", async () => {
@@ -234,7 +252,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
     const nativeStore = storage();
     nativeStore.setItem("weknora_token", "native-session-token");
     const fetch = vi.fn<typeof globalThis.fetch>(async () => response({ success: false }));
-    const { assigned, runtime } = runtimeFor(client, storage(), vi.fn(), fetch, nativeStore);
+    const { navigated, runtime } = runtimeFor(client, storage(), vi.fn(), fetch, nativeStore);
 
     await expect(runtime.resumeStart()).resolves.toEqual({
       code: "native_session_unavailable",
@@ -243,12 +261,12 @@ describe("Supabase to WeKnora authorization continuation", () => {
 
     expect(nativeStore.getItem("weknora_token")).toBe("native-session-token");
     expect(client.getSession).not.toHaveBeenCalled();
-    expect(assigned).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
   });
 
   it("uses the current localhost origin for the OIDC callback", async () => {
     const client = identity();
-    const assigned = vi.fn();
+    const navigated = vi.fn();
     const fetch = vi.fn<typeof globalThis.fetch>(async () =>
       response({
         authorization_url:
@@ -265,7 +283,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       },
       createIdentityClient: () => client,
       fetch,
-      location: { assign: assigned, origin: "http://localhost:4190" },
+      location: { assign: navigated, replace: navigated, origin: "http://localhost:4190" },
       nativeStorage: storage(),
       now: () => 1,
       storage: storage(),
@@ -283,7 +301,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
 
   it("starts only the native WeKnora OIDC endpoint after an ordinary Google login", async () => {
     const client = identity();
-    const { assigned, fetch, runtime } = runtimeFor(client);
+    const { navigated, fetch, runtime } = runtimeFor(client);
 
     await runtime.startGoogle();
     await expect(runtime.completeCallback("?code=google-code&flow=flow_1")).resolves.toEqual({
@@ -295,7 +313,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       expect.objectContaining({ credentials: "same-origin" }),
     );
     expect(fetch.mock.calls.flat().join(" ")).not.toContain("/v1/auth/exchange");
-    expect(assigned).toHaveBeenLastCalledWith(
+    expect(navigated).toHaveBeenLastCalledWith(
       "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
     );
   });
@@ -332,7 +350,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
 
   it("resumes a pending WeKnora authorization after Google login without calling the displaced exchange endpoint", async () => {
     const client = identity();
-    const { assigned, runtime, store } = runtimeFor(client);
+    const { navigated, runtime, store } = runtimeFor(client);
     store.setItem(
       "musnow.auth.pending-authorization",
       JSON.stringify({ authorizationId: "authorization_1", createdAt: 1 }),
@@ -342,7 +360,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
     const completed = await runtime.completeCallback("?code=google-code&flow=flow_1");
 
     expect(completed).toEqual({ state: "identity_complete" });
-    expect(assigned).toHaveBeenLastCalledWith(
+    expect(navigated).toHaveBeenLastCalledWith(
       "https://app.musuw.com/oauth/consent?authorization_id=authorization_1",
     );
     expect(client.exchangeCodeForSession).toHaveBeenCalledWith("google-code");
@@ -351,7 +369,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
 
   it("resumes a pending WeKnora authorization after email OTP verification", async () => {
     const client = identity();
-    const { assigned, runtime, store } = runtimeFor(client);
+    const { navigated, runtime, store } = runtimeFor(client);
     store.setItem(
       "musnow.auth.pending-authorization",
       JSON.stringify({ authorizationId: "authorization_1", createdAt: 1 }),
@@ -365,14 +383,14 @@ describe("Supabase to WeKnora authorization continuation", () => {
       token: "123456",
       type: "email",
     });
-    expect(assigned).toHaveBeenCalledWith(
+    expect(navigated).toHaveBeenCalledWith(
       "https://app.musuw.com/oauth/consent?authorization_id=authorization_1",
     );
   });
 
   it("verifies a six-digit signup code and resumes the existing identity handoff", async () => {
     const client = identity();
-    const { assigned, fetch, runtime, store } = runtimeFor(client);
+    const { navigated, fetch, runtime, store } = runtimeFor(client);
     store.setItem(
       "musnow.auth.flow",
       JSON.stringify({ createdAt: 1, id: "flow_1", kind: "signup" }),
@@ -395,7 +413,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       expect.stringContaining("/api/v1/auth/oidc/url?"),
       expect.objectContaining({ credentials: "same-origin" }),
     );
-    expect(assigned).toHaveBeenLastCalledWith(
+    expect(navigated).toHaveBeenLastCalledWith(
       "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
     );
   });
@@ -446,7 +464,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
         })),
       },
     });
-    const { assigned, runtime } = runtimeFor(
+    const { navigated, runtime } = runtimeFor(
       client,
       storage(),
       vi.fn(),
@@ -460,7 +478,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
     });
 
     expect(client.oauth.approveAuthorization).toHaveBeenCalledOnce();
-    expect(assigned).toHaveBeenCalledWith(
+    expect(navigated).toHaveBeenCalledWith(
       "http://localhost:4190/api/v1/auth/oidc/callback?code=oidc-code&state=weknora-state",
     );
   });
@@ -484,7 +502,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
         })),
       },
     });
-    const assigned = vi.fn();
+    const navigated = vi.fn();
     const runtime = createAuthRuntime({
       config: {
         publicOrigin: "http://localhost:4190",
@@ -493,7 +511,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
         weknoraOAuthClientId: "weknora-client",
       },
       createIdentityClient: () => client,
-      location: { assign: assigned, origin: "https://app.musuw.com" },
+      location: { assign: navigated, replace: navigated, origin: "https://app.musuw.com" },
       nativeStorage: storage(),
       now: () => 1,
       storage: storage(),
@@ -502,13 +520,13 @@ describe("Supabase to WeKnora authorization continuation", () => {
     await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({
       state: "authorization_complete",
     });
-    expect(assigned).toHaveBeenCalledWith(
+    expect(navigated).toHaveBeenCalledWith(
       "http://127.0.0.1:4190/api/v1/auth/oidc/callback?code=oidc-code&state=client-state",
     );
   });
 
   it("trusts the configured staging callback without trusting production or request-host origins", async () => {
-    const assigned = vi.fn();
+    const navigated = vi.fn();
     const client = identity({
       oauth: {
         approveAuthorization: vi.fn(async () => ({
@@ -535,7 +553,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
         weknoraOAuthClientId: "weknora-client",
       },
       createIdentityClient: () => client,
-      location: { assign: assigned, origin: "https://request-host.example" },
+      location: { assign: navigated, replace: navigated, origin: "https://request-host.example" },
       nativeStorage: storage(),
       now: () => 1,
       storage: storage(),
@@ -544,7 +562,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
     await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({
       state: "authorization_complete",
     });
-    expect(assigned).toHaveBeenCalledWith(
+    expect(navigated).toHaveBeenCalledWith(
       "https://staging.musuw.com/api/v1/auth/oidc/callback?code=oidc-code&state=client-state",
     );
 
@@ -560,7 +578,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
         })),
       },
     });
-    const productionAssigned = vi.fn();
+    const productionNavigated = vi.fn();
     const stagingRuntime = createAuthRuntime({
       config: {
         publicOrigin: "https://staging-app.musuw.com",
@@ -569,7 +587,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
         weknoraOAuthClientId: "weknora-client",
       },
       createIdentityClient: () => productionClient,
-      location: { assign: productionAssigned, origin: "https://request-host.example" },
+      location: { assign: productionNavigated, replace: productionNavigated, origin: "https://request-host.example" },
       nativeStorage: storage(),
       now: () => 1,
       storage: storage(),
@@ -581,7 +599,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       code: "oauth_continuation_invalid",
       state: "authorization_error",
     });
-    expect(productionAssigned).not.toHaveBeenCalled();
+    expect(productionNavigated).not.toHaveBeenCalled();
     expect(productionClient.oauth.approveAuthorization).not.toHaveBeenCalled();
   });
 
@@ -598,14 +616,14 @@ describe("Supabase to WeKnora authorization continuation", () => {
         })),
       },
     });
-    const { assigned, runtime } = runtimeFor(client);
+    const { navigated, runtime } = runtimeFor(client);
 
     await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({
       code: "oauth_continuation_invalid",
       state: "authorization_error",
     });
     expect(client.oauth.approveAuthorization).not.toHaveBeenCalled();
-    expect(assigned).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
   });
 
   it("follows Supabase's already-consented redirect only when its callback is trusted", async () => {
@@ -621,7 +639,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
         })),
       },
     });
-    const { assigned, runtime } = runtimeFor(
+    const { navigated, runtime } = runtimeFor(
       client,
       storage(),
       vi.fn(),
@@ -634,7 +652,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       state: "authorization_complete",
     });
     expect(client.oauth.approveAuthorization).not.toHaveBeenCalled();
-    expect(assigned).toHaveBeenCalledWith(
+    expect(navigated).toHaveBeenCalledWith(
       "http://127.0.0.1:4190/api/v1/auth/oidc/callback?code=oidc-code&state=client-state",
     );
   });
@@ -652,18 +670,18 @@ describe("Supabase to WeKnora authorization continuation", () => {
         })),
       },
     });
-    const { assigned, runtime } = runtimeFor(client);
+    const { navigated, runtime } = runtimeFor(client);
 
     await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({
       code: "oauth_continuation_invalid",
       state: "authorization_error",
     });
-    expect(assigned).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
   });
 
   it("approves the configured WeKnora client for an already signed-in user and follows Supabase's redirect_url", async () => {
     const client = identity();
-    const { assigned, runtime, store } = runtimeFor(client);
+    const { navigated, runtime, store } = runtimeFor(client);
     store.setItem(
       "musnow.auth.weknora-oidc",
       JSON.stringify({
@@ -680,7 +698,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
     expect(client.oauth.approveAuthorization).toHaveBeenCalledWith("authorization_1", {
       skipBrowserRedirect: true,
     });
-    expect(assigned).toHaveBeenCalledWith(
+    expect(navigated).toHaveBeenCalledWith(
       "https://app.musuw.com/api/v1/auth/oidc/callback?code=oidc-code&state=weknora-state",
     );
   });
@@ -717,7 +735,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
         })),
       },
     });
-    const { assigned, runtime, store } = runtimeFor(client);
+    const { navigated, runtime, store } = runtimeFor(client);
     store.setItem(
       "musnow.auth.weknora-oidc",
       JSON.stringify({
@@ -732,7 +750,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       state: "authorization_error",
     });
     expect(client.oauth.approveAuthorization).not.toHaveBeenCalled();
-    expect(assigned).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
   });
 
   it("sign-out clears the local Supabase session and every pending continuation", async () => {
@@ -763,7 +781,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       config: { publicOrigin: "https://app.musuw.com", publishableKey: "synthetic", supabaseUrl: "https://identity.example", weknoraOAuthClientId: "weknora-client" },
       createIdentityClient: () => client, nativeStorage: shared, sharedStorage: shared,
       storage: tab, requestTimeoutMs: 5,
-      location: { assign: vi.fn(), origin: "https://app.musuw.com" },
+      location: { assign: vi.fn(), replace: vi.fn(), origin: "https://app.musuw.com" },
     });
     await runtime.signOut();
     expect(shared.getItem("musnow.supabase.pkce")).toBeNull();
@@ -782,7 +800,7 @@ describe("Supabase to WeKnora authorization continuation", () => {
       config: { publicOrigin: "https://app.musuw.com", publishableKey: "synthetic", supabaseUrl: "https://identity.example", weknoraOAuthClientId: "weknora-client" },
       createIdentityClient: () => client, nativeStorage: shared, sharedStorage: shared,
       storage: storage(), requestTimeoutMs: 5,
-      location: { assign: vi.fn(), origin: "https://app.musuw.com" },
+      location: { assign: vi.fn(), replace: vi.fn(), origin: "https://app.musuw.com" },
     });
     await runtime.signOut();
     expect(shared.getItem("musnow.supabase.pkce")).toBe("new-session");
@@ -792,12 +810,12 @@ describe("Supabase to WeKnora authorization continuation", () => {
 describe("password identity continuation", () => {
   it("rejects a password update without a live recovery grant", async () => {
     const client = identity();
-    const { runtime, assigned } = runtimeFor(client);
+    const { runtime, navigated } = runtimeFor(client);
     await expect(runtime.updatePassword("new-password", "new-password")).resolves.toEqual({
       code: "password_recovery_failed", state: "identity_error",
     });
     expect(client.updateUser).not.toHaveBeenCalled();
-    expect(assigned).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
   });
 
   it("rejects an old recovery page after another tab changes the shared identity", async () => {
@@ -827,7 +845,7 @@ describe("password identity continuation", () => {
     const client = identity() as IdentityClient & {
       signInWithPassword: ReturnType<typeof vi.fn>;
     };
-    const assigned = vi.fn();
+    const navigated = vi.fn();
     const nativeStore = storage();
     const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
       expect(String(input)).toBe("http://localhost:4190/api/v1/auth/login");
@@ -847,7 +865,7 @@ describe("password identity continuation", () => {
       createIdentityClient: () => client,
       fetch,
       localMusuwPasswordAuth: true,
-      location: { assign: assigned, origin: "http://localhost:4190" },
+      location: { assign: navigated, replace: navigated, origin: "http://localhost:4190" },
       nativeStorage: nativeStore,
       storage: storage(),
     });
@@ -858,12 +876,12 @@ describe("password identity continuation", () => {
     expect(client.signInWithPassword).not.toHaveBeenCalled();
     expect(nativeStore.getItem("weknora_token")).toBe("local-access-token");
     expect(nativeStore.getItem("weknora_refresh_token")).toBe("local-refresh-token");
-    expect(assigned).toHaveBeenCalledWith("http://localhost:4190/");
+    expect(navigated).toHaveBeenCalledWith("http://localhost:4190/");
   });
 
   it("shows the Musuw login page locally even when a hosted identity session exists", async () => {
     const client = identity();
-    const { assigned, fetch, runtime } = runtimeFor(
+    const { navigated, fetch, runtime } = runtimeFor(
       client,
       storage(),
       vi.fn(),
@@ -877,7 +895,7 @@ describe("password identity continuation", () => {
     await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_login_required" });
     expect(client.getSession).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
-    expect(assigned).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
   });
 
   it("signs in with a normalized email and resumes the native OIDC handoff", async () => {
@@ -888,7 +906,7 @@ describe("password identity continuation", () => {
       data: { session: { access_token: "supabase-access-token" } },
       error: null,
     }));
-    const { assigned, fetch, runtime } = runtimeFor(client);
+    const { navigated, fetch, runtime } = runtimeFor(client);
 
     await expect(
       (runtime as typeof runtime & {
@@ -904,7 +922,7 @@ describe("password identity continuation", () => {
       expect.stringContaining("/api/v1/auth/oidc/url?"),
       expect.objectContaining({ credentials: "same-origin" }),
     );
-    expect(assigned).toHaveBeenLastCalledWith(
+    expect(navigated).toHaveBeenLastCalledWith(
       "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
     );
   });
@@ -917,7 +935,7 @@ describe("password identity continuation", () => {
       data: { session: null },
       error: null,
     }));
-    const { assigned, runtime, store } = runtimeFor(client);
+    const { navigated, runtime, store } = runtimeFor(client);
 
     const result = await (
       runtime as typeof runtime & {
@@ -940,7 +958,7 @@ describe("password identity continuation", () => {
     expect(store.getItem("musnow.auth.flow")).toBe(
       JSON.stringify({ createdAt: 1, id: "flow_1", kind: "signup" }),
     );
-    expect(assigned).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
   });
 
   it("masks an existing-account signup result exactly like a new confirmation flow", async () => {
@@ -966,7 +984,7 @@ describe("password identity continuation", () => {
       data: { session: null },
       error: null,
     }));
-    const { assigned, fetch, runtime } = runtimeFor(client);
+    const { navigated, fetch, runtime } = runtimeFor(client);
 
     await expect(
       (runtime as typeof runtime & {
@@ -988,7 +1006,7 @@ describe("password identity continuation", () => {
       expect.stringContaining("/api/v1/auth/oidc/url?"),
       expect.objectContaining({ credentials: "same-origin" }),
     );
-    expect(assigned).toHaveBeenLastCalledWith(
+    expect(navigated).toHaveBeenLastCalledWith(
       "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
     );
   });
@@ -1003,7 +1021,7 @@ describe("password identity continuation", () => {
       data: { session: { access_token: "supabase-access-token" } },
       error: null,
     }));
-    const { assigned, fetch, runtime, store } = runtimeFor(client);
+    const { navigated, fetch, runtime, store } = runtimeFor(client);
 
     await expect(
       (runtime as typeof runtime & {
@@ -1024,7 +1042,7 @@ describe("password identity continuation", () => {
       flowId: "0123456789abcdef0123456789abcdef",
     });
     expect(fetch).not.toHaveBeenCalled();
-    expect(assigned).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
     expect(store.getItem("musnow.auth.flow")).toBeNull();
 
     await expect(
@@ -1148,7 +1166,7 @@ describe("password identity continuation", () => {
 
   it("treats a legacy flow without kind as the existing OAuth flow", async () => {
     const client = identity();
-    const { assigned, fetch, runtime, store } = runtimeFor(client);
+    const { navigated, fetch, runtime, store } = runtimeFor(client);
     store.setItem("musnow.auth.flow", JSON.stringify({ createdAt: 1, id: "flow_1" }));
 
     await expect(runtime.completeCallback("?code=legacy-code&flow=flow_1")).resolves.toEqual({
@@ -1159,14 +1177,14 @@ describe("password identity continuation", () => {
       expect.stringContaining("/api/v1/auth/oidc/url?"),
       expect.objectContaining({ credentials: "same-origin" }),
     );
-    expect(assigned).toHaveBeenLastCalledWith(
+    expect(navigated).toHaveBeenLastCalledWith(
       "https://identity.example/auth/v1/oauth/authorize?client_id=weknora-client&state=weknora-state",
     );
   });
 
   it("rejects an unknown flow kind instead of treating it as an OAuth callback", async () => {
     const client = identity();
-    const { assigned, fetch, runtime, store } = runtimeFor(client);
+    const { navigated, fetch, runtime, store } = runtimeFor(client);
     store.setItem(
       "musnow.auth.flow",
       JSON.stringify({ createdAt: 1, id: "flow_1", kind: "unexpected" }),
@@ -1178,7 +1196,7 @@ describe("password identity continuation", () => {
     });
     expect(client.exchangeCodeForSession).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
-    expect(assigned).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
     expect(store.getItem("musnow.auth.flow")).toBeNull();
   });
 });
@@ -1189,7 +1207,7 @@ describe('bounded auth phase diagnostics', () => {
       config: { publicOrigin: 'https://app.musuw.com', publishableKey: 'test', supabaseUrl: 'https://identity.example', weknoraOAuthClientId: 'test' },
       createIdentityClient: () => client,
       storage: storage(), nativeStorage: storage(),
-      location: { assign() {}, origin: 'https://app.musuw.com' },
+      location: { assign() {}, replace() {}, origin: 'https://app.musuw.com' },
       requestTimeoutMs: timeout,
       onDiagnostic: event => { events.push(event); report?.() },
     })
@@ -1225,7 +1243,7 @@ describe("recoverable identity-session continuity", () => {
   for (const failure of ["provider", "network", "deadline"] as const) {
     it(`keeps consent retryable after a ${failure} session failure without asking for OTP again`, async () => {
       const store = storage();
-      const assigned = vi.fn();
+      const navigated = vi.fn();
       const events: unknown[] = [];
       const getSession = vi.fn<IdentityClient["getSession"]>()
         .mockImplementationOnce(() => failure === "provider"
@@ -1237,17 +1255,17 @@ describe("recoverable identity-session continuity", () => {
       const runtime = createAuthRuntime({
         config: { publicOrigin: "https://app.musuw.com", publishableKey: "test", supabaseUrl: "https://identity.example", weknoraOAuthClientId: "weknora-client" },
         createIdentityClient: () => client, storage: store, nativeStorage: storage(),
-        location: { assign: assigned, origin: "https://app.musuw.com" }, requestTimeoutMs: 10,
+        location: { assign: navigated, replace: navigated, origin: "https://app.musuw.com" }, requestTimeoutMs: 10,
         onDiagnostic: event => events.push(event),
       });
       store.setItem("musnow.auth.pending-authorization", JSON.stringify({ authorizationId: "authorization_1", createdAt: Date.now() }));
       const before = store.getItem("musnow.auth.pending-authorization");
       await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({ state: "authorization_unavailable" });
-      expect(assigned).not.toHaveBeenCalled();
+      expect(navigated).not.toHaveBeenCalled();
       expect(client.oauth.getAuthorizationDetails).not.toHaveBeenCalled();
       expect(store.getItem("musnow.auth.pending-authorization")).toBe(before);
       await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({ state: "authorization_complete" });
-      expect(assigned).toHaveBeenCalledWith(expect.stringContaining("/api/v1/auth/oidc/callback?"));
+      expect(navigated).toHaveBeenCalledWith(expect.stringContaining("/api/v1/auth/oidc/callback?"));
       expect(events).toEqual(expect.arrayContaining([
         expect.objectContaining({ phase: "auth.session_state", reason: "session_unavailable" }),
         expect.objectContaining({ phase: "auth.session_state", reason: "session_present" }),
@@ -1263,6 +1281,105 @@ describe("recoverable identity-session continuity", () => {
     await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_error", code: "identity_session_unavailable" });
     await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_complete" });
   });
+  it("rechecks identity after a login-required start and retries only the failed native connection", async () => {
+    const client = identity({ getSession: vi.fn<IdentityClient["getSession"]>()
+      .mockResolvedValueOnce({ data: { session: null }, error: null })
+      .mockResolvedValue({ data: { session: { access_token: "token" } }, error: null }) });
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(response({ success: false }, 503))
+      .mockResolvedValue(response({ success: true, authorization_url: "https://identity.example/authorize?state=retry-state" }));
+    const { runtime } = runtimeFor(client, storage(), vi.fn(), fetch);
+    await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_login_required" });
+    await expect(runtime.signInWithPassword("fixture@example.test", "password")).resolves.toEqual({
+      state: "identity_error", code: "native_oidc_unavailable",
+    });
+    await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_complete" });
+    // Repeated route effects still share the successful navigation.
+    await expect(runtime.resumeStart()).resolves.toEqual({ state: "start_complete" });
+    expect(client.signInWithPassword).toHaveBeenCalledOnce();
+    expect(client.getSession).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  for (const phase of ["getAuthorizationDetails", "approveAuthorization"] as const) {
+    for (const failure of ["provider", "network", "deadline"] as const) {
+      it(`preserves consent and retries ${phase} after a temporary ${failure} failure`, async () => {
+        const client = identity();
+        const successful = client.oauth[phase];
+        const failed = vi.fn().mockImplementationOnce(() => failure === "provider"
+          ? Promise.resolve({ data: null, error: { code: "unavailable" } })
+          : failure === "network" ? Promise.reject(new Error("offline")) : new Promise(() => {}))
+          .mockImplementation(successful);
+        const store = storage();
+        store.setItem("musnow.auth.pending-authorization", JSON.stringify({ authorizationId: "authorization_1", createdAt: Date.now() }));
+        const runtime = createAuthRuntime({
+          config: { publicOrigin: "https://app.musuw.com", publishableKey: "test", supabaseUrl: "https://identity.example", weknoraOAuthClientId: "weknora-client" },
+          createIdentityClient: () => ({ ...client, oauth: { ...client.oauth, [phase]: failed } }),
+          storage: store, nativeStorage: storage(), requestTimeoutMs: 10,
+          location: { assign: vi.fn(), replace: vi.fn(), origin: "https://app.musuw.com" },
+        });
+        const before = store.getItem("musnow.auth.pending-authorization");
+        await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({ state: "authorization_unavailable" });
+        expect(store.getItem("musnow.auth.pending-authorization")).toBe(before);
+        await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({ state: "authorization_complete" });
+        expect(failed).toHaveBeenCalledTimes(2);
+        expect(store.getItem("musnow.auth.pending-authorization")).toBeNull();
+      });
+    }
+  }
+
+  it.each(["invalid request", "malformed redirect"])("fails closed for %s instead of offering a temporary retry", async failure => {
+    const client = identity({ oauth: {
+      approveAuthorization: vi.fn(),
+      getAuthorizationDetails: vi.fn(async () => failure === "invalid request"
+        ? { data: null, error: { code: "authorization_invalid" as const } }
+        : { data: { ...authorizationDetails(), redirect_uri: "not-a-url" }, error: null }),
+    } });
+    const { runtime, store, navigated } = runtimeFor(client);
+    store.setItem("musnow.auth.pending-authorization", JSON.stringify({ authorizationId: "authorization_1", createdAt: 1 }));
+    await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toMatchObject({ state: "authorization_error" });
+    expect(store.getItem("musnow.auth.pending-authorization")).toBeNull();
+    expect(client.oauth.approveAuthorization).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
+  });
+
+  it("retries the newly verified identity instead of selecting an older native account", async () => {
+    const nativeStore = storage();
+    nativeStore.setItem("weknora_token", "account-a-native-token");
+    const client = identity({ getSession: vi.fn(async () => ({ data: { session: { access_token: "account-b-identity-token" } }, error: null })) });
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(response({ success: false }, 503))
+      .mockResolvedValue(response({ success: true, authorization_url: "https://identity.example/authorize?state=identity-b" }));
+    const { runtime } = runtimeFor(client, storage(), vi.fn(), fetch, nativeStore);
+    await expect(runtime.resumeIdentityContinuation()).resolves.toEqual({ state: "start_error", code: "native_oidc_unavailable" });
+    await expect(runtime.resumeIdentityContinuation()).resolves.toEqual({ state: "start_complete" });
+    expect(client.getSession).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls.every(([url]) => String(url).includes("/api/v1/auth/oidc/url?"))).toBe(true);
+    expect(nativeStore.getItem("weknora_token")).toBe("account-a-native-token");
+    expect(client.signInWithPassword).not.toHaveBeenCalled();
+    expect(client.verifyOtp).not.toHaveBeenCalled();
+  });
+
+  it.each(["missing", "unavailable"])("does not select an old native account when the new identity session is %s", async state => {
+    const nativeStore = storage();
+    nativeStore.setItem("weknora_token", "account-a-native-token");
+    const client = identity({ getSession: async () => ({ data: { session: null }, error: state === "missing" ? null : { code: "unavailable" } }) });
+    const { runtime, fetch, navigated } = runtimeFor(client, storage(), vi.fn(), undefined, nativeStore);
+    await expect(runtime.resumeIdentityContinuation()).resolves.toEqual(state === "missing"
+      ? { state: "start_login_required" } : { state: "start_error", code: "identity_session_unavailable" });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(navigated).not.toHaveBeenCalled();
+    expect(nativeStore.getItem("weknora_token")).toBe("account-a-native-token");
+  });
+
+  it("preserves a pending consent when retrying the current verified identity", async () => {
+    const { runtime, fetch, store, navigated } = runtimeFor(identity());
+    store.setItem("musnow.auth.pending-authorization", JSON.stringify({ authorizationId: "authorization_1", createdAt: 1 }));
+    await expect(runtime.resumeIdentityContinuation()).resolves.toEqual({ state: "start_complete" });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(navigated).toHaveBeenCalledWith("https://app.musuw.com/oauth/consent?authorization_id=authorization_1");
+  });
+
   it("keeps truly missing sessions distinct from failures", async () => {
     const { runtime } = runtimeFor(identity({ getSession: async () => ({ data: { session: null }, error: null }) }));
     await expect(runtime.continueAuthorization("?authorization_id=authorization_1")).resolves.toEqual({ state: "authorization_login_required" });

@@ -17,6 +17,7 @@ export type SessionStorageLike = Readonly<{
 export const AUTH_FLOW_TTL_MS = 10 * 60 * 1_000;
 
 export type IdentityErrorCode =
+  | "authorization_invalid"
   | "invalid_credentials"
   | "email_not_confirmed"
   | "weak_password"
@@ -115,7 +116,7 @@ export type AuthConfig = Readonly<{
   weknoraOAuthClientId: string;
 }>;
 
-type LocationLike = Readonly<{ assign(url: string): void; origin: string }>;
+type LocationLike = Readonly<{ assign(url: string): void; replace(url: string): void; origin: string }>;
 
 type RuntimeOptions = Readonly<{
   config: AuthConfig;
@@ -504,7 +505,11 @@ export function createAuthRuntime(options: RuntimeOptions) {
   const requestTimeoutMs = Math.max(1, options.requestTimeoutMs ?? defaultRequestTimeoutMs);
   const location: LocationLike =
     options.location ??
-    ({ assign: (url: string) => window.location.assign(url), origin: window.location.origin } satisfies LocationLike);
+    ({
+      assign: (url: string) => window.location.assign(url),
+      replace: (url: string) => window.location.replace(url),
+      origin: window.location.origin,
+    } satisfies LocationLike);
   let client: IdentityClient | null = null;
 
   const identity = (): IdentityClient => {
@@ -751,7 +756,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
         return identityError("unavailable");
       }
       clearContinuation();
-      location.assign(localWorkspaceURL("/", location.origin));
+      location.replace(localWorkspaceURL("/", location.origin));
       return { state: "identity_complete" };
     } catch {
       return identityError("unavailable");
@@ -823,7 +828,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
         } satisfies ExpectedWeKnoraAuthorization),
       );
       recordState("auth.navigation", "oidc_start");
-      location.assign(authorizationURL.url);
+      location.replace(authorizationURL.url);
       return { state: "identity_complete" };
     } catch {
       return { code: "native_oidc_unavailable", state: "identity_error" };
@@ -836,7 +841,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
       const consentURL = new URL("/oauth/consent", location.origin);
       consentURL.searchParams.set("authorization_id", pending.authorizationId);
       recordState("auth.navigation", "consent_resume");
-      location.assign(consentURL.toString());
+      location.replace(consentURL.toString());
       return { state: "identity_complete" };
     }
     return startWeKnoraOIDC();
@@ -854,7 +859,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
       startOperation = (async (): Promise<AuthStartView> => {
         const nativeSession = await nativeSessionState();
         if (nativeSession === "active") {
-          location.assign(localWorkspaceURL(workspacePath, location.origin));
+          location.replace(localWorkspaceURL(workspacePath, location.origin));
           return { state: "start_complete" };
         }
         if (nativeSession === "unavailable") {
@@ -877,10 +882,24 @@ export function createAuthRuntime(options: RuntimeOptions) {
           ? { state: "start_complete" }
           : { code: "native_oidc_unavailable", state: "start_error" };
       })().then(result => {
-        if (result.state === "start_error") startOperation = null;
+        if (result.state !== "start_complete") startOperation = null;
         return result;
       }, error => { startOperation = null; throw error; });
       return startOperation;
+    },
+
+    // A verified identity may differ from an older native workspace session.
+    // Resume its handoff without selecting that older account's fast path.
+    async resumeIdentityContinuation(): Promise<AuthStartView> {
+      const session = await currentIdentitySession();
+      if (session === "missing") return { state: "start_login_required" };
+      if (session === "unavailable") {
+        return { code: "identity_session_unavailable", state: "start_error" };
+      }
+      const continuation = await resumeAfterIdentity();
+      return continuation.state === "identity_complete"
+        ? { state: "start_complete" }
+        : { code: "native_oidc_unavailable", state: "start_error" };
     },
 
     completeCallback(search: string): Promise<IdentityCompletionView> {
@@ -973,7 +992,10 @@ export function createAuthRuntime(options: RuntimeOptions) {
           const details = await withinRequestDeadline(
             identity().oauth.getAuthorizationDetails(authorizationId),
             "auth.authorize",
-          );
+          ).catch(() => null);
+          if (details === null || details.error?.code === "unavailable") {
+            return { state: "authorization_unavailable" };
+          }
           if (details.error !== null || details.data === null) {
             clearContinuation();
             return { code: "oauth_request_invalid", state: "authorization_error" };
@@ -991,7 +1013,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
             }
             clearContinuation();
             recordState("auth.navigation", "native_callback");
-            location.assign(redirectURL);
+            location.replace(redirectURL);
             return { state: "authorization_complete" };
           }
 
@@ -1017,7 +1039,10 @@ export function createAuthRuntime(options: RuntimeOptions) {
           const approved = await withinRequestDeadline(
             identity().oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true }),
             "auth.authorize",
-          );
+          ).catch(() => null);
+          if (approved === null || approved.error?.code === "unavailable") {
+            return { state: "authorization_unavailable" };
+          }
           const redirectURL =
             approved.error === null && approved.data !== null
               ? expected === null
@@ -1030,7 +1055,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
           }
           clearContinuation();
           recordState("auth.navigation", "native_callback");
-          location.assign(redirectURL);
+          location.replace(redirectURL);
           return { state: "authorization_complete" };
         } catch {
           clearContinuation();

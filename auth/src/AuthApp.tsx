@@ -24,6 +24,8 @@ type Screen =
   | "email_entry"
   | "email_code"
   | "identity_pending"
+  | "identity_resume_pending"
+  | "identity_retry"
   | "session_retry"
   | "password_recovery"
   | "password_reset_request"
@@ -145,6 +147,7 @@ export type AuthCopy = Readonly<{
   errors: Readonly<{
     unavailable: string;
     sessionUnavailable: string;
+    connectionUnavailable: string;
     oauthNotAllowed: string;
     authorization: string;
     invalidCode: string;
@@ -227,6 +230,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     errors: {
       unavailable: "登录暂不可用，请重试。",
       sessionUnavailable: "暂时无法确认登录状态，请检查网络后重试，无需重新获取验证码。",
+      connectionUnavailable: "验证已通过，连接暂时失败，请重试。",
       oauthNotAllowed: "此应用未获允许，无法继续授权。",
       authorization: "无法继续授权，请重新开始。",
       invalidCode: "验证码无效，请重新输入。",
@@ -307,6 +311,7 @@ const AUTH_COPY: Readonly<Record<AuthLocale, AuthCopy>> = {
     errors: {
       unavailable: "Sign-in is temporarily unavailable. Please try again.",
       sessionUnavailable: "We could not check your sign-in status. Check your connection and retry; you do not need another code.",
+      connectionUnavailable: "Verification succeeded, but we couldn't connect. Please try again.",
       oauthNotAllowed: "This app is not allowed to continue.",
       authorization: "Unable to continue authorization. Please start again.",
       invalidCode: "Invalid code. Please try again.",
@@ -444,7 +449,15 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
   });
   const handledRoute = useRef<string | null>(null);
 
+  const retryContinuation = useCallback((result: IdentityCompletionView): boolean => {
+    if (result.state !== "identity_error" || result.code !== "native_oidc_unavailable") return false;
+    setError(copy.errors.connectionUnavailable);
+    setScreen("identity_retry");
+    return true;
+  }, [copy]);
+
   const applyIdentityCompletion = useCallback((result: IdentityCompletionView) => {
+    if (retryContinuation(result)) return;
     if (result.state === "password_recovery_ready") {
       window.history.replaceState({}, document.title, "/auth/recovery");
       setError(null);
@@ -464,7 +477,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
           : "login",
       );
     }
-  }, [copy]);
+  }, [copy, retryContinuation]);
 
   const clearPasswordFields = useCallback(() => {
     setPassword("");
@@ -533,11 +546,15 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       screen === "consent_pending" ||
       screen === "logout_pending" ||
       screen === "recovery_pending" ||
+      screen === "identity_resume_pending" ||
       screen === "start_pending";
     if (routeAction && handledRoute.current === route) return;
-    if (screen === "start_pending") {
+    if (screen === "start_pending" || screen === "identity_resume_pending") {
       handledRoute.current = route;
-      void runtime.resumeStart(checkoutWorkspacePathFromSearch(window.location.search)).then(
+      const continuation = screen === "identity_resume_pending";
+      const resume = continuation ? runtime.resumeIdentityContinuation()
+        : runtime.resumeStart(checkoutWorkspacePathFromSearch(window.location.search));
+      void resume.then(
         (result) => {
           if (result.state === "start_login_required") {
             setScreen("login");
@@ -547,12 +564,12 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
           if (message !== null) {
             setError(result.state === "start_error" && result.code === "identity_session_unavailable"
               ? copy.errors.sessionUnavailable : message);
-            setScreen("session_retry");
+            setScreen(continuation ? "identity_retry" : "session_retry");
           }
         },
         () => {
           setError(copy.errors.unavailable);
-          setScreen("session_retry");
+          setScreen(continuation ? "identity_retry" : "session_retry");
         },
       );
       return;
@@ -622,6 +639,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       setScreen("identity_pending");
       try {
         const result = await runtime.signInWithPassword(email, password);
+        if (retryContinuation(result)) return;
         if (result.state === "identity_complete") {
           setScreen("identity_pending");
           return;
@@ -637,7 +655,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         clearPasswordFields();
       }
     },
-    [clearPasswordFields, copy, email, isSubmitting, password, runtime],
+    [clearPasswordFields, copy, email, isSubmitting, password, retryContinuation, runtime],
   );
 
   const signUpWithPassword = useCallback(
@@ -648,6 +666,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       setIsSubmitting(true);
       try {
         const result = await runtime.signUpWithPassword(email, password, passwordConfirmation);
+        if (retryContinuation(result)) return;
         const message = failureMessage(result, copy, "signUp");
         if (message !== null) {
           setError(message);
@@ -668,7 +687,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         clearPasswordFields();
       }
     },
-    [clearPasswordFields, copy, email, isSubmitting, password, passwordConfirmation, runtime],
+    [clearPasswordFields, copy, email, isSubmitting, password, passwordConfirmation, retryContinuation, runtime],
   );
 
   const requestPasswordReset = useCallback(
@@ -705,6 +724,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       setIsSubmitting(true);
       try {
         const result = await runtime.updatePassword(password, passwordConfirmation);
+        if (retryContinuation(result)) return;
         if (result.state === "identity_complete") {
           setScreen("identity_pending");
           return;
@@ -718,7 +738,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         clearPasswordFields();
       }
     },
-    [clearPasswordFields, copy, isSubmitting, password, passwordConfirmation, runtime],
+    [clearPasswordFields, copy, isSubmitting, password, passwordConfirmation, retryContinuation, runtime],
   );
 
   const showRegister = useCallback(() => {
@@ -795,6 +815,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       setIsSubmitting(true);
       try {
         const result = await runtime.verifyEmailOtp(email, verificationCode);
+        if (retryContinuation(result)) return;
         if (result.state === "identity_error" && result.code === "rate_limited") startOtpCooldown(true);
         const message = failureMessage(result, copy);
         if (message !== null) {
@@ -810,7 +831,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         setIsSubmitting(false);
       }
     },
-    [applyIdentityCompletion, copy, email, isSubmitting, otpRateLimited, resendSeconds, runtime, startOtpCooldown, verificationCode],
+    [applyIdentityCompletion, copy, email, isSubmitting, otpRateLimited, resendSeconds, retryContinuation, runtime, startOtpCooldown, verificationCode],
   );
 
   const verifySignupCode = useCallback(
@@ -822,6 +843,7 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
       setScreen("identity_pending");
       try {
         const result = await runtime.verifySignupOtp(email, verificationCode);
+        if (retryContinuation(result)) return;
         if (result.state === "identity_error" && result.code === "rate_limited") startOtpCooldown(true);
         const message = failureMessage(result, copy);
         if (message !== null) {
@@ -837,13 +859,14 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
         setIsSubmitting(false);
       }
     },
-    [applyIdentityCompletion, copy, email, isSubmitting, otpRateLimited, resendSeconds, runtime, startOtpCooldown, verificationCode],
+    [applyIdentityCompletion, copy, email, isSubmitting, otpRateLimited, resendSeconds, retryContinuation, runtime, startOtpCooldown, verificationCode],
   );
 
   const isPendingScreen =
     screen === "callback_pending" ||
     screen === "consent_pending" ||
     screen === "identity_pending" ||
+    screen === "identity_resume_pending" ||
     screen === "logout_pending" ||
     screen === "recovery_pending" ||
     screen === "start_pending";
@@ -934,11 +957,12 @@ export function AuthApp({ runtime }: Readonly<{ runtime: AuthRuntime }>) {
                   {intro !== null ? <p className="auth-intro">{intro}</p> : null}
                   {error !== null ? <p className="auth-error" id="auth-error" role="alert">{error}</p> : null}
 
-        {screen === "session_retry" ? (
+        {screen === "session_retry" || screen === "identity_retry" ? (
           <button className="auth-result-primary" type="button" onClick={() => {
             handledRoute.current = null;
             setError(null);
-            setScreen(window.location.pathname === "/oauth/consent" ? "consent_pending" : "start_pending");
+            setScreen(screen === "identity_retry" ? "identity_resume_pending"
+              : window.location.pathname === "/oauth/consent" ? "consent_pending" : "start_pending");
           }}>{copy.tryAgain}</button>
         ) : screen === "email_code" ? (
           <form

@@ -92,6 +92,10 @@ describe("auth shell localized copy", () => {
     }
     expect(getAuthCopy("en-US").title).toMatch(/musuw/i);
     expect(getAuthCopy("zh-CN").title).toContain("Musuw");
+    expect(getAuthCopy("zh-CN").errors.connectionUnavailable).toBe("验证已通过，连接暂时失败，请重试。");
+    expect(getAuthCopy("en-US").errors.connectionUnavailable).toBe(
+      "Verification succeeded, but we couldn't connect. Please try again.",
+    );
   });
 });
 
