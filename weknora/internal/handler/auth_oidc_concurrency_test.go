@@ -137,8 +137,11 @@ func concurrentOIDCRequest(ctx context.Context, state, code, binding string) *ht
 }
 
 func concurrentOIDCRouter(service *singleUseOIDCService) *gin.Engine {
+	return concurrentOIDCHandlerRouter(&AuthHandler{userService: service})
+}
+
+func concurrentOIDCHandlerRouter(h *AuthHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	h := &AuthHandler{userService: service}
 	router := gin.New()
 	router.GET("/api/v1/auth/oidc/callback", h.OIDCRedirectCallback)
 	return router
@@ -425,7 +428,7 @@ func TestOIDCRedirectCallbackConcurrentDifferentStatesDoNotShareResult(t *testin
 	}
 }
 
-func TestOIDCRedirectCallbackConcurrentSharingDoesNotReplayCompletedSessions(t *testing.T) {
+func TestOIDCRedirectCallbackSuccessLateDuplicatesReuseOneSession(t *testing.T) {
 	const code, verifier = "synthetic-completed-code", "synthetic-completed-verifier"
 	state, binding := concurrentOIDCAttempt(t, t.Name(), verifier)
 	service := &singleUseOIDCService{
@@ -438,15 +441,133 @@ func TestOIDCRedirectCallbackConcurrentSharingDoesNotReplayCompletedSessions(t *
 	if _, reason := concurrentOIDCResult(t, first); reason != "" {
 		t.Fatalf("first callback failed: %s", reason)
 	}
-	// Deliberately retain the original binding, unlike a normal browser that
-	// obeys the deletion cookie. Completed tokens must not be cached for replay.
+	// Requests already sent by the browser retain their original binding even
+	// when the first response has completed and deleted that cookie. A late
+	// duplicate within the short result window must receive the same session.
+	replay := httptest.NewRecorder()
+	router.ServeHTTP(replay, concurrentOIDCRequest(context.Background(), state, code, binding))
+	token, reason := concurrentOIDCResult(t, replay)
+	if reason != "" || token != "synthetic-completed-session" {
+		t.Errorf("late duplicate failed instead of returning the same session: error=%q", reason)
+	}
+	if first.Header().Get("Location") != replay.Header().Get("Location") {
+		t.Error("late duplicate changed the completed callback result")
+	}
+	if got := service.callCount(); got != 1 {
+		t.Errorf("late duplicate exchanged the single-use code %d times, want 1", got)
+	}
+}
+
+func TestOIDCRedirectCallbackLateDuplicateAfterResultExpiryFailsClosed(t *testing.T) {
+	const code, verifier = "synthetic-expired-code", "synthetic-expired-verifier"
+	state, binding := concurrentOIDCAttempt(t, t.Name(), verifier)
+	service := &singleUseOIDCService{
+		grants:  map[string]*singleUseOIDCGrant{code: {verifier: verifier, token: "synthetic-expired-session"}},
+		entered: make(chan struct{}, 2),
+	}
+	h := &AuthHandler{userService: service}
+	router := concurrentOIDCHandlerRouter(h)
+	first := httptest.NewRecorder()
+	router.ServeHTTP(first, concurrentOIDCRequest(context.Background(), state, code, binding))
+	if _, reason := concurrentOIDCResult(t, first); reason != "" {
+		t.Fatalf("first callback failed: %s", reason)
+	}
+	// Move the actual retained result past its lifetime without sleeping or
+	// changing signed state validation. The next callback must not get a token.
+	h.oidcResults.mu.Lock()
+	retained := len(h.oidcResults.entries)
+	for _, result := range h.oidcResults.entries {
+		result.expiresAt = time.Now().Add(-time.Second)
+	}
+	h.oidcResults.mu.Unlock()
+	if retained != 1 {
+		t.Fatalf("retained completed results = %d, want 1", retained)
+	}
 	replay := httptest.NewRecorder()
 	router.ServeHTTP(replay, concurrentOIDCRequest(context.Background(), state, code, binding))
 	token, reason := concurrentOIDCResult(t, replay)
 	if reason != "login_failed" || token != "" {
-		t.Error("completed callback replay returned a previously issued session")
+		t.Error("expired completed callback returned a retained session")
 	}
 	if got := service.callCount(); got != 2 {
-		t.Errorf("completed callback replay bypassed single-use provider validation: calls=%d", got)
+		t.Errorf("expired result bypassed provider validation: calls=%d, want 2", got)
+	}
+	h.oidcResults.mu.Lock()
+	remaining := len(h.oidcResults.entries)
+	h.oidcResults.mu.Unlock()
+	if remaining != 0 {
+		t.Error("expired successful result was not removed")
+	}
+}
+
+func TestOIDCRedirectCallbackLateDuplicateStillValidatesBrowserBinding(t *testing.T) {
+	const code, verifier = "synthetic-warm-code", "synthetic-warm-verifier"
+	state, binding := concurrentOIDCAttempt(t, t.Name(), verifier)
+	_, wrongNonce := concurrentOIDCAttempt(t, t.Name()+"-wrong-nonce", verifier)
+	_, wrongVerifier := concurrentOIDCAttempt(t, t.Name(), "synthetic-wrong-warm-verifier")
+	service := &singleUseOIDCService{
+		grants:  map[string]*singleUseOIDCGrant{code: {verifier: verifier, token: "synthetic-warm-session"}},
+		entered: make(chan struct{}, 2),
+	}
+	router := concurrentOIDCRouter(service)
+	first := httptest.NewRecorder()
+	router.ServeHTTP(first, concurrentOIDCRequest(context.Background(), state, code, binding))
+	if _, reason := concurrentOIDCResult(t, first); reason != "" {
+		t.Fatalf("first callback failed: %s", reason)
+	}
+	for _, invalid := range []struct {
+		name    string
+		binding string
+		reason  string
+	}{
+		{"missing cookie", "", "invalid_state"},
+		{"wrong nonce", wrongNonce, "invalid_state"},
+		{"wrong PKCE verifier", wrongVerifier, "login_failed"},
+	} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, concurrentOIDCRequest(context.Background(), state, code, invalid.binding))
+		token, reason := concurrentOIDCResult(t, recorder)
+		if token != "" || reason != invalid.reason {
+			t.Errorf("%s accessed a retained successful callback: reason=%q", invalid.name, reason)
+		}
+	}
+	if got := service.callCount(); got != 2 {
+		t.Errorf("provider calls = %d, want valid exchange plus separate PKCE rejection", got)
+	}
+	// Rejected bindings must neither disclose nor poison the valid tuple.
+	valid := httptest.NewRecorder()
+	router.ServeHTTP(valid, concurrentOIDCRequest(context.Background(), state, code, binding))
+	token, reason := concurrentOIDCResult(t, valid)
+	if token != "synthetic-warm-session" || reason != "" {
+		t.Errorf("rejected binding changed the valid retained result: reason=%q", reason)
+	}
+	if got := service.callCount(); got != 2 {
+		t.Errorf("valid warm result exchanged its code again: calls=%d", got)
+	}
+}
+
+func TestOIDCRedirectCallbackFailedExchangeIsNotRetained(t *testing.T) {
+	const code, verifier = "synthetic-retry-code", "synthetic-retry-verifier"
+	state, binding := concurrentOIDCAttempt(t, t.Name(), verifier)
+	service := &singleUseOIDCService{
+		grants:  map[string]*singleUseOIDCGrant{code: {verifier: verifier, token: "synthetic-retry-session", used: true}},
+		entered: make(chan struct{}, 2),
+	}
+	router := concurrentOIDCRouter(service)
+	first := httptest.NewRecorder()
+	router.ServeHTTP(first, concurrentOIDCRequest(context.Background(), state, code, binding))
+	if token, reason := concurrentOIDCResult(t, first); token != "" || reason != "login_failed" {
+		t.Fatal("provider rejection did not fail the initial callback")
+	}
+	// A previously rejected callback must still reach provider validation.
+	// A failure is never a reusable result, even for an identical tuple.
+	retry := httptest.NewRecorder()
+	router.ServeHTTP(retry, concurrentOIDCRequest(context.Background(), state, code, binding))
+	token, reason := concurrentOIDCResult(t, retry)
+	if token != "" || reason != "login_failed" {
+		t.Errorf("rejected single-use code unexpectedly produced a session: reason=%q", reason)
+	}
+	if got := service.callCount(); got != 2 {
+		t.Errorf("failed exchange was reused: provider calls=%d, want 2", got)
 	}
 }

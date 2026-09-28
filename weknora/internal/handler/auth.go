@@ -37,11 +37,14 @@ const oidcBindingCookieMaxAge = 600
 const oidcNonceCookieName = "weknora_oidc_nonce"
 const oidcNonceCookieMaxAge = 600
 
+var errOIDCCallbackPayload = stderrors.New("OIDC callback payload encoding failed")
+
 // AuthHandler implements HTTP request handlers for user authentication
 // Provides functionality for user registration, login, logout, and token management
 // through the REST API endpoints
 type AuthHandler struct {
 	oidcCallbacks    singleflight.Group
+	oidcResults      oidcCallbackResultCache
 	userService      interfaces.UserService
 	tenantService    interfaces.TenantService
 	configInfo       *config.Config
@@ -473,20 +476,35 @@ func (h *AuthHandler) OIDCRedirectCallback(c *gin.Context) {
 		return
 	}
 
-	// Only already-validated, identical callbacks may share an in-flight
-	// exchange. Keep the verifier in the key so a different browser binding
-	// cannot join it. Never retain completed results or reusable tokens.
+	// Only already-validated, identical callbacks may share an exchange or its
+	// short success window. The verifier prevents a different browser binding
+	// from joining it; each request has already passed every original check.
 	keyMaterial, _ := json.Marshal([]string{state, decodedState.CodeVerifier, code})
 	key := sha256.Sum256(keyMaterial)
 	callbackID = hex.EncodeToString(key[:16])
 	provisioning := h.resolveOIDCProvisioningMode(ctx)
 	result := h.oidcCallbacks.DoChan(hex.EncodeToString(key[:]), func() (any, error) {
+		if payload, ok := h.oidcResults.get(key, time.Now()); ok {
+			return payload, nil
+		}
 		// An abandoned duplicate must not cancel another browser request that
 		// is still waiting. Bound both existing provider calls to one minute.
 		exchangeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
 		defer cancel()
-		return h.userService.LoginWithOIDC(exchangeCtx, code,
+		resp, err := h.userService.LoginWithOIDC(exchangeCtx, code,
 			strings.TrimSpace(decodedState.RedirectURI), decodedState.CodeVerifier, provisioning)
+		if err != nil {
+			return nil, err
+		}
+		if resp == nil || !resp.Success {
+			return nil, stderrors.New("OIDC login did not succeed")
+		}
+		payload, err := encodeOIDCCallbackPayload(resp)
+		if err != nil {
+			return nil, errOIDCCallbackPayload
+		}
+		h.oidcResults.put(key, payload, time.Now())
+		return payload, nil
 	})
 	var exchange singleflight.Result
 	select {
@@ -497,20 +515,17 @@ func (h *AuthHandler) OIDCRedirectCallback(c *gin.Context) {
 	}
 	if exchange.Err != nil {
 		reason = "exchange_failed"
-		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape("login_failed"))
+		failure := "login_failed"
+		if stderrors.Is(exchange.Err, errOIDCCallbackPayload) {
+			reason, failure = "payload_encode_failed", "payload_encode_failed"
+		}
+		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape(failure))
 		return
 	}
-	resp, ok := exchange.Val.(*types.OIDCCallbackResponse)
-	if !ok || resp == nil || !resp.Success {
+	payload, ok := exchange.Val.(string)
+	if !ok || payload == "" {
 		reason = "exchange_failed"
 		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape("login_failed"))
-		return
-	}
-
-	payload, err := encodeOIDCCallbackPayload(resp)
-	if err != nil {
-		reason = "payload_encode_failed"
-		c.Redirect(http.StatusFound, frontendRedirectURI+"#oidc_error="+urlQueryEscape("payload_encode_failed"))
 		return
 	}
 

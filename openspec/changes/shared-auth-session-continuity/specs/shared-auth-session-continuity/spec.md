@@ -11,9 +11,16 @@ The native callback SHALL preserve signed-state, browser-binding and PKCE verifi
 - **WHEN** one callback disconnects while a valid identical callback is still waiting
 - **THEN** its cancellation SHALL NOT abort the shared exchange; the operation SHALL retain a finite deadline.
 
-#### Scenario: Validation differs or a completed attempt is replayed
-- **WHEN** a callback lacks a valid binding, has different exchange material, or arrives after the shared exchange has completed
-- **THEN** it SHALL NOT obtain a cached successful result or bypass the existing checks.
+#### Scenario: Identical requests arrive just after successful completion
+- **WHEN** an identical callback passes every original check within ten seconds of a successful exchange while its bounded successful result remains retained
+- **THEN** it SHALL receive exactly the same encoded native session without another provider exchange, session creation or token lifetime extension.
+- **AND** successful encoded results SHALL be retained only in this process for ten seconds, at most 128 entries and 64 KiB per entry; expiry SHALL release retained payload references without requiring another request.
+- **AND** oversized responses SHALL complete normally without retention; capacity eviction SHALL NOT bypass provider single-use validation on a later replay.
+
+#### Scenario: Validation differs, success expires, or an exchange fails
+- **WHEN** a callback lacks a valid binding, has different exchange material, or arrives after the ten-second success window
+- **THEN** it SHALL NOT obtain the earlier successful result or bypass the existing checks.
+- **AND** unsuccessful exchanges SHALL NOT be retained as completed results.
 
 ### Requirement: Identity continuity across documents
 The auth shell SHALL use one shared same-origin SDK identity session while retaining standard OAuth validation and short-lived PKCE state.
