@@ -26,6 +26,7 @@ var clientDiagnosticPhases = map[string]bool{
 	"auth.native_session": true, "auth.oidc_start": true, "auth.other": true,
 	"app.startup": true, "api.auth": true, "api.documents": true, "api.other": true,
 }
+
 var clientDiagnosticOutcomes = map[string]bool{
 	"ok": true, "network": true, "timeout": true, "http": true, "identity": true, "error": true,
 }
@@ -88,7 +89,8 @@ func NewClientDiagnosticsHandler() gin.HandlerFunc {
 		flowID, err := uuid.Parse(event.FlowID)
 		if !clientDiagnosticPhases[event.Phase] || !clientDiagnosticOutcomes[event.Outcome] ||
 			event.DurationMS == nil || *event.DurationMS < 0 || *event.DurationMS > 120000 ||
-			err != nil || flowID.Version() != 4 || flowID.Variant() != uuid.RFC4122 || flowID.String() != event.FlowID ||
+			err != nil || flowID.Version() != 4 || flowID.Variant() != uuid.RFC4122 ||
+			flowID.String() != event.FlowID ||
 			(event.Status != 0 && (event.Status < 100 || event.Status > 599)) {
 			c.Status(http.StatusBadRequest)
 			return

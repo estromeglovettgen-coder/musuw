@@ -150,6 +150,8 @@ class UiReleaseScopeTest(unittest.TestCase):
 
     def test_previously_applied_delivery_policy_is_exactly_pinned(self) -> None:
         historical_sources = {
+            "scripts/ci/validate-workflows.rb":
+                "ui-release-reviewed-validate-workflows.rb",
             ".github/workflows/deploy-production.yml":
                 "ui-release-reviewed-deploy-production.txt",
             "docs/DEPLOYMENT.md":

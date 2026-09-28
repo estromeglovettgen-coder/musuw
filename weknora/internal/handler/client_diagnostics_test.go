@@ -18,7 +18,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const validClientDiagnostic = `{"phase":"auth.otp_verify","outcome":"timeout","duration_ms":12000,"flow_id":"d3815104-c538-4a5f-9246-322140b46513","request_id":"req_safe-1","status":0}`
+const validClientDiagnostic = `{"phase":"auth.otp_verify","outcome":"timeout","duration_ms":12000,` +
+	`"flow_id":"d3815104-c538-4a5f-9246-322140b46513","request_id":"req_safe-1","status":0}`
 
 func diagnosticTestRouter() *gin.Engine {
 	r := gin.New()
@@ -53,17 +54,25 @@ func TestClientDiagnosticsAcceptsOnlyBoundedFieldsAndLogsNoRequestData(t *testin
 	var logs bytes.Buffer
 	diagnosticLogs(t, &logs)
 	r := diagnosticTestRouter()
-	w := postDiagnostic(r, validClientDiagnostic, "?email=private@example.test&token=query-secret&content=private-document")
+	w := postDiagnostic(
+		r, validClientDiagnostic, "?email=private@example.test&token=query-secret&content=private-document",
+	)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
 	got := logs.String()
-	for _, want := range []string{"client_diagnostic", "phase=auth.otp_verify", "duration_ms=12000", "flow_id=d3815104-c538-4a5f-9246-322140b46513", "outcome=timeout", "request_id=req_safe-1"} {
+	for _, want := range []string{
+		"client_diagnostic", "phase=auth.otp_verify", "duration_ms=12000",
+		"flow_id=d3815104-c538-4a5f-9246-322140b46513", "outcome=timeout", "request_id=req_safe-1",
+	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in %s", want, got)
 		}
 	}
-	for _, secret := range []string{"@", "never-log", "query-secret", "private-document", "secret-token", "client_ip", "request_body", "response_body", "path="} {
+	for _, secret := range []string{
+		"@", "never-log", "query-secret", "private-document", "secret-token",
+		"client_ip", "request_body", "response_body", "path=",
+	} {
 		if strings.Contains(got, secret) {
 			t.Errorf("private request data %q in %s", secret, got)
 		}
@@ -88,14 +97,17 @@ func TestClientDiagnosticsRejectsMalformedOrPrivatePayloadsWithoutLogging(t *tes
 		"array":            "[" + validClientDiagnostic + "]",
 		"null":             "null",
 	}
-	changes := map[string]any{"phase": "auth.password-user@example.test", "outcome": "arbitrary-secret", "duration_ms": 120001, "flow_id": "oidc-state-secret", "request_id": "secret@email.test", "status": 600}
+	changes := map[string]any{
+		"phase": "auth.password-user@example.test", "outcome": "arbitrary-secret", "duration_ms": 120001,
+		"flow_id": "oidc-state-secret", "request_id": "secret@email.test", "status": 600,
+	}
 	for field, value := range changes {
-		copy := make(map[string]any)
+		changed := make(map[string]any)
 		for k, v := range original {
-			copy[k] = v
+			changed[k] = v
 		}
-		copy[field] = value
-		body, _ := json.Marshal(copy)
+		changed[field] = value
+		body, _ := json.Marshal(changed)
 		cases["invalid "+field] = string(body)
 	}
 	for name, body := range map[string]string{
@@ -103,9 +115,11 @@ func TestClientDiagnosticsRejectsMalformedOrPrivatePayloadsWithoutLogging(t *tes
 		"fractional duration": strings.Replace(validClientDiagnostic, "12000", "1.5", 1),
 		"wrong field case":    strings.Replace(validClientDiagnostic, `"phase"`, `"Phase"`, 1),
 		"long request id":     strings.Replace(validClientDiagnostic, "req_safe-1", strings.Repeat("a", 65), 1),
-		"nonrandom uuid":      strings.Replace(validClientDiagnostic, "d3815104-c538-4a5f-9246-322140b46513", "00000000-0000-0000-0000-000000000000", 1),
-		"missing duration":    strings.Replace(validClientDiagnostic, `"duration_ms":12000,`, "", 1),
-		"null status":         strings.Replace(validClientDiagnostic, `"status":0`, `"status":null`, 1),
+		"nonrandom uuid": strings.Replace(
+			validClientDiagnostic, "d3815104-c538-4a5f-9246-322140b46513", "00000000-0000-0000-0000-000000000000", 1,
+		),
+		"missing duration": strings.Replace(validClientDiagnostic, `"duration_ms":12000,`, "", 1),
+		"null status":      strings.Replace(validClientDiagnostic, `"status":0`, `"status":null`, 1),
 	} {
 		cases[name] = body
 	}
@@ -131,7 +145,9 @@ func TestClientDiagnosticsUsesOneGlobalBudgetAcrossClientIdentifiers(t *testing.
 			t.Fatalf("request %d status %d", i, w.Code)
 		}
 	}
-	body := strings.Replace(validClientDiagnostic, "d3815104-c538-4a5f-9246-322140b46513", "84f4edc5-d014-40ad-b086-546a9891a21b", 1)
+	body := strings.Replace(
+		validClientDiagnostic, "d3815104-c538-4a5f-9246-322140b46513", "84f4edc5-d014-40ad-b086-546a9891a21b", 1,
+	)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/client-diagnostics", strings.NewReader(body))
 	req.RemoteAddr = "203.0.113.199:1234"
 	req.Header.Set("X-Forwarded-For", "203.0.113.200")
@@ -180,16 +196,25 @@ func (r *countingDiagnosticBody) Read(p []byte) (int, error) {
 func TestClientDiagnosticsAcceptsContractEnumsAndBoundaryValues(t *testing.T) {
 	diagnosticLogs(t, io.Discard)
 	r := diagnosticTestRouter()
-	for _, phase := range []string{"auth.session", "auth.exchange", "auth.authorize", "auth.password", "auth.otp_send", "auth.otp_verify", "auth.native_session", "auth.oidc_start", "auth.other", "app.startup", "api.auth", "api.documents", "api.other"} {
+	for _, phase := range []string{
+		"auth.session", "auth.exchange", "auth.authorize", "auth.password", "auth.otp_send", "auth.otp_verify",
+		"auth.native_session", "auth.oidc_start", "auth.other", "app.startup", "api.auth", "api.documents", "api.other",
+	} {
 		for _, outcome := range []string{"ok", "network", "timeout", "http", "identity", "error"} {
-			body, _ := json.Marshal(map[string]any{"phase": phase, "outcome": outcome, "duration_ms": 0, "flow_id": "84f4edc5-d014-40ad-b086-546a9891a21b"})
+			body, _ := json.Marshal(map[string]any{
+				"phase": phase, "outcome": outcome, "duration_ms": 0,
+				"flow_id": "84f4edc5-d014-40ad-b086-546a9891a21b",
+			})
 			if w := postDiagnostic(r, string(body), ""); w.Code != http.StatusNoContent {
 				t.Fatalf("phase=%s outcome=%s status=%d", phase, outcome, w.Code)
 			}
 		}
 	}
 	for _, status := range []int{0, 100, 599} {
-		body, _ := json.Marshal(map[string]any{"phase": "app.startup", "outcome": "error", "duration_ms": 120000, "flow_id": "84f4edc5-d014-40ad-b086-546a9891a21b", "status": status, "request_id": strings.Repeat("a", 64)})
+		body, _ := json.Marshal(map[string]any{
+			"phase": "app.startup", "outcome": "error", "duration_ms": 120000,
+			"flow_id": "84f4edc5-d014-40ad-b086-546a9891a21b", "status": status, "request_id": strings.Repeat("a", 64),
+		})
 		if w := postDiagnostic(r, string(body), ""); w.Code != http.StatusNoContent {
 			t.Fatalf("boundary status=%d response=%d", status, w.Code)
 		}
@@ -219,6 +244,9 @@ func TestClientDiagnosticsGlobalBudgetHoldsUnderConcurrentRequests(t *testing.T)
 	}
 	wg.Wait()
 	if accepted.Load() != 600 || rejected.Load() != 40 || unexpected.Load() != 0 {
-		t.Fatalf("concurrent counts accepted=%d rejected=%d unexpected=%d", accepted.Load(), rejected.Load(), unexpected.Load())
+		t.Fatalf(
+			"concurrent counts accepted=%d rejected=%d unexpected=%d",
+			accepted.Load(), rejected.Load(), unexpected.Load(),
+		)
 	}
 }

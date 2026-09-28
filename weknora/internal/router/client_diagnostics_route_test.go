@@ -1,3 +1,4 @@
+// Package router wires the application HTTP routes.
 package router
 
 import (
@@ -14,7 +15,9 @@ func TestClientDiagnosticsIsReachableBeforeAuthentication(t *testing.T) {
 	handler.Edition = "lite"
 	t.Cleanup(func() { handler.Edition = oldEdition })
 	r := NewRouter(RouterParams{SystemHandler: &handler.SystemHandler{}})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/client-diagnostics", strings.NewReader(`{"phase":"app.startup","outcome":"ok","duration_ms":0,"flow_id":"84f4edc5-d014-40ad-b086-546a9891a21b"}`))
+	body := `{"phase":"app.startup","outcome":"ok","duration_ms":0,` +
+		`"flow_id":"84f4edc5-d014-40ad-b086-546a9891a21b"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/client-diagnostics", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
