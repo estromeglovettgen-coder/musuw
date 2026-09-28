@@ -550,7 +550,9 @@ func TestOIDCRedirectCallbackFailedExchangeIsNotRetained(t *testing.T) {
 	const code, verifier = "synthetic-retry-code", "synthetic-retry-verifier"
 	state, binding := concurrentOIDCAttempt(t, t.Name(), verifier)
 	service := &singleUseOIDCService{
-		grants:  map[string]*singleUseOIDCGrant{code: {verifier: verifier, token: "synthetic-retry-session", used: true}},
+		grants: map[string]*singleUseOIDCGrant{
+			code: {verifier: verifier, token: "synthetic-retry-session", used: true},
+		},
 		entered: make(chan struct{}, 2),
 	}
 	router := concurrentOIDCRouter(service)
