@@ -269,7 +269,11 @@ func awaitConcurrentOIDCExchange(t *testing.T, service *singleUseOIDCService) {
 }
 
 func TestOIDCRedirectCallbackConcurrentDuplicateSurvivesLeaderCancellation(t *testing.T) {
-	const code, verifier, token = "synthetic-canceled-code", "synthetic-canceled-verifier", "synthetic-surviving-session"
+	const (
+		code     = "synthetic-canceled-code"
+		verifier = "synthetic-canceled-verifier"
+		token    = "synthetic-surviving-session"
+	)
 	state, binding := concurrentOIDCAttempt(t, t.Name(), verifier)
 	release := make(chan struct{})
 	service := &singleUseOIDCService{
@@ -329,9 +333,12 @@ func TestOIDCRedirectCallbackConcurrentInvalidBindingCannotShareSuccess(t *testi
 		name   string
 		result <-chan *httptest.ResponseRecorder
 	}{
-		{"missing binding", runConcurrentOIDCCallback(router, concurrentOIDCRequest(context.Background(), state, code, ""))},
-		{"wrong nonce", runConcurrentOIDCCallback(router, concurrentOIDCRequest(context.Background(), state, code, wrongNonce))},
-		{"wrong PKCE verifier", runConcurrentOIDCCallback(router, concurrentOIDCRequest(wrongVerifierWaiter, state, code, wrongVerifier))},
+		{"missing binding", runConcurrentOIDCCallback(router,
+			concurrentOIDCRequest(context.Background(), state, code, ""))},
+		{"wrong nonce", runConcurrentOIDCCallback(router,
+			concurrentOIDCRequest(context.Background(), state, code, wrongNonce))},
+		{"wrong PKCE verifier", runConcurrentOIDCCallback(router,
+			concurrentOIDCRequest(wrongVerifierWaiter, state, code, wrongVerifier))},
 	}
 	awaitOIDCWaiter(t, validWaiter)
 	awaitOIDCWaiter(t, wrongVerifierWaiter)
