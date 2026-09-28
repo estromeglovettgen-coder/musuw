@@ -60,3 +60,12 @@ Chromium/WebKit 用例，视口 430 × 932。首屏静态 JS gzip 从 2,140,538 
 晋级仍核对完整 SHA、main 祖先、成功 CI、此前 artifact、在线 staging digest、
 当前正式环境成功 manifest，以及 `server-production` required reviewer。
 保留健康检查和失败回滚，只晋级同一组验收镜像，不在服务器编译或使用可变标签。
+
+## 正式发布结果
+
+[正式发布 36442869406](https://github.com/estromeglovettgen-coder/musuw/actions/runs/36442869406)
+于 2026-09-28 15:23 UTC 成功，保留原有 required reviewer，晋级了表中的同一组镜像。
+线上 revision、镜像、发布指针和容器健康复查通过；私有应用日志目录 700、appuser
+可写、文件非空。源站和公开站点 curl 检查 HTTP 200。两入口 HTML 与已验收 staging
+逐字节一致，430 × 932 浏览器登录页正常、占位移除、无横向溢出或页面错误。
+最终用户的国内运营商/真实手机登录验收仍待用户执行，不将模拟浏览器结果代替它。
