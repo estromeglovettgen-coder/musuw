@@ -21,6 +21,7 @@ import { installTDesignIconOfflineGuard } from "@/utils/tdesign-icon-offline";
 import { installAutofillGuard } from "@/utils/disable-autofill";
 import { installReferenceTextareaAutosize } from "@/utils/referenceTextareaAutosize";
 import { useAuthStore } from "@/stores/auth";
+import { hasPendingOIDCCallback } from "@/utils/nativeAuthHandoff";
 
 // 必须在 Vue 组件挂载之前执行，避免 tdesign-icons 运行时请求 tdesign.gtimg.com
 installTDesignIconOfflineGuard();
@@ -44,7 +45,9 @@ app.config.errorHandler = (err, instance, info) => {
   // Capabilities (can_create_tenant, auto_accept_invitation) are not cached
   // in localStorage — reconcile once before first paint when a session exists.
   const authStore = useAuthStore();
-  if (localStorage.getItem("weknora_token")) {
+  // App.vue consumes a new OIDC session after mounting and reconciles it with
+  // /auth/me. Checking an older token first can redirect away from that callback.
+  if (localStorage.getItem("weknora_token") && !hasPendingOIDCCallback(window.location.hash)) {
     try {
       await authStore.refreshFromAuthMe();
     } catch {
