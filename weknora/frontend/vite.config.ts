@@ -181,6 +181,9 @@ export default defineConfig({
         operations: resolve(__dirname, 'operations.html'),
       },
       output: {
+        // Keep shared Vue/DOMPurify dependencies out of optional rendering chunks;
+        // otherwise importing them at startup also downloads Mermaid and Highlight.
+        onlyExplicitManualChunks: true,
         manualChunks(id) {
           if (!id.includes('node_modules')) return
           if (id.includes('mermaid') || id.includes('/dagre') || id.includes('cytoscape')) {

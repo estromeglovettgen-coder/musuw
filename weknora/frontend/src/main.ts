@@ -1,3 +1,4 @@
+import { reportDiagnostic } from "../../../shared/client-diagnostics";
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
@@ -64,4 +65,9 @@ app.config.errorHandler = (err, instance, info) => {
   installAutofillGuard();
 }
 
-bootstrap();
+bootstrap().then(() => {
+  reportDiagnostic({ phase: 'app.startup', outcome: 'ok', duration_ms: Math.min(120_000, Math.round(performance.now())) });
+}, error => {
+  reportDiagnostic({ phase: 'app.startup', outcome: 'error', duration_ms: Math.min(120_000, Math.round(performance.now())) });
+  throw error; // Keep the entry shell's existing startup-failure feedback.
+});

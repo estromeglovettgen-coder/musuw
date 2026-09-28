@@ -189,6 +189,9 @@ func NewRouter(params RouterParams) *gin.Engine {
 	// remains behind authentication or the signed webhook.
 	r.GET("/api/v1/billing/paddle/public-config", params.EntitlementHandler.PaddlePublicConfig)
 
+	// Browser failures must remain reportable before a native session exists.
+	r.POST("/api/v1/client-diagnostics", handler.NewClientDiagnosticsHandler())
+
 	// 认证中间件
 	r.Use(middleware.Auth(params.TenantService, params.UserService, params.TenantMemberService, params.TenantAPIKeyService, params.Config))
 

@@ -1,3 +1,5 @@
+import { reportDiagnostic } from "../../../../shared/client-diagnostics";
+import { installRequestDiagnostics } from "./requestDiagnostics";
 // src/utils/request.js
 import axios from "axios";
 import { generateRandomString, MAX_FILE_SIZE_MB } from "./index";
@@ -26,6 +28,8 @@ const instance = axios.create({
     "X-Request-ID": `${generateRandomString(12)}`,
   },
 });
+
+installRequestDiagnostics(instance, reportDiagnostic);
 
 // 获取当前用户语言（用于 Accept-Language header）
 export function getCurrentLanguage(): string {

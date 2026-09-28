@@ -10,7 +10,7 @@ import { hasPendingOIDCCallback, isDefinitiveNativeSessionFailure } from './util
 // HTTP responses are the external boundaries; no live authentication is used.
 const mainSource = readFileSync(new URL('./main.ts', import.meta.url), 'utf8')
 const startupStart = mainSource.indexOf('async function bootstrap() {')
-const startupEnd = mainSource.indexOf('\nbootstrap();', startupStart)
+const startupEnd = mainSource.indexOf('\nbootstrap()', startupStart)
 assert.ok(startupStart >= 0 && startupEnd > startupStart)
 const startup = mainSource.slice(startupStart, startupEnd)
 const createBootstrap = new Function(

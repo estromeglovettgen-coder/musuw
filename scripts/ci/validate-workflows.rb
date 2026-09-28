@@ -86,7 +86,7 @@ ci_on = root_key(ci, "on")
 fail_contract "ci.yml must run on pull requests" unless ci_on.key?("pull_request")
 fail_contract "ci.yml must run on pushes to main" unless ci_on.dig("push", "branches") == ["main"]
 fail_contract "ci.yml must cancel superseded runs" unless ci.dig("concurrency", "cancel-in-progress") == true
-required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SOURCE_MANIFEST* *PROVENANCE* docs/DEPLOYMENT.md integration/weknora-staging/** scripts/weknora-staging/** scripts/weknora-staging-deploy.sh integration/operations/** playwright.operations*.config.ts]
+required_ci_paths = %w[openspec/** AGENTS.md README.md THIRD_PARTY_NOTICES.md SOURCE_MANIFEST* *PROVENANCE* docs/DEPLOYMENT.md integration/weknora-staging/** scripts/weknora-staging/** scripts/weknora-staging-deploy.sh integration/operations/** playwright.operations*.config.ts shared/** playwright.startup-feedback.config.ts]
 %w[pull_request push].each do |trigger|
   configured = Array(ci_on.dig(trigger, "paths"))
   missing = required_ci_paths.reject { |path| configured.include?(path) }

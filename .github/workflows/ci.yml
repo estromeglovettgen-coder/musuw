@@ -6,6 +6,7 @@ on:
       - '.github/workflows/**'
       - '.nvmrc'
       - 'auth/**'
+      - 'shared/**'
       - 'storefront/**'
       - 'weknora/**'
       - 'e2e/**'
@@ -14,6 +15,7 @@ on:
       - 'playwright.billing.config.ts'
       - 'playwright.marketplace.config.ts'
       - 'playwright.operations*.config.ts'
+      - 'playwright.startup-feedback.config.ts'
       - 'scripts/**'
       - 'scripts/weknora-staging/**'
       - 'scripts/weknora-staging-deploy.sh'
@@ -38,6 +40,7 @@ on:
       - '.github/workflows/**'
       - '.nvmrc'
       - 'auth/**'
+      - 'shared/**'
       - 'storefront/**'
       - 'weknora/**'
       - 'e2e/**'
@@ -46,6 +49,7 @@ on:
       - 'playwright.billing.config.ts'
       - 'playwright.marketplace.config.ts'
       - 'playwright.operations*.config.ts'
+      - 'playwright.startup-feedback.config.ts'
       - 'scripts/**'
       - 'scripts/weknora-staging/**'
       - 'scripts/weknora-staging-deploy.sh'
@@ -147,6 +151,8 @@ jobs:
         run: npx playwright test --config=playwright.marketplace.config.ts
       - name: Exercise operations reconnect and visibility recovery
         run: npm run admin:e2e:recovery
+      - name: Exercise startup feedback and recovery without external services
+        run: npx playwright test --config=playwright.startup-feedback.config.ts --project=chromium
       - name: Preserve browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
@@ -158,6 +164,7 @@ jobs:
             test-results/billing
             test-results/creator-marketplace
             test-results/operations-recovery
+            test-results/startup-feedback
           retention-days: 7
 
   auth:

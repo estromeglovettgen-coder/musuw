@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Limit one reviewed creator-marketplace/curated-import release to its evidence.
+"""Limit the reviewed login/performance release to its exact recorded evidence.
 
 The workflow separately verifies green CI, main ancestry, the live production
 baseline, matching staged image digests and the server-production reviewer.
@@ -8,10 +8,13 @@ This guard does not assert full Paddle Sandbox lifecycle acceptance.
 import sys
 
 
-REVIEWED_RELEASE = (
+# Fill candidate and staging run only after the targeted acceptance recorded in
+# docs/LOGIN_PERFORMANCE_RELEASE_REVIEW_20260928.md has passed. None cannot match
+# a command-line argument, so the pending record rejects every promotion.
+REVIEWED_RELEASE: tuple[str | None, str, str | None] = (
+    None,
     "19faaa073c1018ab8ebf699b841585feed38f728",
-    "16d503fb9fc1c6ca4653e90406117eab457650b4",
-    "36318675629",
+    None,
 )
 
 

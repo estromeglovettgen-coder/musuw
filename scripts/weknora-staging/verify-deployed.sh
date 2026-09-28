@@ -127,6 +127,10 @@ docker exec weknora-v072-staging-searxng python3 -c 'import json,urllib.request;
 app_env="$(docker inspect weknora-v072-staging-app --format '{{range .Config.Env}}{{println .}}{{end}}')"
 frontend_env="$(docker inspect weknora-v072-staging-frontend --format '{{range .Config.Env}}{{println .}}{{end}}')"
 printf '%s\n' "$app_env" | grep -Fqx 'MUSUW_DEPLOYMENT_ENVIRONMENT=staging' || fail 'staging deployment selector is missing at runtime'
+printf '%s\n' "$app_env" | grep -Fqx 'LOG_PATH=/var/log/weknora/app.log' || fail 'staging persistent application log is disabled'
+log_mount="$(docker inspect weknora-v072-staging-app --format '{{range .Mounts}}{{if eq .Destination "/var/log/weknora"}}{{.Type}}|{{.Name}}|{{.RW}}{{end}}{{end}}')"
+[ "$log_mount" = 'volume|weknora-v072-staging-app-logs|true' ] || fail 'staging application log volume is not isolated'
+docker exec --user appuser weknora-v072-staging-app sh -ec 'test -w /var/log/weknora && test -s /var/log/weknora/app.log && test -w /var/log/weknora/app.log && test "$(stat -c %a /var/log/weknora)" = 700' || fail 'staging application log is unavailable to the runtime user'
 printf '%s\n' "$app_env" | grep -Fqx 'MUSUW_PADDLE_ENVIRONMENT=sandbox' || fail 'staging Paddle selector is not Sandbox at runtime'
 printf '%s\n' "$app_env" | grep -Fqx 'LANGFUSE_ENABLED=true' || fail 'staging Langfuse tracing is disabled at runtime'
 printf '%s\n' "$app_env" | grep -Fqx 'LANGFUSE_HOST=https://jp.cloud.langfuse.com' || fail 'staging Langfuse host has drifted at runtime'
@@ -184,6 +188,7 @@ curl -fsS --connect-timeout 5 "http://127.0.0.1:${frontend_port}/api/v1/billing/
 jq -e '(.configured == true) and (.environment == "sandbox") and (.client_token | type == "string" and startswith("test_"))' "$paddle_json" >/dev/null || fail 'staging public Paddle config is not a configured Sandbox unit'
 
 for volume in \
+    weknora-v072-staging-app-logs \
     weknora-v072-staging-neo4j-data \
     weknora-v072-staging-postgres-data \
     weknora-v072-staging-data-files \

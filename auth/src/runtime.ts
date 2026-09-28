@@ -1,3 +1,4 @@
+import type { DiagnosticEvent, DiagnosticPhase } from "../../shared/client-diagnostics";
 import { publicOriginFromValue } from "./config";
 
 /**
@@ -126,6 +127,7 @@ type RuntimeOptions = Readonly<{
   nextFlowId?: () => string;
   now?: () => number;
   requestTimeoutMs?: number;
+  onDiagnostic?: (event: DiagnosticEvent) => void;
   sharedStorage?: SessionStorageLike;
   storage: SessionStorageLike;
 }>;
@@ -533,7 +535,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
 
   const currentIdentitySession = async (): Promise<IdentitySession | null> => {
     try {
-      const current = await withinRequestDeadline(identity().getSession());
+      const current = await withinRequestDeadline(identity().getSession(), "auth.session");
       const session = current.error === null ? current.data.session : null;
       return session?.access_token.trim() === "" ? null : session;
     } catch {
@@ -559,19 +561,38 @@ export function createAuthRuntime(options: RuntimeOptions) {
     return true;
   };
 
-  const withinRequestDeadline = <T>(request: Promise<T>): Promise<T> =>
+  const withinRequestDeadline = <T>(request: Promise<T>, phase?: DiagnosticPhase): Promise<T> =>
     new Promise<T>((resolve, reject) => {
-      const timer = globalThis.setTimeout(
-        () => reject(new Error("Authentication request timed out")),
-        requestTimeoutMs,
-      );
+      const started = performance.now();
+      let settled = false;
+      const record = (outcome: DiagnosticEvent['outcome'], status?: number): void => {
+        if (!phase) return;
+        try {
+          options.onDiagnostic?.({ phase, outcome,
+            duration_ms: Math.min(120_000, Math.max(0, Math.round(performance.now() - started))),
+            ...(status === undefined ? {} : { status }),
+          });
+        } catch { /* Operational reporting cannot change authentication. */ }
+      };
+      const timer = globalThis.setTimeout(() => {
+        settled = true;
+        record('timeout');
+        reject(new Error("Authentication request timed out"));
+      }, requestTimeoutMs);
       void request.then(
         (value) => {
+          if (settled) return;
+          settled = true;
           globalThis.clearTimeout(timer);
+          if (value instanceof Response) record(value.ok ? 'ok' : 'http', value.status);
+          else record(isObject(value) && value['error'] ? 'identity' : 'ok');
           resolve(value);
         },
         (error: unknown) => {
+          if (settled) return;
+          settled = true;
           globalThis.clearTimeout(timer);
+          record('network');
           reject(error);
         },
       );
@@ -677,6 +698,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
           },
           method: "POST",
         }),
+        "auth.password",
       );
       if (response.status === 401 || response.status === 403) {
         return identityError("invalid_credentials");
@@ -726,6 +748,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
             Authorization: `Bearer ${token}`,
           },
         }),
+        "auth.native_session",
       );
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
@@ -752,6 +775,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
           credentials: "same-origin",
           headers: { Accept: "application/json" },
         }),
+        "auth.oidc_start",
       );
       if (!response.ok) return { code: "native_oidc_unavailable", state: "identity_error" };
       const payload: unknown = await withinRequestDeadline(response.json());
@@ -859,6 +883,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
             supabaseFlowId === null
               ? identity().exchangeCodeForSession(code)
               : identity().exchangeCodeForSession(code, { flowId: supabaseFlowId }),
+            "auth.exchange",
           );
           if (result.error !== null || !validSession(result.data.session)) {
             clearRecoveryMarker();
@@ -905,6 +930,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
         try {
           const details = await withinRequestDeadline(
             identity().oauth.getAuthorizationDetails(authorizationId),
+            "auth.authorize",
           );
           if (details.error !== null || details.data === null) {
             clearContinuation();
@@ -947,6 +973,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
 
           const approved = await withinRequestDeadline(
             identity().oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true }),
+            "auth.authorize",
           );
           const redirectURL =
             approved.error === null && approved.data !== null
@@ -979,6 +1006,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
       try {
         const result = await withinRequestDeadline(
           identity().signInWithPassword({ email, password }),
+          "auth.password",
         );
         if (result.error !== null) return identityError(identityErrorCode(result.error));
         if (!validSession(result.data.session)) return identityError("unavailable");
@@ -1076,6 +1104,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
       try {
         const result = await withinRequestDeadline(
           identity().signInWithOtp({ email, options: { shouldCreateUser: true } }),
+          "auth.otp_send",
         );
         return result.error === null
           ? { email, state: "email_otp_sent" }
@@ -1130,6 +1159,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
       try {
         const result = await withinRequestDeadline(
           identity().verifyOtp({ email, token, type: "email" }),
+          "auth.otp_verify",
         );
         if (result.error !== null || !validSession(result.data.session)) {
           return { code: "email_code_invalid", state: "identity_error" };
@@ -1148,6 +1178,7 @@ export function createAuthRuntime(options: RuntimeOptions) {
       try {
         const result = await withinRequestDeadline(
           identity().verifyOtp({ email, token, type: "signup" }),
+          "auth.otp_verify",
         );
         if (result.error !== null || !validSession(result.data.session)) {
           return { code: "email_code_invalid", state: "identity_error" };

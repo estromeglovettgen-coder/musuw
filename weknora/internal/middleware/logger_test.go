@@ -79,6 +79,9 @@ func TestSanitizeQuery(t *testing.T) {
 }
 
 func TestShouldLogBodies(t *testing.T) {
+	if shouldLogBodies("/api/v1/client-diagnostics") {
+		t.Fatal("diagnostic input must only be read by the bounded handler")
+	}
 	if shouldLogBodies("/api/v1/auth/oidc/callback") {
 		t.Fatal("authentication request and response bodies must not be logged")
 	}

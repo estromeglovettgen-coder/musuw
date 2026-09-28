@@ -1,3 +1,4 @@
+import { reportDiagnostic } from "../../shared/client-diagnostics";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -26,6 +27,7 @@ try {
   );
   const runtime = createAuthRuntime({
     config,
+    onDiagnostic: reportDiagnostic,
     createIdentityClient: (identityConfig) =>
       createSupabaseIdentityClient(identityConfig, window.sessionStorage, window.localStorage),
     localMusuwPasswordAuth: isLocalMusuwAuthEnabled(

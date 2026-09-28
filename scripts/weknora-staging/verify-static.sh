@@ -256,6 +256,10 @@ jq -e '
     .services.frontend.ports[0].host_ip == "127.0.0.1" and .services.frontend.ports[0].published == "4192" and
     .services.app.ports[0].host_ip == "127.0.0.1" and .services.app.ports[0].published == "18092" and
     .services.app.environment.MUSUW_DEPLOYMENT_ENVIRONMENT == "staging" and
+    .services.app.environment.LOG_PATH == "/var/log/weknora/app.log" and
+    .volumes["app-logs"].name == "weknora-v072-staging-app-logs" and
+    ([.services.app.volumes[] | select(.source == "app-logs" and .target == "/var/log/weknora" and .type == "volume" and .read_only != true)] | length) == 1 and
+    ([.services.frontend.volumes[]? | select(.source == "app-logs")] | length) == 0 and
     .services.app.environment.MUSUW_PADDLE_ENVIRONMENT == "sandbox" and
     .services.app.environment.MUSUW_PADDLE_API_URL == "https://sandbox-api.paddle.com" and
     .services.app.environment.LANGFUSE_ENABLED == "true" and

@@ -85,6 +85,9 @@ func sanitizeQuery(raw string) string {
 // data that field-level JSON redaction cannot safely inspect. Keep request
 // metadata, but never persist those request or response bodies.
 func shouldLogBodies(path string) bool {
+	if path == "/api/v1/client-diagnostics" {
+		return false
+	}
 	pathLower := strings.ToLower(path)
 	// Sharing and invitation endpoints carry tenant/user identifiers and
 	// sometimes operator-supplied messages or signed links. The generic
@@ -192,6 +195,12 @@ func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		routePath := c.Request.URL.Path
+		// Only the diagnostics handler emits its validated, rate-limited event.
+		// Do not duplicate it with unbounded body/query/IP/request-header logs.
+		if routePath == "/api/v1/client-diagnostics" {
+			c.Next()
+			return
+		}
 		path := routePath
 		raw := c.Request.URL.RawQuery
 		bodyLoggingAllowed := shouldLogBodies(routePath)

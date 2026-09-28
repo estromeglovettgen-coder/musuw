@@ -244,6 +244,10 @@ fi
 # public endpoints are intentionally inspected without printing the remaining
 # environment so file-backed credentials stay undisclosed.
 app_env="$(docker inspect weknora-v072-production-app --format '{{range .Config.Env}}{{println .}}{{end}}')"
+printf '%s\n' "$app_env" | grep -Fqx 'LOG_PATH=/var/log/weknora/app.log' || die 'production persistent application log is disabled'
+log_mount="$(docker inspect weknora-v072-production-app --format '{{range .Mounts}}{{if eq .Destination "/var/log/weknora"}}{{.Type}}|{{.Name}}|{{.RW}}{{end}}{{end}}')"
+[ "$log_mount" = 'volume|weknora-v072-production-app-logs|true' ] || die 'production application log volume is not isolated'
+docker exec --user appuser weknora-v072-production-app sh -ec 'test -w /var/log/weknora && test -s /var/log/weknora/app.log && test -w /var/log/weknora/app.log && test "$(stat -c %a /var/log/weknora)" = 700' || die 'production application log is unavailable to the runtime user'
 oidc_issuer="$(weknora_production_require_env_value "$runtime_dir/production.env" OIDC_AUTH_ISSUER_URL)"
 printf '%s\n' "$app_env" | grep -Fqx "OIDC_AUTH_ISSUER_URL=$oidc_issuer" || die 'production OIDC issuer has drifted at runtime'
 printf '%s\n' "$app_env" | grep -Fqx "OIDC_AUTH_DISCOVERY_URL=$oidc_issuer/.well-known/openid-configuration" || die 'production OIDC discovery URL has drifted at runtime'

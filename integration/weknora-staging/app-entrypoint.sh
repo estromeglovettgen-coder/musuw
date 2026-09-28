@@ -4,6 +4,9 @@
 # is never mounted into this project.
 set -eu
 
+# Private named-volume logs must remain writable after native privilege drop.
+install -d -m 0700 -o appuser -g appuser /var/log/weknora
+
 paddle_runtime_contract=/opt/weknora-staging/paddle-runtime-contract.sh
 if [ ! -r "$paddle_runtime_contract" ]; then
     printf '%s\n' 'required staging Paddle runtime contract is unavailable' >&2

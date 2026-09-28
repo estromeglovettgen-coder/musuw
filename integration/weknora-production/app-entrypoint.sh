@@ -4,6 +4,10 @@
 # execs the native WeKnora process.
 set -eu
 
+# Private named-volume logs must remain writable after native privilege drop.
+# The existing logger bounds and rotates app.log; never place it in /data/files.
+install -d -m 0700 -o appuser -g appuser /var/log/weknora
+
 paddle_runtime_contract=/opt/weknora-production/paddle-runtime-contract.sh
 if [ ! -r "$paddle_runtime_contract" ]; then
     printf '%s\n' 'required Paddle runtime contract is unavailable' >&2

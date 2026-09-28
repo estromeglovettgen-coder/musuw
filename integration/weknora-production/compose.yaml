@@ -48,6 +48,7 @@ services:
       - ${WEKNORA_PRODUCTION_RUNTIME_DIR:?set WEKNORA_PRODUCTION_RUNTIME_DIR}/production.env
     environment: !override
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_PATH: /var/log/weknora/app.log
       GIN_MODE: ${GIN_MODE:-release}
       TZ: ${TZ:-Asia/Shanghai}
       AUTO_MIGRATE: ${AUTO_MIGRATE:-true}
@@ -104,6 +105,7 @@ services:
     command: ["./WeKnora"]
     volumes: !override
       - data-files:/data/files
+      - app-logs:/var/log/weknora
       - docreader-tmp:/tmp/docreader:ro
       - ../weknora/config/config.yaml:/app/config/config.yaml:ro
       - ../integration/weknora-production/app-entrypoint.sh:/opt/weknora-production/app-entrypoint.sh:ro
@@ -309,6 +311,8 @@ networks:
     driver: bridge
 
 volumes:
+  app-logs:
+    name: weknora-v072-production-app-logs
   postgres-data:
     external: true
     name: ${WEKNORA_PRODUCTION_POSTGRES_VOLUME:?set WEKNORA_PRODUCTION_POSTGRES_VOLUME in production.env}

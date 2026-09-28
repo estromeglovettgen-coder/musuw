@@ -241,16 +241,9 @@ class UiReleaseScopeTest(unittest.TestCase):
             with self.subTest(path=path):
                 reviewed_content = (SOURCE_ROOT / path).read_text(encoding="utf-8")
                 if path == "weknora/frontend/index.html":
-                    # Reconstruct the historical presentation-only fixture.
-                    # Preserving explicit KB entry is a later behavior change,
-                    # not permission to widen the production UI release gate.
-                    current_guard = "if (path !== '/' && path !== '/platform') return;"
-                    historical_guard = (
-                        "if (path !== '/' && path !== '/platform' "
-                        "&& path !== '/platform/knowledge-bases') return;"
-                    )
-                    self.assertEqual(reviewed_content.count(current_guard), 1)
-                    reviewed_content = reviewed_content.replace(current_guard, historical_guard, 1)
+                    # Keep testing the reviewed historical blob, not later
+                    # startup/auth behavior. This does not broaden UI authority.
+                    reviewed_content = (SCRIPT.parent / "fixtures/ui-release-reviewed-index.html").read_text(encoding="utf-8")
                     blob = subprocess.run(
                         ["git", "hash-object", "--stdin"], input=reviewed_content,
                         text=True, capture_output=True, check=True,

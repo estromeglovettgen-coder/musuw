@@ -1113,3 +1113,41 @@ describe("password identity continuation", () => {
     expect(store.getItem("musnow.auth.flow")).toBeNull();
   });
 });
+
+describe('bounded auth phase diagnostics', () => {
+  function instrumented(client: IdentityClient, events: unknown[], timeout = 20, report?: () => void) {
+    return createAuthRuntime({
+      config: { publicOrigin: 'https://app.musuw.com', publishableKey: 'test', supabaseUrl: 'https://identity.example', weknoraOAuthClientId: 'test' },
+      createIdentityClient: () => client,
+      storage: storage(), nativeStorage: storage(),
+      location: { assign() {}, origin: 'https://app.musuw.com' },
+      requestTimeoutMs: timeout,
+      onDiagnostic: event => { events.push(event); report?.() },
+    })
+  }
+  it('records OTP send outcome without email or input and ignores reporter exceptions', async () => {
+    const events: unknown[] = []
+    const runtime = instrumented(identity(), events, 1000, () => { throw Error('report failed') })
+    expect(await runtime.requestEmailOtp('private@example.test')).toEqual({ email: 'private@example.test', state: 'email_otp_sent' })
+    expect(events).toEqual([{ phase: 'auth.otp_send', outcome: 'ok', duration_ms: expect.any(Number) }])
+    expect(JSON.stringify(events)).not.toContain('private')
+  })
+  it('records a deadline once and ignores late identity completion', async () => {
+    let resolve!: (value: { error: null }) => void
+    const events: unknown[] = []
+    const runtime = instrumented(identity({ signInWithOtp: () => new Promise(done => { resolve = done }) }), events)
+    expect((await runtime.requestEmailOtp('private@example.test')).state).toBe('email_otp_error')
+    expect(events).toEqual([{ phase: 'auth.otp_send', outcome: 'timeout', duration_ms: expect.any(Number) }])
+    resolve({ error: null })
+    await Promise.resolve()
+    expect(events).toHaveLength(1)
+  })
+  it('distinguishes rejected requests and bounded identity refusals', async () => {
+    const events: unknown[] = []
+    const failing = identity({ signInWithOtp: async () => { throw Error('sensitive upstream details') } })
+    await instrumented(failing, events).requestEmailOtp('private@example.test')
+    await instrumented(identity({ signInWithOtp: async () => ({ error: { code: 'rate_limited' } }) }), events).requestEmailOtp('private@example.test')
+    expect(events.map(event => (event as { outcome: string }).outcome)).toEqual(['network', 'identity'])
+    expect(JSON.stringify(events)).not.toContain('sensitive')
+  })
+})

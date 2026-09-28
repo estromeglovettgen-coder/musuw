@@ -68,9 +68,10 @@ Compose overlay 在 [`integration/weknora-staging/compose.yaml`](../integration/
 
 不存在 `full` 或“健康检查后自动生产”的路径。人工 Paddle 验收是发布门，不是
 可选说明；storage accounting 修复也必须等这条门全部通过后才开始。
-当前唯一的 `reviewed-curated-release` 精确版本例外见
-[`CURATED_RELEASE_REVIEW_20260927.md`](CURATED_RELEASE_REVIEW_20260927.md)；
-它记录有限证据，不得称为 `full-sandbox-e2e-green`。
+`reviewed-curated-release` 只接受 guard 当前登记的一个精确版本组合；
+此前已完成的发布记录见 [`CURATED_RELEASE_REVIEW_20260927.md`](CURATED_RELEASE_REVIEW_20260927.md)。
+本次登录与性能发布记录见 [`LOGIN_PERFORMANCE_RELEASE_REVIEW_20260928.md`](LOGIN_PERFORMANCE_RELEASE_REVIEW_20260928.md)，
+候选和 staging run 未经定向验收登记前一律拒绝晋级。这些记录均不得称为 `full-sandbox-e2e-green`。
 
 ## CI Environment 与 secret 边界
 

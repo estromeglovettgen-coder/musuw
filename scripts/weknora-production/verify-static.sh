@@ -350,6 +350,10 @@ jq -e '
   ((.services.frontend.networks | has("edge")) | not) and
   (.services.app.environment.APP_EXTERNAL_URL == "https://app.musuw.com") and
   (.services.app.environment.FRONTEND_BASE_URL == "https://app.musuw.com") and
+  (.services.app.environment.LOG_PATH == "/var/log/weknora/app.log") and
+  (.volumes["app-logs"].name == "weknora-v072-production-app-logs") and
+  ([.services.app.volumes[] | select(.source == "app-logs" and .target == "/var/log/weknora" and .type == "volume" and .read_only != true)] | length == 1) and
+  ([.services.frontend.volumes[]? | select(.source == "app-logs")] | length == 0) and
   (.services.app.environment.OIDC_AUTH_AUTHORIZATION_ENDPOINT == "https://identity.example/auth/v1/oauth/authorize") and
   (.services.app.environment.OIDC_AUTH_TOKEN_ENDPOINT == "https://identity.example/auth/v1/oauth/token") and
   (.services.app.environment.OIDC_AUTH_USER_INFO_ENDPOINT == "https://identity.example/auth/v1/oauth/userinfo") and

@@ -60,6 +60,9 @@ for runtime_file in production.public.env auth-public.env production.env; do
     grep -Fq "$runtime_file" "$release_ci" || fail "release rollback does not preserve $runtime_file"
 done
 grep -Fq 'automatic production rollback failed' "$release_ci" || fail 'release helper does not report a failed rollback honestly'
+grep -Fq 'LOG_PATH=/var/log/weknora/app.log' "$release_ci" || fail 'release helper does not verify persistent application logging'
+grep -Fq 'volume|weknora-v072-production-app-logs|true' "$release_ci" || fail 'release helper does not verify the private log volume'
+grep -Fq 'docker exec --user appuser weknora-v072-production-app' "$release_ci" || fail 'release helper does not verify logs as the actual app user'
 grep -Fq -- '--no-build' "$release_ci" || fail 'release helper still permits a server-side build'
 if grep -Fq 'build-images.sh' "$release_ci"; then
     fail 'release helper still invokes the removed server image build'

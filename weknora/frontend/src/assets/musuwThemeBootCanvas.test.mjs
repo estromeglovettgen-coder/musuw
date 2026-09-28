@@ -10,10 +10,12 @@ test('pre-paint theme resolves the active user namespace before the legacy fallb
   assert.match(index, /localStorage\.getItem\(userThemeKey\)\s*\|\|\s*localStorage\.getItem\(anonThemeKey\)\s*\|\|\s*localStorage\.getItem\(legacyThemeKey\)/)
 })
 
-test('the app boot canvas stays transparent and inherits the resolved root theme', () => {
-  const afterAppMount = index.split('<div id="app"></div>')[1]
-  assert.ok(afterAppMount)
-  assert.doesNotMatch(afterAppMount, /style\.background|localStorage\.getItem/)
+test('startup feedback uses the root theme without repainting the app canvas', () => {
+  const appStart = index.indexOf('<div id="app">')
+  assert.ok(appStart > 0)
+  assert.doesNotMatch(index.slice(appStart), /style\.background|WeKnora_theme/)
+  assert.doesNotMatch(index, /#app\s*\{[^}]*background/)
+  assert.match(index, /html\[theme-mode="dark"\] #musuw-startup \{ background: #151619;/)
 })
 
 test('pre-paint browser and Wails canvases match the final theme authority', () => {

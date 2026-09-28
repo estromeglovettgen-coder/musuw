@@ -203,7 +203,7 @@ jobs:
             else
               git show "$EVENT_SHA:scripts/ci/verify-reviewed-curated-release.py" > "$RUNNER_TEMP/verify-reviewed-curated-release.py"
               python3 "$RUNNER_TEMP/verify-reviewed-curated-release.py" "$actual" "$UI_BASE_SHA" "$REQUESTED_STAGING_RUN_ID"
-              printf 'Owner-requested reviewed creator/curated release: %s -> %s; limited acceptance only; full Sandbox E2E NOT claimed.\n' "$UI_BASE_SHA" "$actual" >> "$GITHUB_STEP_SUMMARY"
+              printf 'Owner-requested exact reviewed release: %s -> %s; limited acceptance only; full Sandbox E2E NOT claimed.\n' "$UI_BASE_SHA" "$actual" >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
           {
