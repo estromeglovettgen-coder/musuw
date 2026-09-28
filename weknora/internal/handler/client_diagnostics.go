@@ -40,11 +40,17 @@ var clientDiagnosticMetadataEnums = map[string]map[string]bool{
 	"flow_status":     {"restored": true, "new": true, "expired": true, "unavailable": true},
 	"navigation_type": {"navigate": true, "reload": true, "back_forward": true, "prerender": true, "unknown": true},
 	"visibility":      {"visible": true, "hidden": true},
-	"page":            {"start": true, "consent": true, "callback": true, "error": true, "logout": true, "app": true, "other": true},
-	"browser_kind":    {"quark": true, "chrome": true, "safari": true, "firefox": true, "edge": true, "other": true},
-	"platform_kind":   {"mobile": true, "desktop": true, "other": true},
-	"storage_status":  {"session_available": true, "session_unavailable": true},
-	"reason":          {"session_present": true, "session_missing": true, "session_unavailable": true, "oidc_start": true, "consent_resume": true, "native_callback": true, "login_required": true, "authorization_complete": true, "authorization_invalid": true},
+	"page": {
+		"start": true, "consent": true, "callback": true, "error": true, "logout": true, "app": true, "other": true,
+	},
+	"browser_kind":   {"quark": true, "chrome": true, "safari": true, "firefox": true, "edge": true, "other": true},
+	"platform_kind":  {"mobile": true, "desktop": true, "other": true},
+	"storage_status": {"session_available": true, "session_unavailable": true},
+	"reason": {
+		"session_present": true, "session_missing": true, "session_unavailable": true, "oidc_start": true,
+		"consent_resume": true, "native_callback": true, "login_required": true,
+		"authorization_complete": true, "authorization_invalid": true,
+	},
 }
 
 type clientDiagnosticTimings struct {
@@ -83,6 +89,7 @@ func validDiagnosticUUID(value string) bool {
 	id, err := uuid.Parse(value)
 	return err == nil && id.Version() == 4 && id.Variant() == uuid.RFC4122 && id.String() == value
 }
+
 func validDiagnosticMilliseconds(value *int) bool {
 	return value != nil && *value >= 0 && *value <= 120000
 }
@@ -136,8 +143,10 @@ func NewClientDiagnosticsHandler() gin.HandlerFunc {
 			c.Status(http.StatusBadRequest)
 			return
 		}
-		fields, exact := exactDiagnosticObject(body, "phase", "outcome", "duration_ms", "flow_id", "request_id", "status",
-			"journey_id", "document_id", "page", "browser_kind", "platform_kind", "viewport_width", "storage_status", "reason", "timings", "resources", "flow_status", "navigation_type", "visibility")
+		fields, exact := exactDiagnosticObject(body,
+			"phase", "outcome", "duration_ms", "flow_id", "request_id", "status",
+			"journey_id", "document_id", "page", "browser_kind", "platform_kind", "viewport_width", "storage_status",
+			"reason", "timings", "resources", "flow_status", "navigation_type", "visibility")
 		if !exact || !clientDiagnosticPhases[event.Phase] || !clientDiagnosticOutcomes[event.Outcome] ||
 			!validDiagnosticMilliseconds(event.DurationMS) || !validDiagnosticUUID(event.FlowID) ||
 			(event.Status != 0 && (event.Status < 100 || event.Status > 599)) {
@@ -154,7 +163,11 @@ func NewClientDiagnosticsHandler() gin.HandlerFunc {
 				return
 			}
 		}
-		for key, value := range map[string]string{"flow_status": event.FlowStatus, "navigation_type": event.NavigationType, "visibility": event.Visibility, "page": event.Page, "browser_kind": event.BrowserKind, "platform_kind": event.PlatformKind, "storage_status": event.StorageStatus, "reason": event.Reason} {
+		for key, value := range map[string]string{
+			"flow_status": event.FlowStatus, "navigation_type": event.NavigationType, "visibility": event.Visibility,
+			"page": event.Page, "browser_kind": event.BrowserKind, "platform_kind": event.PlatformKind,
+			"storage_status": event.StorageStatus, "reason": event.Reason,
+		} {
 			if _, present := fields[key]; present && !clientDiagnosticMetadataEnums[key][value] {
 				c.Status(http.StatusBadRequest)
 				return
@@ -166,7 +179,8 @@ func NewClientDiagnosticsHandler() gin.HandlerFunc {
 		}
 		if raw, present := fields["timings"]; present {
 			_, exact := exactDiagnosticObject(raw, "ttfb_ms", "download_ms")
-			if !exact || event.Timings == nil || !validDiagnosticMilliseconds(event.Timings.TTFBMS) || !validDiagnosticMilliseconds(event.Timings.DownloadMS) {
+			if !exact || event.Timings == nil || !validDiagnosticMilliseconds(event.Timings.TTFBMS) ||
+				!validDiagnosticMilliseconds(event.Timings.DownloadMS) {
 				c.Status(http.StatusBadRequest)
 				return
 			}
@@ -180,7 +194,10 @@ func NewClientDiagnosticsHandler() gin.HandlerFunc {
 			for i, item := range items {
 				_, exact := exactDiagnosticObject(item, "name", "duration_ms", "ttfb_ms", "download_ms")
 				resource := event.Resources[i]
-				if !exact || !clientDiagnosticAssetName.MatchString(resource.Name) || !validDiagnosticMilliseconds(resource.DurationMS) || !validDiagnosticMilliseconds(resource.TTFBMS) || !validDiagnosticMilliseconds(resource.DownloadMS) {
+				if !exact || !clientDiagnosticAssetName.MatchString(resource.Name) ||
+					!validDiagnosticMilliseconds(resource.DurationMS) ||
+					!validDiagnosticMilliseconds(resource.TTFBMS) ||
+					!validDiagnosticMilliseconds(resource.DownloadMS) {
 					c.Status(http.StatusBadRequest)
 					return
 				}
@@ -193,7 +210,12 @@ func NewClientDiagnosticsHandler() gin.HandlerFunc {
 		if event.RequestID != "" {
 			bounded["request_id"] = event.RequestID
 		}
-		for key, value := range map[string]string{"flow_status": event.FlowStatus, "navigation_type": event.NavigationType, "visibility": event.Visibility, "journey_id": event.JourneyID, "document_id": event.DocumentID, "page": event.Page, "browser_kind": event.BrowserKind, "platform_kind": event.PlatformKind, "storage_status": event.StorageStatus, "reason": event.Reason} {
+		for key, value := range map[string]string{
+			"flow_status": event.FlowStatus, "navigation_type": event.NavigationType, "visibility": event.Visibility,
+			"journey_id": event.JourneyID, "document_id": event.DocumentID, "page": event.Page,
+			"browser_kind": event.BrowserKind, "platform_kind": event.PlatformKind,
+			"storage_status": event.StorageStatus, "reason": event.Reason,
+		} {
 			if value != "" {
 				bounded[key] = value
 			}
@@ -202,12 +224,17 @@ func NewClientDiagnosticsHandler() gin.HandlerFunc {
 			bounded["viewport_width"] = *event.ViewportWidth
 		}
 		if event.Timings != nil {
-			bounded["timings"] = map[string]int{"ttfb_ms": *event.Timings.TTFBMS, "download_ms": *event.Timings.DownloadMS}
+			bounded["timings"] = map[string]int{
+				"ttfb_ms": *event.Timings.TTFBMS, "download_ms": *event.Timings.DownloadMS,
+			}
 		}
 		if len(event.Resources) > 0 {
 			resources := make([]map[string]interface{}, 0, len(event.Resources))
 			for _, resource := range event.Resources {
-				resources = append(resources, map[string]interface{}{"name": resource.Name, "duration_ms": *resource.DurationMS, "ttfb_ms": *resource.TTFBMS, "download_ms": *resource.DownloadMS})
+				resources = append(resources, map[string]interface{}{
+					"name": resource.Name, "duration_ms": *resource.DurationMS,
+					"ttfb_ms": *resource.TTFBMS, "download_ms": *resource.DownloadMS,
+				})
 			}
 			bounded["resources"] = resources
 		}

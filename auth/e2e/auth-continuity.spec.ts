@@ -17,11 +17,14 @@ const bundle = buildSync({
     const client = createSupabaseIdentityClient(config, sessionStorage, localStorage);
     let sessionChecks = 0;
     const runtime = createAuthRuntime({config, nativeStorage:localStorage, storage:sessionStorage,
-      sharedStorage:localStorage, requestTimeoutMs:100,
+      sharedStorage:localStorage,
       createIdentityClient:()=>({...client, getSession: async()=>{
         const failure = new URLSearchParams(location.search).get('fail_session');
         if(failure && sessionChecks++ === 0) {
-          if(failure === 'timeout') await new Promise(resolve => setTimeout(resolve, 500));
+          if(failure === 'timeout') {
+            window.__sessionCheckStarted = true;
+            await new Promise(() => {});
+          }
           else throw Error('synthetic offline');
         }
         return client.getSession();
@@ -37,7 +40,7 @@ const html = `<html><head><meta charset="utf-8"><meta name="viewport" content="w
 const token = `${Buffer.from('{"alg":"HS256"}').toString('base64url')}.${Buffer.from(JSON.stringify({ sub: 'test-user', exp: 4102444800, role: 'authenticated' })).toString('base64url')}.fixture`;
 const session = { access_token: token, refresh_token: 'fixture-refresh', expires_in: 3600, expires_at: 4102444800, token_type: 'bearer', user: { id: 'test-user', aud: 'authenticated', role: 'authenticated', email: 'fixture@example.test', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' } };
 
-async function fixture(page: Page, seedSession = true, rateLimited = false) {
+async function fixture(page: Page, seedSession = true, rateLimited = false, authorizationDelayMs = 0) {
   let authorizationCalls = 0;
   let otpCalls = 0;
   await page.addInitScript(({ session, seedSession }) => {
@@ -56,6 +59,7 @@ async function fixture(page: Page, seedSession = true, rateLimited = false) {
     if (path === '/api/v1/auth/oidc/url') return json({ success: true, authorization_url: 'https://identity.example/next?state=fixture-state' });
     if (path === '/auth/v1/oauth/authorizations/authorization_1') {
       authorizationCalls++;
+      if (authorizationDelayMs) await new Promise(resolve => setTimeout(resolve, authorizationDelayMs));
       return json({ authorization_id: 'authorization_1', client: { id: 'weknora-client', name: 'Musuw', uri: '', logo_uri: '' }, redirect_uri: 'https://app.musuw.com/api/v1/auth/oidc/callback', scope: 'openid email profile' });
     }
     if (path === '/auth/v1/oauth/authorizations/authorization_1/consent') return json({ redirect_url: 'https://app.musuw.com/api/v1/auth/oidc/callback?code=fixture-code&state=fixture-state' });
@@ -70,10 +74,25 @@ async function fixture(page: Page, seedSession = true, rateLimited = false) {
 
 test.use({ viewport: { width: 430, height: 932 }, locale: 'zh-CN' });
 
+test.afterEach(async ({ page }, info) => {
+  if (info.status !== info.expectedStatus) {
+    await info.attach('auth-diagnostics.json', {
+      body: JSON.stringify(await page.evaluate(() => (window as any).__diagnostics ?? [])),
+      contentType: 'application/json',
+    });
+  }
+});
+
 for (const failure of ['network', 'timeout']) {
 test(`temporary session ${failure} has a same-page retry, without another OTP`, async ({ page }) => {
-  const network = await fixture(page);
+  // A normal authorization response must not inherit an artificial 100ms session deadline.
+  const network = await fixture(page, true, false, 150);
+  if (failure === 'timeout') await page.clock.install();
   await page.goto(`https://app.musuw.com/oauth/consent?authorization_id=authorization_1&fail_session=${failure}`);
+  if (failure === 'timeout') {
+    await page.waitForFunction(() => (window as any).__sessionCheckStarted === true);
+    await page.clock.fastForward(30_001);
+  }
   await expect(page.getByRole('alert')).toContainText('暂时无法确认登录状态');
   await expect(page.locator('input[name="password"]')).toHaveCount(0);
   expect(network.authorizationCalls()).toBe(0);

@@ -39,7 +39,10 @@ func TestClientDiagnosticsAcceptsBoundedNavigationEvidence(t *testing.T) {
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("status=%d, want204", w.Code)
 	}
-	for _, want := range []string{"journey_id=84f4edc5-d014-40ad-b086-546a9891a21b", "browser_kind=quark", "phase=app.navigation", "index-ABcd_123.js"} {
+	for _, want := range []string{
+		"journey_id=84f4edc5-d014-40ad-b086-546a9891a21b", "browser_kind=quark",
+		"phase=app.navigation", "index-ABcd_123.js",
+	} {
 		if !strings.Contains(logs.String(), want) {
 			t.Errorf("missing bounded evidence %q", want)
 		}
@@ -229,7 +232,8 @@ func TestClientDiagnosticsAcceptsContractEnumsAndBoundaryValues(t *testing.T) {
 	for _, phase := range []string{
 		"auth.session", "auth.exchange", "auth.authorize", "auth.password", "auth.otp_send", "auth.otp_verify",
 		"auth.native_session", "auth.oidc_start", "auth.other", "app.startup", "api.auth", "api.documents", "api.other",
-		"auth.session_state", "auth.continuation", "auth.navigation", "app.navigation", "app.entry", "app.bootstrap", "app.router", "app.mount", "auth.entry", "auth.startup", "auth.mount",
+		"auth.session_state", "auth.continuation", "auth.navigation", "app.navigation", "app.entry", "app.bootstrap",
+		"app.router", "app.mount", "auth.entry", "auth.startup", "auth.mount",
 	} {
 		for _, outcome := range []string{"ok", "network", "timeout", "http", "identity", "error"} {
 			body, _ := json.Marshal(map[string]any{
@@ -299,11 +303,13 @@ func TestClientDiagnosticsRejectsPrivateOrMalformedNavigationEvidence(t *testing
 		"viewport fraction":   func(m map[string]any) { m["viewport_width"] = 1.5 },
 		"null timings":        func(m map[string]any) { m["timings"] = nil },
 		"missing download":    func(m map[string]any) { m["timings"] = map[string]any{"ttfb_ms": 1} },
-		"nested private":      func(m map[string]any) { m["timings"].(map[string]any)["url"] = "https://private.test?token=secret" },
-		"nested case":         func(m map[string]any) { m["timings"] = map[string]any{"TTFB_ms": 1, "download_ms": 1} },
-		"nested null":         func(m map[string]any) { m["timings"].(map[string]any)["ttfb_ms"] = nil },
-		"timing overflow":     func(m map[string]any) { m["timings"].(map[string]any)["ttfb_ms"] = 120001 },
-		"timing fraction":     func(m map[string]any) { m["timings"].(map[string]any)["download_ms"] = 0.5 },
+		"nested private": func(m map[string]any) {
+			m["timings"].(map[string]any)["url"] = "https://private.test?token=secret"
+		},
+		"nested case":     func(m map[string]any) { m["timings"] = map[string]any{"TTFB_ms": 1, "download_ms": 1} },
+		"nested null":     func(m map[string]any) { m["timings"].(map[string]any)["ttfb_ms"] = nil },
+		"timing overflow": func(m map[string]any) { m["timings"].(map[string]any)["ttfb_ms"] = 120001 },
+		"timing fraction": func(m map[string]any) { m["timings"].(map[string]any)["download_ms"] = 0.5 },
 		"resource url": func(m map[string]any) {
 			m["resources"].([]any)[0].(map[string]any)["name"] = "https://private.test/index-ABcd_123.js"
 		},
@@ -313,15 +319,22 @@ func TestClientDiagnosticsRejectsPrivateOrMalformedNavigationEvidence(t *testing
 		"resource name too long": func(m map[string]any) {
 			m["resources"].([]any)[0].(map[string]any)["name"] = strings.Repeat("a", 101) + "-ABcd_123.js"
 		},
-		"resource missing duration": func(m map[string]any) { delete(m["resources"].([]any)[0].(map[string]any), "duration_ms") },
-		"resource null":             func(m map[string]any) { m["resources"] = []any{nil} },
-		"resource unknown":          func(m map[string]any) { m["resources"].([]any)[0].(map[string]any)["body"] = "secret" },
+		"resource missing duration": func(m map[string]any) {
+			delete(m["resources"].([]any)[0].(map[string]any), "duration_ms")
+		},
+		"resource null": func(m map[string]any) { m["resources"] = []any{nil} },
+		"resource unknown": func(m map[string]any) {
+			m["resources"].([]any)[0].(map[string]any)["body"] = "secret"
+		},
 		"resource key case": func(m map[string]any) {
 			r := m["resources"].([]any)[0].(map[string]any)
 			r["Name"] = r["name"]
 			delete(r, "name")
 		},
-		"too many resources": func(m map[string]any) { r := m["resources"].([]any)[0]; m["resources"] = []any{r, r, r, r} },
+		"too many resources": func(m map[string]any) {
+			r := m["resources"].([]any)[0]
+			m["resources"] = []any{r, r, r, r}
+		},
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -359,7 +372,9 @@ func TestClientDiagnosticsAcceptsExpandedBoundaryPayload(t *testing.T) {
 	input["flow_status"] = "restored"
 	input["navigation_type"] = "reload"
 	input["visibility"] = "visible"
-	resource := map[string]any{"name": strings.Repeat("a", 100) + "-12345678.css", "duration_ms": 120000, "ttfb_ms": 0, "download_ms": 120000}
+	resource := map[string]any{
+		"name": strings.Repeat("a", 100) + "-12345678.css", "duration_ms": 120000, "ttfb_ms": 0, "download_ms": 120000,
+	}
 	input["resources"] = []any{resource, resource, resource}
 	body, _ := json.Marshal(input)
 	if len(body) <= 1024 || len(body) > 2048 {
