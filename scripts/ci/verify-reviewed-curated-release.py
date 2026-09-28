@@ -9,12 +9,12 @@ import sys
 
 
 # Exact candidate and successful staging run from the completed targeted
-# acceptance in docs/LOGIN_RELIABILITY_RELEASE_REVIEW_20260928.md.
+# acceptance in docs/SHARED_AUTH_SESSION_RELEASE_20260928.md.
 # This permission cannot be reused for a different release or baseline.
 REVIEWED_RELEASE: tuple[str | None, str, str | None] = (
+    "7d18cc0d321718985200dd67ab0525127253e18e",
     "43fe545b1b222e034f66a36b4d63f02d8b5afe41",
-    "9ce4918f4e4ec75fd5f37c4bc95d4f6ca2518939",
-    "36469956185",
+    "36481536038",
 )
 
 

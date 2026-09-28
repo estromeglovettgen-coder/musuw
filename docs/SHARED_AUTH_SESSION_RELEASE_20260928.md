@@ -33,4 +33,16 @@ The router also now displays a localized refresh-and-retry message on navigation
 
 Both browser cases passed against the final production build. The positive route had zero console/page errors or missing resources; the negative case displayed the message and retained the list. All 1,294 frontend tests, type checking, the 15-case locale audit, workflow/source/provenance checks and a focused corrective review passed. Deployment verification remains required.
 
+## Reviewed combined staging release
+
+- Candidate: `7d18cc0d321718985200dd67ab0525127253e18e`, merged through PR #111; all 14 CI jobs passed in run `36479544804`.
+- Immutable staging deployment: `36481536038`, successful. Container revision, digest and healthy status matched the release manifest.
+- App image digest: `sha256:0ce70025e490b77b62fa924feb23a7ef51f8adb60490fbaca9028e3caa594208`.
+- Frontend image digest: `sha256:d94f7e1c67f58aca49d96fa002982b1b2b6e9ba86600db910f411b144968f841`.
+- Delivered-asset acceptance: all seven cases passed. Four auth cases cover continuity and missing shared identity in Chromium/WebKit at 430 × 932; three knowledge navigation cases cover those mobile engines and desktop Chromium at 1440 × 1000, with documents, Wiki and rendered graph. HTML, scripts, styles and the graph worker are the actual deployed files; business/provider/diagnostic transport is synthetic or blocked.
+- No page or route errors remained. The private acceptance harness required awaiting cancelled decorative-asset handling and allowing the existing static graph worker; application code was unchanged during staging acceptance.
+- Production baseline was freshly verified as `43fe545b1b222e034f66a36b4d63f02d8b5afe41`, both containers healthy. Its known graph defect remains a rollback limitation.
+
+The reviewed release guard authorizes only this candidate, baseline and staging-run tuple. Existing CI, ancestry, image digest, capacity and protected production-review gates remain. This is targeted auth/navigation acceptance, not full payment-lifecycle acceptance. Production promotion and real-phone verification remain pending.
+
 After release, verify the delivered auth bundle and synthetic browser handoff against the deployed revision. Real mainland Quark login must then be retested using the ordinary switch-to-mail-and-return interaction. Shared storage denied or cleared by the browser remains an explicit limitation; previous network startup latency is not proven solved by this storage change.
