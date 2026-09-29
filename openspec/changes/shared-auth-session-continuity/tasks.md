@@ -24,4 +24,4 @@
 - [x] 4.1 Measure the delivered mobile entry and real-provider login, including failure recovery and browser history.
 - [x] 4.2 Reproduce and fix verified-identity handoff retry and consumed authorization history with minimal existing mechanisms.
 - [x] 4.3 Pass focused/browser regressions, typecheck/build and one consolidated adversarial review.
-- [ ] 4.4 Accept immutable staging images, promote them and verify the delivered production login surface; report physical-phone and network limits.
+- [x] 4.4 Accept immutable staging images, promote them and verify the delivered production login surface; report physical-phone and network limits.
