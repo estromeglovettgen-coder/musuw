@@ -9,12 +9,12 @@ import sys
 
 
 # Exact candidate and successful staging run from the completed targeted
-# acceptance in docs/OIDC_CONCURRENT_CALLBACK_RELEASE_20260928.md.
+# acceptance in docs/LOGIN_EXPERIENCE_RELEASE_20260928.md.
 # This permission cannot be reused for a different release or baseline.
 REVIEWED_RELEASE: tuple[str | None, str, str | None] = (
+    "627dcce5433ac9e01a4339bfefa600c5e9784d1d",
     "cce10cdce69731a9b2142e9176a3dcaffafab948",
-    "7d18cc0d321718985200dd67ab0525127253e18e",
-    "36494831362",
+    "36500677060",
 )
 
 

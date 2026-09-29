@@ -21,4 +21,15 @@ The implementation reuses the existing identity continuation and retry UI. A ver
 
 Local auth unit tests (153), typecheck and the build with non-secret CI configuration passed. Chromium, WebKit and Firefox passed 66 browser cases: 57 continuation cases and nine document-history cases. An initial WebKit history fixture used its restricted port 4190; switching only the fully intercepted test origin resolved the fixture failure. Consolidated adversarial review and its corrective delta passed: independent two-tab tests with the new identity present, missing and unavailable never reused the old native account or resubmitted the password.
 
-Immutable staging acceptance and production promotion are pending. Physical Quark, external mail-app suspension and actual mainland network conditions remain separate acceptance limits.
+Candidate `627dcce5433ac9e01a4339bfefa600c5e9784d1d` passed CI run `36499522253`: all 11 applicable jobs succeeded; the conditional Go lint matrix was skipped. Immutable staging run `36500677060` succeeded and both deployed services were independently observed healthy on the candidate revision.
+
+The accepted image pair is:
+
+- App: `ghcr.io/estromeglovettgen-coder/musuw-app@sha256:3d249a581b6fff840819c0a6cb10af592330a815330ec2d93f905a5d2a0cb878`.
+- Frontend: `ghcr.io/estromeglovettgen-coder/musuw-frontend@sha256:0c1d69d4e7cbe147469bac4150d122191698811c3ecbc78e545a9c3939b760e6`.
+
+Six real-provider staging cases passed across Chromium and WebKit: normal sign-in with authenticated refresh and Back/Forward; one interrupted native OIDC-start request followed by same-page retry; and one injected provider authorization-details 503 followed by same-page retry. Each used one password exchange, the actual Go callback, the actual frontend callback consumer, and authoritative identity/knowledge-list responses. The account, tenant, durable native credentials and cleared callback fragment matched; no script or contract errors occurred. Ancillary business data remained explicitly isolated and no email, model or payment flows were invoked.
+
+The first Chromium probe sampled the temporary `/` URL during the callback's asynchronous final route guard, after credentials were persisted and the knowledge view was visible. The harness now waits for the final knowledge route after callback and API completion, retaining the strict route assertion. The corrected full six-case run passed. Its normal sign-in timings were 3149/3686 ms, refresh 1361/1314 ms, native-handoff retry 2295/2456 ms and provider-details retry 1390/1795 ms (Chromium/WebKit). These individual samples on the operator's network are not a comparative performance guarantee.
+
+Production promotion is pending. Physical Quark, external mail-app suspension and actual mainland network conditions remain separate acceptance limits.
