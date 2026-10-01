@@ -269,7 +269,7 @@ test("high-risk Musuw product semantics remain composed with the target", async 
     ]),
     assertFileContains("internal/agent/engine.go", [
       '"query_len"',
-      "ErrorCode: openrouter.ErrorCode(err)",
+      "ErrorCode: openrouter.ErrorCode(retErr)",
       "ReasoningDetails: response.ReasoningDetails",
     ]),
   ]);

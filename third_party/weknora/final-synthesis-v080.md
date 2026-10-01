@@ -58,3 +58,54 @@ Fresh local checks passed on 2026-09-20:
 
 Independent review found no blockers within this requested alignment scope.
 No production deployment or live model request was performed.
+
+## Musuw final-answer correction, 2026-10-01
+
+The historical alignment above described the 2026-09-20 implementation. A
+production 50-round request subsequently exposed its documented limitations:
+reconstructed retrieval context drove the synthesis output allowance to one
+token, and the empty answer was treated as success. This correction deliberately
+diverges from the pinned upstream finalizer at those boundaries:
+
+- Reserve the configured completion budget and the existing 4096-token safety
+  margin, then compact only retrieved results with the existing non-mutating
+  head/tail preview helper. Keep newest results first; if compact markers alone
+  cannot fit, omit oldest standalone results. Preserve the system/user/final
+  instructions and reject an impossible fixed input instead of requesting one
+  output token. User-configured context windows and ordinary research calls
+  remain unchanged.
+- Retry empty synthesis once with an explicit visible-answer request and
+  `Thinking=false`. The first synthesis call retains the upstream parameter
+  omission. Neither failed attempt emits a successful answer-done marker.
+- Persistent empty synthesis returns an error. Emit the failure before stream
+  completion and save a visible failure notice; user cancellation emits no error
+  and does not initiate a new synthesis call on an already cancelled context.
+- Display execution rounds from backend completion/persisted steps, independent
+  of merged thinking cards, and remove the cyclic thinking-promotion filter.
+
+`finalize_budget_test.go` exercises long tool history through the terminal loop,
+successful empty-result recovery, persistent failure/event ordering and failed
+degradation. The handler test checks that reloading failure retains visible text.
+The frontend behavior test executes the component's actual Vue computed getters:
+50 rounds/42 cards previously displayed 41, and now display 50 with all 42 cards.
+These deterministic fixtures do not attest to live provider or deployment checks.
+
+Adversarial review also reproduced and corrected inline `<think>` leakage during
+empty-answer recovery, cancellation entering degraded synthesis, and compaction
+dropping a complete image reference from the middle of a result. Final synthesis
+now reuses `ThinkStreamSplitter`; streamed and saved visible text agree. Cancelled
+requests cannot start a recovery call, including the transient retry wait. The
+shared compactor retains complete Markdown image references when they fit its
+existing budget; final image instructions refer only to retained context.
+
+Fresh focused checks on 2026-10-01: agent/session race suites, adjacent
+modelcontext/chat/types suites, Go server build, frontend production build with
+type checking, source manifest, resolution ledger (1601 paths, zero blockers),
+workflow validation and all six upgrade contracts passed. These are local checks;
+this record does not assert that staging or production has been deployed.
+
+The consolidated review passed five adversarial probes after correction.
+Cancellation also preserves already received partial steps and reported usage.
+Frontend stream/timeline/style/toolbar regressions passed 31 checks.
+Follow-up: the existing generic stream path can accept a partial answer after a
+provider stream error; that separate behavior is not changed by this hotfix.

@@ -14,6 +14,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/modelcontext"
 	"github.com/Tencent/WeKnora/internal/models/chat"
+	"github.com/Tencent/WeKnora/internal/searchutil"
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
@@ -101,12 +102,22 @@ func trimCurrentTurnToolResults(
 	}
 
 	var toolIndexes []int
-	total := 0
 	for i := lastUser + 1; i < len(messages); i++ {
 		if messages[i].Role == "tool" {
 			toolIndexes = append(toolIndexes, i)
-			total += estimator.EstimateMessage(&messages[i])
 		}
+	}
+	return trimToolResultMessages(messages, toolIndexes, estimator, budget)
+}
+
+// Final synthesis uses standalone user messages for results, while ReAct uses
+// paired tool messages. Both paths share the same non-mutating compaction.
+func trimToolResultMessages(
+	messages []chat.Message, toolIndexes []int, estimator *agenttoken.Estimator, budget int,
+) ([]chat.Message, bool) {
+	total := 0
+	for _, idx := range toolIndexes {
+		total += estimator.EstimateMessage(&messages[idx])
 	}
 	if total <= budget || len(toolIndexes) == 0 {
 		return messages, false
@@ -157,6 +168,15 @@ func compactToolMessage(msg chat.Message, maxTokens int, estimator *agenttoken.E
 		return base
 	}
 
+	// Keep complete image references even when their surrounding text is in
+	// the omitted middle. Partial image URLs cannot be used in an answer.
+	for _, image := range searchutil.MarkdownImageRegex.FindAllString(msg.Content, -1) {
+		candidate := base
+		candidate.Content += "\n" + image
+		if estimator.EstimateMessage(&candidate) <= maxTokens {
+			base = candidate
+		}
+	}
 	best := base
 	low, high := 1, len(runes)
 	for low <= high {
