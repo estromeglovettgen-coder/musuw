@@ -1,0 +1,34 @@
+# trigger
+name: Task1 final reference/business transplant
+on:
+  push:
+    branches: [task1-source-parity-final]
+    paths:
+      - .github/workflows/_task1_final_reference_business.yml
+permissions:
+  contents: write
+jobs:
+  transplant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: task1-source-parity-final
+          fetch-depth: 0
+      - name: Apply deterministic transplant
+        run: python3 scripts/task1_final_reference_business.py
+      - name: Validate frontend
+        working-directory: weknora/frontend
+        run: |
+          npm ci
+          npm test
+          npm run type-check
+          npm run check-i18n
+          npm run build
+      - name: Commit branch changes
+        run: |
+          git config user.name "musuw-final-parity"
+          git config user.email "actions@users.noreply.github.com"
+          git add weknora/frontend/src/App.vue weknora/frontend/src/components/KBSwitcherDropdown.vue weknora/frontend/src/views/knowledge/KnowledgeBase.vue weknora/frontend/src/views/knowledge/components/DocumentCardView.vue weknora/frontend/src/views/knowledge/components/DocumentListView.vue weknora/frontend/src/views/knowledge/components/DocumentActionMenu.vue weknora/frontend/src/views/knowledge/components/KbFolderTree.vue weknora/frontend/src/views/knowledge/components/KbUploadSourceDropdown.vue weknora/frontend/src/views/knowledge/components/DocumentBatchBar.vue weknora/frontend/src/views/knowledge/components/TagEditDialog.vue
+          git commit -m "fix(ui): restore reference knowledge UI over upstream business" || exit 0
+          git push origin HEAD:task1-source-parity-final
