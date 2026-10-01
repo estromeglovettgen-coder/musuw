@@ -12,6 +12,9 @@ RUN = "35432690027"
 AGENT_CANDIDATE = "1a2cba494b7f9b21ad4fa41185d4b20340d2bb9a"
 AGENT_BASELINE = "13ed3446bb992792b33684fb65da78d57309c6e7"
 AGENT_RUN = "35519086160"
+BUDGET_CANDIDATE = "1fb4617bbbd94f65aab9ba3a0ba8aaf977a87567"
+BUDGET_BASELINE = "627dcce5433ac9e01a4339bfefa600c5e9784d1d"
+BUDGET_RUN = "36908316075"
 
 
 class ReviewedModelRelease(unittest.TestCase):
@@ -33,6 +36,7 @@ class ReviewedModelRelease(unittest.TestCase):
     def test_rejects_another_revision_baseline_or_run(self):
         for candidate, baseline, run in (
             (CANDIDATE, BASELINE, RUN), (AGENT_CANDIDATE, AGENT_BASELINE, AGENT_RUN),
+            (BUDGET_CANDIDATE, BUDGET_BASELINE, BUDGET_RUN),
         ):
             for args in [("main", baseline, run), ("a" * 40, baseline, run),
                          (candidate, "b" * 40, run), (candidate, baseline, "35428477248"),
@@ -45,15 +49,22 @@ class ReviewedModelRelease(unittest.TestCase):
     def test_rejects_mixed_release_tuples(self):
         exact_scopes = {
             (CANDIDATE, BASELINE, RUN), (AGENT_CANDIDATE, AGENT_BASELINE, AGENT_RUN),
+            (BUDGET_CANDIDATE, BUDGET_BASELINE, BUDGET_RUN),
         }
-        for candidate in (CANDIDATE, AGENT_CANDIDATE):
-            for baseline in (BASELINE, AGENT_BASELINE):
-                for run in (RUN, AGENT_RUN):
+        for candidate in (CANDIDATE, AGENT_CANDIDATE, BUDGET_CANDIDATE):
+            for baseline in (BASELINE, AGENT_BASELINE, BUDGET_BASELINE):
+                for run in (RUN, AGENT_RUN, BUDGET_RUN):
                     args = (candidate, baseline, run)
                     if args in exact_scopes:
                         continue
                     with self.subTest(args=args):
                         self.assertNotEqual(self.invoke(*args).returncode, 0)
+
+    def test_exact_budget_hotfix_scope(self):
+        result = self.invoke(BUDGET_CANDIDATE, BUDGET_BASELINE, BUDGET_RUN)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("full_sandbox_e2e=false", result.stdout)
+        self.assertIn("owner_review=required", result.stdout)
 
     def test_rejects_abandoned_branch_candidate_and_staging_run(self):
         abandoned_candidate = "1b2137125a06aeb9eb9a07c6dacd5488d308a33b"

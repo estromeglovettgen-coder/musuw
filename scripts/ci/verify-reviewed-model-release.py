@@ -22,6 +22,11 @@ def main(args):
             "13ed3446bb992792b33684fb65da78d57309c6e7",
             "35519086160",
         ),
+        (
+            "1fb4617bbbd94f65aab9ba3a0ba8aaf977a87567",
+            "627dcce5433ac9e01a4339bfefa600c5e9784d1d",
+            "36908316075",
+        ),
     }
     if tuple(args) not in reviewed:
         print("model release rejected: candidate, production baseline or staging run is not reviewed", file=sys.stderr)
