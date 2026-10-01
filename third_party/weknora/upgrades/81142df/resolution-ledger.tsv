@@ -593,11 +593,11 @@ go.sum	M	M	100644	690884ec91252c905c037bf4907e8829c9b299fa	compose-three-way		ov
 internal/agent/act.go	-	M	100644	0072ff1f0a5f66992491c6f59245173c4de17b63	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/agent/const.go	-	M	100644	a0c8c7bac17ba8f71bebde5bc0b3aa8b09a4d8f1	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
 internal/agent/const_test.go	-	A	100644	b347cde7601c2e7ce6efd221b393433d7bded40d	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
-internal/agent/engine.go	M	M	100644	5afe71cf142bbd6c607a0594b2f9a74ff440bfde	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/agent/engine.go	M	M	100644	7f412f3ce192f9dea68f1fe259466e3816e470a5	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/agent/engine_memory_test.go	-	A	100644	db1a00aa095ec32d6af35a12b2b0490e0e90c7c5	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/agent/engine_test.go	-	M	100644	87c7c661f5a0782b77a563e5d99f3777e7fa934f	adapt-upstream-for-musuw		fixed-target path is present with Musuw product/runtime adaptation
-internal/agent/finalize.go	M	M	100644	de925412b565c4865f9b50613f41e4ab4386aad8	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-internal/agent/observe.go	M	M	100644	b67dcc7c7208f8e909737bb67acb501279fb04cc	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/agent/finalize.go	M	M	100644	5630fc0683f12c66dee1ff3e4248fd2f04d389d7	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
+internal/agent/observe.go	M	M	100644	4f9e45c8a2f91b6afef1464d0dc1f8a3366bf873	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
 internal/agent/observe_test.go	-	M	100644	e920358030fbc54c3704d1395ab7c4a546331b1f	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/agent/prompts.go	-	M	100644	80d158d3514992456748c9052383866ac727dbef	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/agent/prompts_shell_test.go	-	A	100644	8a1fb68234efaff3f463f7bc8b9cd1342375f4ee	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
@@ -1027,7 +1027,7 @@ internal/handler/sandbox_skill.go	-	A	100644	d00b6bd0857cbc4757a09ca3701a479bcca
 internal/handler/sandbox_skill_env_test.go	-	A	100644	644eed7bc42a74745b33c57ddb55cdc1cb64d7be	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/handler/sandbox_skill_test.go	-	A	100644	34b8b8f1b11662801bd90e2ffbb280f04396311b	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/handler/session/agent_stream_handler.go	M	M	100644	831ecf569ecb2fdc2eb12941c30ace30541bd4f5	compose-three-way		overlap review composed target capability with Musuw product semantics at the existing owner
-internal/handler/session/agent_stream_handler_error_test.go	A	-	100644	f224ae6b9a40816766df8dd387caa99bc1948aea	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
+internal/handler/session/agent_stream_handler_error_test.go	A	-	100644	504e8992e01622bb3618b0b76c2fb60341bfecac	adapt-musuw-for-target		audited Musuw path retained and adapted at its existing owner for the target contract
 internal/handler/session/artifact_download.go	-	A	100644	6186bed8b3bea9a895f489d34e805aed08c348cb	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/handler/session/artifact_download_test.go	-	A	100644	e58a1d202b494ff345889551555df249eaed6eac	adopt-upstream-exact		fixed-target upstream-only content is byte-identical
 internal/handler/session/artifact_reference.go	-	A	100644	1152b10bb4c15a5b9f84f869960635cbf1dc04eb	adopt-upstream-exact		fixed-target upstream-only content is byte-identical

@@ -378,9 +378,12 @@ func (e *AgentEngine) executeLoop(
 		// SSE closes at completion. Failures must arrive first, otherwise a
 		// failed synthesis looks like a successful but empty completed turn.
 		if retErr != nil && !errors.Is(retErr, context.Canceled) {
-			e.eventBus.Emit(context.WithoutCancel(ctx), event.Event{
+			_ = e.eventBus.Emit(context.WithoutCancel(ctx), event.Event{
 				ID: generateEventID("error"), Type: event.EventError, SessionID: sessionID,
-				Data: event.ErrorData{Error: retErr.Error(), ErrorCode: openrouter.ErrorCode(retErr), Stage: "agent_execution", SessionID: sessionID},
+				Data: event.ErrorData{
+					Error: retErr.Error(), ErrorCode: openrouter.ErrorCode(retErr),
+					Stage: "agent_execution", SessionID: sessionID,
+				},
 			})
 		}
 		emitCompletion()

@@ -101,7 +101,9 @@ func TestFinalSynthesisRespectsUpstreamContextBudget(t *testing.T) {
 			err := engine.streamFinalAnswerToEventBus(context.Background(), "query", &types.AgentState{}, "session")
 			if tc.wantError {
 				require.ErrorContains(t, err, "cannot fit the user request")
-				require.Len(t, model.opts, 1, "reject an impossible fixed input instead of sending a one-token answer request")
+				require.Len(
+					t, model.opts, 1, "reject an impossible fixed input instead of sending a one-token answer request",
+				)
 				return
 			}
 			require.NoError(t, err)

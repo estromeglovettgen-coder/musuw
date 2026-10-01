@@ -112,7 +112,9 @@ func trimCurrentTurnToolResults(
 
 // Final synthesis uses standalone user messages for results, while ReAct uses
 // paired tool messages. Both paths share the same non-mutating compaction.
-func trimToolResultMessages(messages []chat.Message, toolIndexes []int, estimator *agenttoken.Estimator, budget int) ([]chat.Message, bool) {
+func trimToolResultMessages(
+	messages []chat.Message, toolIndexes []int, estimator *agenttoken.Estimator, budget int,
+) ([]chat.Message, bool) {
 	total := 0
 	for _, idx := range toolIndexes {
 		total += estimator.EstimateMessage(&messages[idx])

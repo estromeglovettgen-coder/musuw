@@ -99,7 +99,8 @@ Now generate the final answer:`, query, imageRequirement)
 	}
 	answerID := generateEventID("answer")
 	for attempt := 0; attempt < 2; attempt++ {
-		logger.Infof(ctx, "[Agent][FinalAnswer] Prepared context: prompt_tokens=%d output_tokens=%d messages=%d attempt=%d",
+		logger.Infof(ctx,
+			"[Agent][FinalAnswer] Prepared context: prompt_tokens=%d output_tokens=%d messages=%d attempt=%d",
 			e.tokenEstimator.EstimateMessages(messages), budget, len(messages), attempt+1)
 		opts := &chat.ChatOptions{
 			Temperature:         e.config.Temperature,
@@ -117,7 +118,7 @@ Now generate the final answer:`, query, imageRequirement)
 				return
 			}
 			visibleAnswer.WriteString(content)
-			e.eventBus.Emit(ctx, event.Event{
+			_ = e.eventBus.Emit(ctx, event.Event{
 				ID: answerID, Type: event.EventAgentFinalAnswer, SessionID: sessionID,
 				Data: event.AgentFinalAnswerData{Content: content},
 			})
@@ -143,7 +144,7 @@ Now generate the final answer:`, query, imageRequirement)
 			state.FinalAnswer = fullAnswer
 			// Emit done only after confirming the stream produced an answer.
 			// Empty/whitespace streams must not stop the frontend before recovery.
-			e.eventBus.Emit(ctx, event.Event{
+			_ = e.eventBus.Emit(ctx, event.Event{
 				ID: answerID, Type: event.EventAgentFinalAnswer, SessionID: sessionID,
 				Data: event.AgentFinalAnswerData{Done: true},
 			})
@@ -159,7 +160,8 @@ Now generate the final answer:`, query, imageRequirement)
 			}
 			logger.Warn(ctx, "[Agent][FinalAnswer] Empty answer; retrying once without reasoning")
 			messages = append([]chat.Message(nil), messages...)
-			messages[len(messages)-1].Content += "\nPlease provide your complete answer now as plain text, not reasoning."
+			messages[len(messages)-1].Content += "\nPlease provide your complete answer now " +
+				"as plain text, not reasoning."
 			messages, budget, err = e.prepareFinalAnswerContext(messages)
 			if err != nil {
 				return err
@@ -187,7 +189,10 @@ func (e *AgentEngine) prepareFinalAnswerContext(messages []chat.Message) ([]chat
 	fixed := []chat.Message{messages[0], messages[1], messages[last]}
 	toolBudget := inputBudget - e.tokenEstimator.EstimateMessages(fixed)
 	if toolBudget < 0 {
-		return nil, 0, fmt.Errorf("final answer context cannot fit the user request and %d output tokens in the %d-token window", budget, e.config.MaxContextTokens)
+		return nil, 0, fmt.Errorf(
+			"final answer context cannot fit the user request and %d output tokens in the %d-token window",
+			budget, e.config.MaxContextTokens,
+		)
 	}
 	indexes := make([]int, 0, max(last-2, 0))
 	for i := 2; i < last; i++ {
@@ -207,7 +212,9 @@ func (e *AgentEngine) prepareFinalAnswerContext(messages []chat.Message) ([]chat
 	}
 	if !hasImage {
 		messages = append([]chat.Message(nil), messages...)
-		messages[len(messages)-1].Content = strings.ReplaceAll(messages[len(messages)-1].Content, finalAnswerImageRequirement(true), "")
+		messages[len(messages)-1].Content = strings.ReplaceAll(
+			messages[len(messages)-1].Content, finalAnswerImageRequirement(true), "",
+		)
 	}
 	return messages, budget, nil
 }
@@ -245,7 +252,7 @@ func (e *AgentEngine) emitCompletionEvent(
 		knowledgeRefsInterface = append(knowledgeRefsInterface, ref)
 	}
 
-	e.eventBus.Emit(ctx, event.Event{
+	_ = e.eventBus.Emit(ctx, event.Event{
 		ID:        generateEventID("complete"),
 		Type:      event.EventAgentComplete,
 		SessionID: sessionID,

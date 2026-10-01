@@ -47,14 +47,26 @@ func TestExecuteLoop_FinalSynthesisReservesOutputWithLongToolHistory(t *testing.
 		return nil
 	})
 
-	result, err := engine.executeLoop(t.Context(), state, "请根据资料整理项目安排", emptyMessages(), nil, "session", "message")
+	result, err := engine.executeLoop(
+		t.Context(), state, "请根据资料整理项目安排", emptyMessages(), nil, "session", "message",
+	)
 	require.NoError(t, err)
 	require.Len(t, model.opts, 1)
 	require.Equal(t, 4096, model.opts[0].MaxCompletionTokens, "input size must not starve final answer output")
-	require.LessOrEqual(t, engine.tokenEstimator.EstimateMessages(model.calls[0])+model.opts[0].MaxCompletionTokens+4096, 24_000)
+	require.LessOrEqual(
+		t, engine.tokenEstimator.EstimateMessages(
+			model.calls[0],
+		)+model.opts[0].MaxCompletionTokens+4096, 24_000,
+	)
 	require.Contains(t, fmt.Sprint(model.calls[0]), latestFact, "retain the newest retrieved evidence")
-	require.Contains(t, fmt.Sprint(model.calls[0]), "请根据资料整理项目安排", "never truncate the user's request")
-	require.Equal(t, original, state.RoundSteps[0].ToolCalls[0].Result.Output, "compaction must not mutate saved tool results")
+	require.Contains(
+		t, fmt.Sprint(
+			model.calls[0],
+		), "请根据资料整理项目安排", "never truncate the user's request",
+	)
+	require.Equal(
+		t, original, state.RoundSteps[0].ToolCalls[0].Result.Output, "compaction must not mutate saved tool results",
+	)
 	require.True(t, result.IsComplete)
 	require.Equal(t, answer, result.FinalAnswer)
 	require.Equal(t, answer, streamed.String())
@@ -65,8 +77,20 @@ func TestExecuteLoop_FinalSynthesisReservesOutputWithLongToolHistory(t *testing.
 
 func TestExecuteLoop_FinalSynthesisRecoversFromReasoningOnly(t *testing.T) {
 	model := &mockChat{responses: []mockResponse{
-		{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeThinking, Content: "reasoning only", Done: true}}},
-		{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeAnswer, Content: "Recovered final answer.", Done: true}}},
+		{
+			chunks: []types.StreamResponse{
+				{
+					ResponseType: types.ResponseTypeThinking, Content: "reasoning only", Done: true,
+				},
+			},
+		},
+		{
+			chunks: []types.StreamResponse{
+				{
+					ResponseType: types.ResponseTypeAnswer, Content: "Recovered final answer.", Done: true,
+				},
+			},
+		},
 	}}
 	engine := newTestEngine(t, model, withMaxIterations(1))
 	var answer strings.Builder
@@ -74,7 +98,11 @@ func TestExecuteLoop_FinalSynthesisRecoversFromReasoningOnly(t *testing.T) {
 		answer.WriteString(evt.Data.(event.AgentFinalAnswerData).Content)
 		return nil
 	})
-	state, err := engine.executeLoop(t.Context(), &types.AgentState{CurrentRound: 1}, "question", emptyMessages(), nil, "session", "message")
+	state, err := engine.executeLoop(
+		t.Context(), &types.AgentState{
+			CurrentRound: 1,
+		}, "question", emptyMessages(), nil, "session", "message",
+	)
 	require.NoError(t, err)
 	require.True(t, state.IsComplete)
 	require.Equal(t, "Recovered final answer.", state.FinalAnswer)
@@ -85,7 +113,13 @@ func TestExecuteLoop_FinalSynthesisRecoversFromReasoningOnly(t *testing.T) {
 }
 
 func TestExecuteLoop_FinalSynthesisEmptyFailsBeforeCompletion(t *testing.T) {
-	response := mockResponse{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeThinking, Content: "reasoning only", Done: true}}}
+	response := mockResponse{
+		chunks: []types.StreamResponse{
+			{
+				ResponseType: types.ResponseTypeThinking, Content: "reasoning only", Done: true,
+			},
+		},
+	}
 	model := &mockChat{responses: []mockResponse{response, response}}
 	engine := newTestEngine(t, model, withMaxIterations(1))
 	var terminal []event.EventType
@@ -95,22 +129,48 @@ func TestExecuteLoop_FinalSynthesisEmptyFailsBeforeCompletion(t *testing.T) {
 			return nil
 		})
 	}
-	state, err := engine.executeLoop(t.Context(), &types.AgentState{CurrentRound: 1}, "question", emptyMessages(), nil, "session", "message")
+	state, err := engine.executeLoop(
+		t.Context(), &types.AgentState{
+			CurrentRound: 1,
+		}, "question", emptyMessages(), nil, "session", "message",
+	)
 	require.Error(t, err, "empty synthesis is not successful completion")
 	require.False(t, state.IsComplete)
-	require.Equal(t, []event.EventType{event.EventError, event.EventAgentComplete}, terminal, "failure must reach the stream before its terminal completion")
+	require.Equal(
+		t, []event.EventType{
+			event.EventError, event.EventAgentComplete,
+		}, terminal, "failure must reach the stream before its terminal completion",
+	)
 	require.Len(t, model.opts, 2, "only one empty-answer recovery attempt is allowed")
 }
 
 func TestExecuteLoop_DegradedSynthesisCannotSucceedWithEmptyAnswer(t *testing.T) {
-	response := mockResponse{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeThinking, Content: "reasoning only", Done: true}}}
+	response := mockResponse{
+		chunks: []types.StreamResponse{
+			{
+				ResponseType: types.ResponseTypeThinking, Content: "reasoning only", Done: true,
+			},
+		},
+	}
 	model := &mockChat{responses: []mockResponse{
-		{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeError, Content: "provider rejected the request", Done: true}}},
+		{
+			chunks: []types.StreamResponse{
+				{
+					ResponseType: types.ResponseTypeError, Content: "provider rejected the request", Done: true,
+				},
+			},
+		},
 		response, response,
 	}}
 	engine := newTestEngine(t, model, withMaxIterations(50))
 	state := &types.AgentState{CurrentRound: 1, RoundSteps: []types.AgentStep{{
-		Iteration: 0, ToolCalls: []types.ToolCall{{Name: "test_lookup", Result: &types.ToolResult{Success: true, Output: "retrieved evidence"}}},
+		Iteration: 0, ToolCalls: []types.ToolCall{
+			{
+				Name: "test_lookup", Result: &types.ToolResult{
+					Success: true, Output: "retrieved evidence",
+				},
+			},
+		},
 	}}}
 	result, err := engine.executeLoop(t.Context(), state, "question", emptyMessages(), nil, "session", "message")
 	require.ErrorContains(t, err, "synthesis also failed")
@@ -120,8 +180,22 @@ func TestExecuteLoop_DegradedSynthesisCannotSucceedWithEmptyAnswer(t *testing.T)
 
 func TestFinalSynthesisReviewInlineThinkingRecoveryDoesNotPolluteStream(t *testing.T) {
 	model := &mockChat{responses: []mockResponse{
-		{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeAnswer, Content: "<thi"}, {ResponseType: types.ResponseTypeAnswer, Content: "nk>private reasoning</think>", Done: true}}},
-		{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeAnswer, Content: "Recovered visible answer.", Done: true}}},
+		{
+			chunks: []types.StreamResponse{
+				{
+					ResponseType: types.ResponseTypeAnswer, Content: "<thi",
+				}, {
+					ResponseType: types.ResponseTypeAnswer, Content: "nk>private reasoning</think>", Done: true,
+				},
+			},
+		},
+		{
+			chunks: []types.StreamResponse{
+				{
+					ResponseType: types.ResponseTypeAnswer, Content: "Recovered visible answer.", Done: true,
+				},
+			},
+		},
 	}}
 	engine := newTestEngine(t, model, withMaxIterations(1))
 	var live strings.Builder
@@ -129,7 +203,11 @@ func TestFinalSynthesisReviewInlineThinkingRecoveryDoesNotPolluteStream(t *testi
 		live.WriteString(evt.Data.(event.AgentFinalAnswerData).Content)
 		return nil
 	})
-	state, err := engine.executeLoop(t.Context(), &types.AgentState{CurrentRound: 1}, "question", emptyMessages(), nil, "session", "message")
+	state, err := engine.executeLoop(
+		t.Context(), &types.AgentState{
+			CurrentRound: 1,
+		}, "question", emptyMessages(), nil, "session", "message",
+	)
 	require.NoError(t, err)
 	require.Equal(t, "Recovered visible answer.", state.FinalAnswer)
 	require.Equal(t, state.FinalAnswer, live.String(), "streamed and saved visible answer must agree")
@@ -141,7 +219,9 @@ type finalSynthesisCancelChat struct {
 	attempts int
 }
 
-func (m *finalSynthesisCancelChat) ChatStream(ctx context.Context, messages []chat.Message, opts *chat.ChatOptions) (<-chan types.StreamResponse, error) {
+func (m *finalSynthesisCancelChat) ChatStream(
+	ctx context.Context, _ []chat.Message, _ *chat.ChatOptions,
+) (<-chan types.StreamResponse, error) {
 	m.attempts++
 	if m.attempts == 1 {
 		m.cancel()
@@ -149,37 +229,104 @@ func (m *finalSynthesisCancelChat) ChatStream(ctx context.Context, messages []ch
 	}
 	return nil, fmt.Errorf("post-cancellation model request: %w", ctx.Err())
 }
+
 func TestFinalSynthesisReviewCancellationDoesNotStartDegradedSynthesis(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	model := &finalSynthesisCancelChat{mockChat: &mockChat{}, cancel: cancel}
 	engine := newTestEngine(t, model, withMaxIterations(50))
-	state := &types.AgentState{CurrentRound: 1, RoundSteps: []types.AgentStep{{Iteration: 0, ToolCalls: []types.ToolCall{{Name: "test_lookup", Result: &types.ToolResult{Success: true, Output: "saved evidence"}}}}}}
+	state := &types.AgentState{
+		CurrentRound: 1, RoundSteps: []types.AgentStep{
+			{
+				Iteration: 0, ToolCalls: []types.ToolCall{
+					{
+						Name: "test_lookup", Result: &types.ToolResult{
+							Success: true, Output: "saved evidence",
+						},
+					},
+				},
+			},
+		},
+	}
 	_, err := engine.executeLoop(ctx, state, "question", emptyMessages(), nil, "session", "message")
 	require.ErrorIs(t, err, context.Canceled)
 	require.Equal(t, 1, model.attempts, "user stop must not initiate a new model request")
 }
+
 func TestFinalSynthesisReviewCompactionPreservesCompleteRetrievedImage(t *testing.T) {
 	const imageURL = "https://review.invalid/only-relevant-image.png"
 	const image = "![only relevant image](" + imageURL + ")"
-	output := strings.Repeat("middle evidence padding ", 9000) + image + strings.Repeat("trailing evidence padding ", 9000)
-	model := &mockChat{responses: []mockResponse{{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeAnswer, Content: "answer", Done: true}}}}}
-	engine := newTestEngine(t, model, withMaxIterations(1), func(cfg *types.AgentConfig) { cfg.MaxContextTokens = 24000 })
-	state := &types.AgentState{CurrentRound: 1, RoundSteps: []types.AgentStep{{Iteration: 0, ToolCalls: []types.ToolCall{{Name: "test_lookup", Result: &types.ToolResult{Success: true, Output: output}}}}}}
-	_, err := engine.executeLoop(t.Context(), state, "show the relevant image", emptyMessages(), nil, "session", "message")
+	output := strings.Repeat(
+		"middle evidence padding ", 9000,
+	) + image + strings.Repeat(
+		"trailing evidence padding ", 9000,
+	)
+	model := &mockChat{
+		responses: []mockResponse{
+			{
+				chunks: []types.StreamResponse{
+					{
+						ResponseType: types.ResponseTypeAnswer, Content: "answer", Done: true,
+					},
+				},
+			},
+		},
+	}
+	engine := newTestEngine(
+		t, model, withMaxIterations(
+			1,
+		), func(cfg *types.AgentConfig) { cfg.MaxContextTokens = 24000 },
+	)
+	state := &types.AgentState{
+		CurrentRound: 1, RoundSteps: []types.AgentStep{
+			{
+				Iteration: 0, ToolCalls: []types.ToolCall{
+					{
+						Name: "test_lookup", Result: &types.ToolResult{
+							Success: true, Output: output,
+						},
+					},
+				},
+			},
+		},
+	}
+	_, err := engine.executeLoop(
+		t.Context(), state, "show the relevant image", emptyMessages(), nil, "session", "message",
+	)
 	require.NoError(t, err)
 	got := fmt.Sprint(model.calls[0])
 	require.Contains(t, got, "MUST include at least one relevant Markdown image")
 	require.Contains(t, got, image, "the model must receive a complete image to fulfill the preserved requirement")
 	require.Equal(t, output, state.RoundSteps[0].ToolCalls[0].Result.Output)
 }
+
 func TestFinalSynthesisReviewRecoveryUsageIsAccumulative(t *testing.T) {
 	model := &mockChat{responses: []mockResponse{
-		{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeThinking, Content: "reason", Done: true, Usage: &types.TokenUsage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30}}}},
-		{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeAnswer, Content: "answer", Done: true, Usage: &types.TokenUsage{PromptTokens: 40, CompletionTokens: 50, TotalTokens: 90}}}},
+		{
+			chunks: []types.StreamResponse{
+				{
+					ResponseType: types.ResponseTypeThinking, Content: "reason", Done: true, Usage: &types.TokenUsage{
+						PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30,
+					},
+				},
+			},
+		},
+		{
+			chunks: []types.StreamResponse{
+				{
+					ResponseType: types.ResponseTypeAnswer, Content: "answer", Done: true, Usage: &types.TokenUsage{
+						PromptTokens: 40, CompletionTokens: 50, TotalTokens: 90,
+					},
+				},
+			},
+		},
 	}}
 	engine := newTestEngine(t, model, withMaxIterations(1))
-	state, err := engine.executeLoop(t.Context(), &types.AgentState{CurrentRound: 1}, "question", emptyMessages(), nil, "session", "message")
+	state, err := engine.executeLoop(
+		t.Context(), &types.AgentState{
+			CurrentRound: 1,
+		}, "question", emptyMessages(), nil, "session", "message",
+	)
 	require.NoError(t, err)
 	require.Equal(t, 120, state.TurnUsage.TotalTokens)
 	require.Equal(t, 50, state.TurnUsage.PromptTokens)
@@ -191,16 +338,47 @@ type finalSynthesisPartialCancelChat struct {
 	cancel context.CancelFunc
 }
 
-func (m *finalSynthesisPartialCancelChat) ChatStream(ctx context.Context, messages []chat.Message, opts *chat.ChatOptions) (<-chan types.StreamResponse, error) {
+func (m *finalSynthesisPartialCancelChat) ChatStream(
+	ctx context.Context, messages []chat.Message, opts *chat.ChatOptions,
+) (<-chan types.StreamResponse, error) {
 	m.cancel()
 	return m.mockChat.ChatStream(ctx, messages, opts)
 }
+
 func TestFinalSynthesisReviewCancellationPreservesPartialStepAndUsage(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	model := &finalSynthesisPartialCancelChat{mockChat: &mockChat{responses: []mockResponse{{chunks: []types.StreamResponse{{ResponseType: types.ResponseTypeAnswer, Content: "partial work before stop", Done: true, Usage: &types.TokenUsage{PromptTokens: 100, CompletionTokens: 20, TotalTokens: 120}}}}}}, cancel: cancel}
+	model := &finalSynthesisPartialCancelChat{
+		mockChat: &mockChat{
+			responses: []mockResponse{
+				{
+					chunks: []types.StreamResponse{
+						{
+							ResponseType: types.ResponseTypeAnswer,
+							Content:      "partial work before stop",
+							Done:         true, Usage: &types.TokenUsage{
+								PromptTokens: 100, CompletionTokens: 20, TotalTokens: 120,
+							},
+						},
+					},
+				},
+			},
+		}, cancel: cancel,
+	}
 	engine := newTestEngine(t, model, withMaxIterations(50))
-	state := &types.AgentState{CurrentRound: 1, RoundSteps: []types.AgentStep{{Iteration: 0, ToolCalls: []types.ToolCall{{Name: "test_lookup", Result: &types.ToolResult{Success: true, Output: "saved evidence"}}}}}}
+	state := &types.AgentState{
+		CurrentRound: 1, RoundSteps: []types.AgentStep{
+			{
+				Iteration: 0, ToolCalls: []types.ToolCall{
+					{
+						Name: "test_lookup", Result: &types.ToolResult{
+							Success: true, Output: "saved evidence",
+						},
+					},
+				},
+			},
+		},
+	}
 	result, _ := engine.executeLoop(ctx, state, "question", emptyMessages(), nil, "session", "message")
 	require.False(t, result.IsComplete)
 	require.Empty(t, result.FinalAnswer)
