@@ -79,11 +79,11 @@ func TestFinalSynthesisRespectsUpstreamContextBudget(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		remaining int
-		want      int
+		wantError bool
 	}{
-		{name: "ample_space", remaining: 10000, want: 4096},
-		{name: "limited_space", remaining: 128, want: 128},
-		{name: "exhausted_space", remaining: -100, want: 1},
+		{name: "ample_space", remaining: 10000},
+		{name: "limited_space", remaining: 128, wantError: true},
+		{name: "exhausted_space", remaining: -100, wantError: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			response := mockResponse{chunks: []types.StreamResponse{{
@@ -98,10 +98,15 @@ func TestFinalSynthesisRespectsUpstreamContextBudget(t *testing.T) {
 			// synthesis prompt; the remaining output allowance is the fixture.
 			promptTokens := engine.tokenEstimator.EstimateMessages(model.calls[0])
 			engine.config.MaxContextTokens = promptTokens + 4096 + tc.remaining
-			require.NoError(t, engine.streamFinalAnswerToEventBus(
-				context.Background(), "query", &types.AgentState{}, "session"))
-			require.Equal(t, tc.want, model.opts[1].MaxTokens)
-			require.Equal(t, tc.want, model.opts[1].MaxCompletionTokens)
+			err := engine.streamFinalAnswerToEventBus(context.Background(), "query", &types.AgentState{}, "session")
+			if tc.wantError {
+				require.ErrorContains(t, err, "cannot fit the user request")
+				require.Len(t, model.opts, 1, "reject an impossible fixed input instead of sending a one-token answer request")
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, 4096, model.opts[1].MaxTokens)
+			require.Equal(t, 4096, model.opts[1].MaxCompletionTokens)
 		})
 	}
 }

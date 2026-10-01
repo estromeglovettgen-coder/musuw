@@ -1712,13 +1712,25 @@ const intermediateStepsCount = computed(() => {
   ).length;
 });
 
-// Number of reasoning rounds (thinking cards) and tool invocations. We report
-// these separately instead of summing them into one opaque "step" count, which
-// over-counts what the user perceives as agent loops (a single loop emits one
-// thinking card plus its tool calls).
+// Execution rounds are independent of timeline cards: adjacent thinking events
+// can merge, and answer duplicates can disappear from the visible steps.
 const reasoningRoundsCount = computed(() => {
   if (!hasAnswerStarted.value && !isConversationDone.value) return 0;
-  return intermediateEvents.value.filter((e: any) => e.type === 'thinking').length;
+  const stream = eventStream.value || [];
+  const completed = stream.find((e: any) => e.type === 'agent_complete');
+  if (Number.isInteger(completed?.total_steps) && completed.total_steps >= 0) {
+    return completed.total_steps;
+  }
+  const steps = props.session.agent_steps;
+  if (Array.isArray(steps) && steps.length > 0) {
+    // Persisted AgentStep.iteration is zero-based, including rounds with no
+    // reasoning text. Older records without iteration still retain each step.
+    const rounds = steps.reduce((count, step) => Number.isInteger(step?.iteration) && step.iteration >= 0
+      ? Math.max(count, step.iteration + 1) : count, 0);
+    return rounds || steps.length;
+  }
+  return new Set(stream.filter((e: any) => e.type === 'thinking')
+    .map((e: any, index: number) => e.event_id || index)).size;
 });
 
 const toolCallsCount = computed(() => {
@@ -1920,34 +1932,15 @@ const buildFullEventList = (stream: any[]) => {
   });
 };
 
-// IDs of thinking events that should NOT be rendered in the intermediate-
-// steps tree because their content is already shown as the final answer.
-// Two cases produce duplicates:
-//   1. `promotedThinkingEventId` — agent loop ended via natural-stop with
-//      no answer event at all; we promote the trailing thinking into a
-//      virtual answer card (see displayEvents) and must hide the source
-//      thinking from the tree.
-//   2. Natural-stop path on the backend streams answer chunks as thought
-//      events first, then re-emits the *same* content as one big answer
-//      event. The merged thinking event in the tree would duplicate the
-//      answer card, so detect content-equivalence and hide it.
+// Hide thinking cards only when a real answer already displays the same text.
+// Do not depend on finalContent here: it reads the collapsed tree state, which
+// itself depends on these visible intermediate events.
 const hiddenThinkingEventIds = computed<Set<string>>(() => {
   const hidden = new Set<string>();
   const stream = eventStream.value;
   if (!stream || !Array.isArray(stream)) return hidden;
 
-  // Case 1: trailing thinking promoted to answer (no answer events present).
-  const final = finalContent.value;
-  if (final && final.type === 'thinking') {
-    const hasRealAnswer = stream.some(
-      (e: any) => e.type === 'answer' && !e.superseded && e.content && e.content.trim()
-    );
-    if (!hasRealAnswer && final.event_id) {
-      hidden.add(final.event_id);
-    }
-  }
-
-  // Case 2: natural-stop duplicates — answer events carry the same content
+  // Natural-stop duplicates — answer events carry the same content
   // already streamed as thinking chunks. Compare merged thinking events
   // against the concatenated answer content and hide on match. Superseded
   // preambles are excluded: they are the retracted tool-round narration, not

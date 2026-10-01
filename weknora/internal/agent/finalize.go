@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	agenttools "github.com/Tencent/WeKnora/internal/agent/tools"
@@ -92,85 +93,130 @@ Now generate the final answer:`, query, imageRequirement)
 		Content: finalPrompt,
 	})
 
-	// Generate a single ID for this entire final answer stream
+	messages, budget, err := e.prepareFinalAnswerContext(messages)
+	if err != nil {
+		return err
+	}
 	answerID := generateEventID("answer")
-	logger.Debugf(ctx, "[Agent][FinalAnswer] AnswerID: %s", answerID)
-	answerDoneEmitted := false
-
-	budget := e.clampCompletionBudgetToContext(e.tokenEstimator.EstimateMessages(messages))
-	llmResult, err := e.streamLLMToEventBus(
-		ctx,
-		messages,
-		&chat.ChatOptions{
+	for attempt := 0; attempt < 2; attempt++ {
+		logger.Infof(ctx, "[Agent][FinalAnswer] Prepared context: prompt_tokens=%d output_tokens=%d messages=%d attempt=%d",
+			e.tokenEstimator.EstimateMessages(messages), budget, len(messages), attempt+1)
+		opts := &chat.ChatOptions{
 			Temperature:         e.config.Temperature,
 			MaxTokens:           budget,
 			MaxCompletionTokens: budget,
-		},
-		func(chunk *types.StreamResponse, fullContent string) {
-			// Defensive filter: only emit answer content, skip thinking chunks
+		}
+		if attempt > 0 {
+			thinking := false
+			opts.Thinking = &thinking
+		}
+		splitter := agenttools.NewThinkStreamSplitter()
+		var visibleAnswer strings.Builder
+		emitAnswer := func(content string) {
+			if content == "" || (visibleAnswer.Len() == 0 && strings.TrimSpace(content) == "") {
+				return
+			}
+			visibleAnswer.WriteString(content)
+			e.eventBus.Emit(ctx, event.Event{
+				ID: answerID, Type: event.EventAgentFinalAnswer, SessionID: sessionID,
+				Data: event.AgentFinalAnswerData{Content: content},
+			})
+		}
+		llmResult, err := e.streamLLMToEventBus(ctx, messages, opts, func(chunk *types.StreamResponse, _ string) {
 			if chunk.ResponseType == types.ResponseTypeThinking {
 				return
 			}
-			if chunk.Content != "" {
-				logger.Debugf(ctx, "[Agent][FinalAnswer] Emitting answer chunk: %d chars", len(chunk.Content))
-				e.eventBus.Emit(ctx, event.Event{
-					ID:        answerID,
-					Type:      event.EventAgentFinalAnswer,
-					SessionID: sessionID,
-					Data: event.AgentFinalAnswerData{
-						Content: chunk.Content,
-						Done:    chunk.Done,
-					},
-				})
-				if chunk.Done {
-					answerDoneEmitted = true
-				}
+			_, answer := splitter.Feed(chunk.Content)
+			emitAnswer(answer)
+		})
+		// Count recovery calls too; their usage is still part of this turn.
+		if llmResult != nil && llmResult.Usage != nil {
+			state.TurnUsage.Accumulate(*llmResult.Usage)
+		}
+		if err != nil {
+			return fmt.Errorf("final answer generation failed: %w", err)
+		}
+		_, tail := splitter.Flush()
+		emitAnswer(tail)
+		fullAnswer := visibleAnswer.String()
+		if strings.TrimSpace(fullAnswer) != "" {
+			state.FinalAnswer = fullAnswer
+			// Emit done only after confirming the stream produced an answer.
+			// Empty/whitespace streams must not stop the frontend before recovery.
+			e.eventBus.Emit(ctx, event.Event{
+				ID: answerID, Type: event.EventAgentFinalAnswer, SessionID: sessionID,
+				Data: event.AgentFinalAnswerData{Done: true},
+			})
+			common.PipelineInfo(ctx, "Agent", "final_answer_done", map[string]interface{}{
+				"session_id": sessionID, "answer_len": len(fullAnswer),
+			})
+			return nil
+		}
+
+		if attempt == 0 {
+			if ctx.Err() != nil {
+				return ctx.Err()
 			}
-		},
-	)
-	if err != nil {
-		logger.Errorf(ctx, "[Agent][FinalAnswer] Final answer generation failed: %v", err)
-		common.PipelineError(ctx, "Agent", "final_answer_stream_failed", map[string]interface{}{
-			"session_id": sessionID,
-			"error":      err.Error(),
-		})
-		return err
+			logger.Warn(ctx, "[Agent][FinalAnswer] Empty answer; retrying once without reasoning")
+			messages = append([]chat.Message(nil), messages...)
+			messages[len(messages)-1].Content += "\nPlease provide your complete answer now as plain text, not reasoning."
+			messages, budget, err = e.prepareFinalAnswerContext(messages)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return fmt.Errorf("final answer generation returned no visible content after recovery")
+}
+
+// Reserve the configured answer budget before fitting retrieved content into
+// the remaining window. Shrinking output to one token cannot produce an answer.
+// Only result messages may be compacted/dropped; never truncate the user's
+// request, system instructions, or the final-answer instructions.
+func (e *AgentEngine) prepareFinalAnswerContext(messages []chat.Message) ([]chat.Message, int, error) {
+	budget := e.getCompletionTokenBudget()
+	if e.config.MaxContextTokens <= 0 {
+		return messages, budget, nil
+	}
+	inputBudget := e.config.MaxContextTokens - contextSafetyTokens - budget
+	if e.tokenEstimator.EstimateMessages(messages) <= inputBudget {
+		return messages, budget, nil
 	}
 
-	if !answerDoneEmitted {
-		e.eventBus.Emit(ctx, event.Event{
-			ID:        answerID,
-			Type:      event.EventAgentFinalAnswer,
-			SessionID: sessionID,
-			Data: event.AgentFinalAnswerData{
-				Content: "",
-				Done:    true,
-			},
-		})
+	last := len(messages) - 1
+	fixed := []chat.Message{messages[0], messages[1], messages[last]}
+	toolBudget := inputBudget - e.tokenEstimator.EstimateMessages(fixed)
+	if toolBudget < 0 {
+		return nil, 0, fmt.Errorf("final answer context cannot fit the user request and %d output tokens in the %d-token window", budget, e.config.MaxContextTokens)
 	}
-
-	// The synthesis call is often the largest of the turn — fold its usage
-	// into the turn aggregate like every ReAct round.
-	if llmResult.Usage != nil {
-		state.TurnUsage.Accumulate(*llmResult.Usage)
+	indexes := make([]int, 0, max(last-2, 0))
+	for i := 2; i < last; i++ {
+		indexes = append(indexes, i)
 	}
-
-	// Safety net: strip any residual <think> blocks that may have leaked through
-	fullAnswer := agenttools.StripThinkBlocks(llmResult.Content)
-	logger.Infof(ctx, "[Agent][FinalAnswer] Final answer generated: %d characters", len(fullAnswer))
-	common.PipelineInfo(ctx, "Agent", "final_answer_done", map[string]interface{}{
-		"session_id": sessionID,
-		"answer_len": len(fullAnswer),
-	})
-	state.FinalAnswer = fullAnswer
-	return nil
+	messages, _ = trimToolResultMessages(messages, indexes, e.tokenEstimator, toolBudget)
+	// Even compact markers have a cost. If they alone exceed the remaining
+	// window, omit oldest standalone results until the fixed input fits.
+	for len(messages) > 3 && e.tokenEstimator.EstimateMessages(messages) > inputBudget {
+		messages = append(append([]chat.Message(nil), messages[:2]...), messages[3:]...)
+	}
+	// Image instructions must describe the context actually sent, not an
+	// image that existed only in an omitted result.
+	hasImage := false
+	for _, msg := range messages[2 : len(messages)-1] {
+		hasImage = hasImage || searchutil.MarkdownImageRegex.MatchString(msg.Content)
+	}
+	if !hasImage {
+		messages = append([]chat.Message(nil), messages...)
+		messages[len(messages)-1].Content = strings.ReplaceAll(messages[len(messages)-1].Content, finalAnswerImageRequirement(true), "")
+	}
+	return messages, budget, nil
 }
 
 // handleMaxIterations generates a final answer when the agent loop exhausted all iterations
 // without the LLM producing a natural stop. It marks state.IsComplete = true.
 func (e *AgentEngine) handleMaxIterations(
 	ctx context.Context, query string, state *types.AgentState, sessionID string,
-) {
+) error {
 	logger.Info(ctx, "Reached max iterations, generating final answer")
 	common.PipelineWarn(ctx, "Agent", "max_iterations_reached", map[string]interface{}{
 		"iterations": state.CurrentRound,
@@ -183,9 +229,10 @@ func (e *AgentEngine) handleMaxIterations(
 		common.PipelineError(ctx, "Agent", "final_answer_failed", map[string]interface{}{
 			"error": err.Error(),
 		})
-		state.FinalAnswer = "Sorry, I was unable to generate a complete answer."
+		return err
 	}
 	state.IsComplete = true
+	return nil
 }
 
 // emitCompletionEvent emits the EventAgentComplete event with execution summary.

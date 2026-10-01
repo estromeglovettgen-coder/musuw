@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -432,15 +433,36 @@ func (e *AgentEngine) callLLMWithRetry(
 	messages = agenttools.SanitizeMessages(messages)
 
 	response, err := e.streamThinkingToEventBus(ctx, messages, tools, iteration, sessionID)
+	if ctx.Err() != nil {
+		if response != nil {
+			return response, nil // Preserve stopped round content and reported usage.
+		}
+		return nil, ctx.Err()
+	}
+	if err != nil && errors.Is(err, context.Canceled) {
+		return nil, err
+	}
 	if err != nil && isTransientError(err) {
 		// Retry transient errors (timeout, rate limit, server errors) up to maxLLMRetries times
 		for retry := 1; retry <= maxLLMRetries; retry++ {
 			retryDelay := time.Duration(retry) * time.Second
 			logger.Warnf(ctx, "[Agent][Round-%d] LLM transient error (attempt %d/%d), retrying in %v: %v",
 				round, retry, maxLLMRetries, retryDelay, err)
-			time.Sleep(retryDelay)
+			timer := time.NewTimer(retryDelay)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return nil, ctx.Err()
+			case <-timer.C:
+			}
 
 			response, err = e.streamThinkingToEventBus(ctx, messages, tools, iteration, sessionID)
+			if ctx.Err() != nil {
+				if response != nil {
+					return response, nil
+				}
+				return nil, ctx.Err()
+			}
 			if err == nil || !isTransientError(err) {
 				break
 			}

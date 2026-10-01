@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -286,17 +287,6 @@ func (e *AgentEngine) Execute(
 	_, err := e.executeLoop(ctx, state, query, messages, tools, sessionID, messageID)
 	if err != nil {
 		logger.Errorf(ctx, "[Agent] Execution failed: %v", err)
-		e.eventBus.Emit(ctx, event.Event{
-			ID:        generateEventID("error"),
-			Type:      event.EventError,
-			SessionID: sessionID,
-			Data: event.ErrorData{
-				Error:     err.Error(),
-				ErrorCode: openrouter.ErrorCode(err),
-				Stage:     "agent_execution",
-				SessionID: sessionID,
-			},
-		})
 		finishAgentSpan(agentSpan, state, err)
 		return nil, err
 	}
@@ -363,7 +353,7 @@ func (e *AgentEngine) executeLoop(
 	tools []chat.Tool,
 	sessionID string,
 	messageID string,
-) (*types.AgentState, error) {
+) (result *types.AgentState, retErr error) {
 	startTime := time.Now()
 	common.PipelineInfo(ctx, "Agent", "loop_start", map[string]interface{}{
 		"max_iterations": e.config.MaxIterations,
@@ -384,7 +374,17 @@ func (e *AgentEngine) executeLoop(
 		completionEmitted = true
 		e.emitCompletionEvent(context.WithoutCancel(ctx), state, sessionID, messageID, startTime)
 	}
-	defer emitCompletion()
+	defer func() {
+		// SSE closes at completion. Failures must arrive first, otherwise a
+		// failed synthesis looks like a successful but empty completed turn.
+		if retErr != nil && !errors.Is(retErr, context.Canceled) {
+			e.eventBus.Emit(context.WithoutCancel(ctx), event.Event{
+				ID: generateEventID("error"), Type: event.EventError, SessionID: sessionID,
+				Data: event.ErrorData{Error: retErr.Error(), ErrorCode: openrouter.ErrorCode(retErr), Stage: "agent_execution", SessionID: sessionID},
+			})
+		}
+		emitCompletion()
+	}()
 
 	emptyRetries := 0
 	consecutiveSameContent := 0
@@ -396,13 +396,6 @@ loop:
 		case <-ctx.Done():
 			logger.Warnf(ctx, "[Agent] Context cancelled at round %d: %v",
 				state.CurrentRound+1, ctx.Err())
-			// Try to salvage existing results
-			if totalTC := countTotalToolCalls(state.RoundSteps); totalTC > 0 {
-				logger.Infof(ctx, "[Agent] Synthesizing final answer from %d existing tool results",
-					totalTC)
-				_ = e.streamFinalAnswerToEventBus(ctx, query, state, sessionID)
-				state.IsComplete = true
-			}
 			return state, ctx.Err()
 		default:
 		}
@@ -433,7 +426,9 @@ loop:
 	// complete answer." message, which then leaks to the UI as the final
 	// answer for a conversation the user deliberately stopped.
 	if !state.IsComplete && ctx.Err() == nil {
-		e.handleMaxIterations(ctx, query, state, sessionID)
+		if err := e.handleMaxIterations(ctx, query, state, sessionID); err != nil {
+			return state, err
+		}
 	}
 
 	return state, nil

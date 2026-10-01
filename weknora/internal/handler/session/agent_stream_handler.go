@@ -561,6 +561,18 @@ func (h *AgentStreamHandler) handleError(ctx context.Context, evt event.Event) e
 		return nil
 	}
 
+	// Completion persists the message after this terminal error. Store a
+	// visible failure now so reloading cannot turn a failed synthesis blank.
+	h.mu.Lock()
+	if h.assistantMessage != nil && strings.TrimSpace(h.assistantMessage.Content) == "" {
+		h.assistantMessage.Content = "Generation failed. Please try again."
+		if strings.HasPrefix(types.LanguageFromContextOrDefault(ctx), "zh") {
+			h.assistantMessage.Content = "生成失败，请重试。"
+		}
+		h.assistantMessage.IsFallback = true
+	}
+	h.mu.Unlock()
+
 	// Build error metadata
 	metadata := map[string]interface{}{
 		"stage": data.Stage,
